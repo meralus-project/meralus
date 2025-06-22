@@ -1,11 +1,15 @@
-use glam::{DVec3, Vec2, Vec3, vec2, vec3};
-use glamour::ToRaw;
-use glium::{buffer::ReadError, pixel_buffer::PixelBuffer};
+use glam::{DVec3, Vec2, Vec3, ivec3, vec2, vec3};
 use meralus_engine::KeyCode;
 use meralus_shared::{Color, Cube3D};
-use meralus_world::Face;
+use meralus_world::{ChunkManager, Face};
 
-use crate::{Camera, KeyboardController, renderers::Line};
+use crate::{
+    Aabb, BakedBlockModelLoader, Camera, KeyboardController,
+    loaders::BakedBlockModel,
+    raycast::{HitType, RayCastResult},
+    renderers::Line,
+    world::Colliders,
+};
 
 const AMBIENT_OCCLUSION_VALUES: [f32; 4] = [0.4, 0.55, 0.75, 1.0];
 
@@ -82,26 +86,6 @@ impl AsColor for Vec3 {
         }
 
         Color::BLACK
-    }
-}
-
-pub trait BufferExt {
-    fn read_flatten(&self) -> Result<Vec<u8>, ReadError>;
-}
-
-impl BufferExt for PixelBuffer<(u8, u8, u8, u8)> {
-    fn read_flatten(&self) -> Result<Vec<u8>, ReadError> {
-        let mut pixels = Vec::with_capacity(self.len() * 4);
-        let buffer = self.read()?;
-
-        for (a, b, c, d) in buffer {
-            pixels.push(a);
-            pixels.push(b);
-            pixels.push(c);
-            pixels.push(d);
-        }
-
-        Ok(pixels)
     }
 }
 
@@ -250,4 +234,281 @@ pub fn cube_outline(Cube3D { origin, size }: Cube3D) -> [Line; 12] {
             Color::BLUE,
         )
     })
+}
+
+pub trait ChunkManagerPhysics {
+    fn collides(&self, aabb: Aabb) -> bool;
+    fn get_colliders(&self, collider_position: DVec3, aabb: Aabb) -> Colliders;
+    fn raycast(
+        &self,
+        models: &BakedBlockModelLoader,
+        origin: DVec3,
+        target: DVec3,
+        last_uncollidable_block: bool,
+    ) -> Option<RayCastResult>;
+
+    fn get_model_for<'a>(
+        &self,
+        models: &'a BakedBlockModelLoader,
+        position: Vec3,
+    ) -> Option<&'a BakedBlockModel>;
+}
+
+fn raycast_into(position: Vec3, start: DVec3, end: DVec3, aabb: Aabb) -> Option<RayCastResult> {
+    aabb.calculate_intercept(start - position.as_dvec3(), end - position.as_dvec3())
+        .map(|raytraceresult| {
+            RayCastResult::new3(
+                raytraceresult.hit_vec + position.as_dvec3(),
+                raytraceresult.hit_side,
+                position,
+            )
+        })
+}
+
+impl ChunkManagerPhysics for ChunkManager {
+    fn collides(&self, aabb: Aabb) -> bool {
+        let min = aabb.min.floor().as_ivec3().to_array();
+        let max = aabb.max.ceil().as_ivec3().to_array();
+
+        for y in min[1]..max[1] {
+            for z in min[2]..max[2] {
+                for x in min[0]..max[0] {
+                    let position = ivec3(x, y, z).as_dvec3();
+
+                    if self.contains_block(position.as_vec3()) {
+                        let block = Aabb::new(position, position + DVec3::ONE);
+
+                        if aabb.intersects_with_x(block)
+                            && aabb.intersects_with_y(block)
+                            && aabb.intersects_with_z(block)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    fn get_colliders(&self, collider_position: DVec3, aabb: Aabb) -> Colliders {
+        let min = aabb.min.floor().as_ivec3().to_array();
+        let max = aabb.max.ceil().as_ivec3().to_array();
+
+        let mut colliders = Colliders::default();
+
+        for y in min[1]..max[1] {
+            for z in min[2]..max[2] {
+                for x in min[0]..max[0] {
+                    let position = ivec3(x, y, z).as_dvec3();
+
+                    if self.contains_block(position.as_vec3()) {
+                        let block = Aabb::new(position, position + DVec3::ONE);
+
+                        if aabb.intersects_with_x(block)
+                            && aabb.intersects_with_y(block)
+                            && aabb.intersects_with_z(block)
+                        {
+                            let colliding_position = position - collider_position.floor();
+
+                            if colliding_position.x < 0.0 {
+                                colliders.left = Some(position);
+                            } else if colliding_position.x > 0.0 {
+                                colliders.right = Some(position);
+                            } else if colliding_position.y < 0.0 {
+                                colliders.bottom = Some(position);
+                            } else if colliding_position.y > 0.0 {
+                                colliders.top = Some(position);
+                            } else if colliding_position.z < 0.0 {
+                                colliders.back = Some(position);
+                            } else if colliding_position.z > 0.0 {
+                                colliders.front = Some(position);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        colliders
+    }
+
+    fn raycast(
+        &self,
+        models: &BakedBlockModelLoader,
+        mut origin: DVec3,
+        target: DVec3,
+        last_uncollidable_block: bool,
+    ) -> Option<RayCastResult> {
+        if origin.is_nan() || target.is_nan() {
+            None
+        } else {
+            let mut start = origin.floor();
+            let end = target.floor();
+
+            let mut position = start.as_vec3();
+            let block = self.get_model_for(models, position);
+
+            if let Some(block) = block {
+                let result = raycast_into(position, origin, target, Aabb::from(block.bounding_box));
+
+                if result.is_some() {
+                    return result;
+                }
+            }
+
+            let mut result: Option<RayCastResult> = None;
+
+            for _ in 0..200 {
+                if origin.is_nan() {
+                    return None;
+                }
+
+                if (start.x - end.x).abs() < 0.0001
+                    && (start.y - end.y).abs() < 0.0001
+                    && (start.z - end.z).abs() < 0.0001
+                {
+                    return if last_uncollidable_block {
+                        result
+                    } else {
+                        None
+                    };
+                }
+
+                let mut modify_d3 = true;
+                let mut modify_d4 = true;
+                let mut modify_d5 = true;
+
+                let mut d0 = 999.0f64;
+                let mut d1 = 999.0f64;
+                let mut d2 = 999.0f64;
+
+                if end.x > start.x {
+                    d0 = start.x + 1.0;
+                } else if end.x < start.x {
+                    d0 = start.x + 0.0;
+                } else {
+                    modify_d3 = false;
+                }
+
+                if end.y > start.y {
+                    d1 = start.y + 1.0;
+                } else if end.y < start.y {
+                    d1 = start.y + 0.0;
+                } else {
+                    modify_d4 = false;
+                }
+
+                if end.z > start.z {
+                    d2 = start.z + 1.0;
+                } else if end.z < start.z {
+                    d2 = start.z + 0.0;
+                } else {
+                    modify_d5 = false;
+                }
+
+                let mut d3 = 999.0f64;
+                let mut d4 = 999.0f64;
+                let mut d5 = 999.0f64;
+
+                let d6 = target.x - origin.x;
+                let d7 = target.y - origin.y;
+                let d8 = target.z - origin.z;
+
+                if modify_d3 {
+                    d3 = (d0 - origin.x) / d6;
+                }
+
+                if modify_d4 {
+                    d4 = (d1 - origin.y) / d7;
+                }
+
+                if modify_d5 {
+                    d5 = (d2 - origin.z) / d8;
+                }
+
+                if d3 == -0.0 {
+                    d3 = -0.0001;
+                }
+
+                if d4 == -0.0 {
+                    d4 = -0.0001;
+                }
+
+                if d5 == -0.0 {
+                    d5 = -0.0001;
+                }
+
+                let facing_at = if d3 < d4 && d3 < d5 {
+                    origin = DVec3::new(d0, d7.mul_add(d3, origin.y), d8.mul_add(d3, origin.z));
+
+                    if end.x > start.x {
+                        Face::Left
+                    } else {
+                        Face::Right
+                    }
+                } else if d4 < d5 {
+                    origin = DVec3::new(d6.mul_add(d4, origin.x), d1, d8.mul_add(d4, origin.z));
+
+                    if end.y > start.y {
+                        Face::Bottom
+                    } else {
+                        Face::Top
+                    }
+                } else {
+                    origin = DVec3::new(d6.mul_add(d5, origin.x), d7.mul_add(d5, origin.y), d2);
+
+                    if end.z > start.z {
+                        Face::Front
+                    } else {
+                        Face::Back
+                    }
+                };
+
+                start = origin.floor()
+                    - match facing_at {
+                        Face::Right => DVec3::X,
+                        Face::Top => DVec3::Y,
+                        Face::Back => DVec3::Z,
+                        Face::Bottom | Face::Left | Face::Front => DVec3::ZERO,
+                    };
+
+                position = start.as_vec3();
+
+                let block = self.get_model_for(models, position);
+
+                if let Some(block) = block {
+                    let result =
+                        raycast_into(position, origin, target, Aabb::from(block.bounding_box));
+
+                    if result.is_some() {
+                        return result;
+                    }
+                } else {
+                    result.replace(RayCastResult::new(
+                        HitType::None,
+                        origin,
+                        facing_at,
+                        position,
+                    ));
+                }
+            }
+
+            if last_uncollidable_block {
+                result
+            } else {
+                None
+            }
+        }
+    }
+
+    fn get_model_for<'a>(
+        &self,
+        models: &'a BakedBlockModelLoader,
+        position: Vec3,
+    ) -> Option<&'a BakedBlockModel> {
+        self.get_block(position)
+            .and_then(|block| models.get(block.into()))
+    }
 }

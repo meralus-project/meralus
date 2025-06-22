@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::{borrow::Borrow, hash::Hash};
 
+use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use glam::{IVec2, Mat4, Vec2, Vec3};
 use glium::{
     BackfaceCullingMode, Depth, DepthTest, DrawParameters, Frame, PolygonMode, Program, Surface,
@@ -14,7 +15,7 @@ use meralus_world::{CHUNK_SIZE_F32, Face, SUBCHUNK_COUNT_F32};
 use owo_colors::OwoColorize;
 
 use super::Shader;
-use crate::{BLENDING, impl_vertex, player::FrustumCulling};
+use crate::{BLENDING, camera::FrustumCulling, impl_vertex};
 
 struct VoxelShader;
 
@@ -186,29 +187,6 @@ impl VoxelRenderer {
         }
     }
 
-    fn setup_chunks(&mut self) {
-        self.opaque_data
-            .retain(|k, _| self.rendered_chunks.contains(k));
-        self.translucent_data
-            .retain(|k, _| self.rendered_chunks.contains(k));
-
-        for chunk in &self.rendered_chunks {
-            if !self.opaque_data.contains_key(chunk) || !self.translucent_data.contains_key(chunk) {
-                let voxels = self.world_mesh.get(chunk).unwrap();
-
-                self.opaque_data.insert(
-                    *chunk,
-                    VertexBuffer::new(&self.display, &voxels[0]).unwrap(),
-                );
-
-                self.translucent_data.insert(
-                    *chunk,
-                    VertexBuffer::new(&self.display, &voxels[1]).unwrap(),
-                );
-            }
-        }
-    }
-
     pub const fn get_debug_info(&self) -> (usize, usize) {
         (self.draw_calls, self.vertices)
     }
@@ -237,6 +215,13 @@ impl VoxelRenderer {
         )
     }
 
+    pub fn contains_chunk<Q: ?Sized + Hash + Eq>(&self, k: &Q) -> bool
+    where
+        (IVec2, Face): Borrow<Q>,
+    {
+        self.opaque_data.contains_key(k) || self.translucent_data.contains_key(k)
+    }
+
     pub fn render_with_params(
         &mut self,
         frame: &mut Frame,
@@ -247,13 +232,20 @@ impl VoxelRenderer {
     ) {
         for key in self.world_mesh.keys() {
             if Self::is_chunk_visible(frustum, key.0) {
-                self.rendered_chunks.insert(*key);
-            } else if self.rendered_chunks.contains(key) {
-                self.rendered_chunks.remove(key);
+                if self.rendered_chunks.insert(*key) && !self.contains_chunk(key) {
+                    let voxels = self.world_mesh.get(key).unwrap();
+
+                    self.opaque_data
+                        .insert(*key, VertexBuffer::new(&self.display, &voxels[0]).unwrap());
+
+                    self.translucent_data
+                        .insert(*key, VertexBuffer::new(&self.display, &voxels[1]).unwrap());
+                }
+            } else if self.rendered_chunks.remove(key) {
+                self.opaque_data.remove(key);
+                self.translucent_data.remove(key);
             }
         }
-
-        self.setup_chunks();
 
         let uniforms = uniform! {
             // origin: origin.to_array(),
@@ -265,35 +257,33 @@ impl VoxelRenderer {
 
         self.draw_calls = 0;
 
-        for key in self.world_mesh.keys() {
-            if Self::is_chunk_visible(frustum, key.0) {
-                if let Some(buffer) = self.opaque_data.get(key) {
-                    frame
-                        .draw(
-                            buffer,
-                            NoIndices(PrimitiveType::TrianglesList),
-                            &self.shader,
-                            &uniforms,
-                            params,
-                        )
-                        .expect("failed to draw!");
+        for key in &self.rendered_chunks {
+            if let Some(buffer) = self.opaque_data.get(key) {
+                frame
+                    .draw(
+                        buffer,
+                        NoIndices(PrimitiveType::TrianglesList),
+                        &self.shader,
+                        &uniforms,
+                        params,
+                    )
+                    .expect("failed to draw!");
 
-                    self.draw_calls += 1;
-                }
+                self.draw_calls += 1;
+            }
 
-                if let Some(buffer) = self.translucent_data.get(key) {
-                    frame
-                        .draw(
-                            buffer,
-                            NoIndices(PrimitiveType::TrianglesList),
-                            &self.shader,
-                            &uniforms,
-                            params,
-                        )
-                        .expect("failed to draw!");
+            if let Some(buffer) = self.translucent_data.get(key) {
+                frame
+                    .draw(
+                        buffer,
+                        NoIndices(PrimitiveType::TrianglesList),
+                        &self.shader,
+                        &uniforms,
+                        params,
+                    )
+                    .expect("failed to draw!");
 
-                    self.draw_calls += 1;
-                }
+                self.draw_calls += 1;
             }
         }
 

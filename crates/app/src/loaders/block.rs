@@ -13,7 +13,7 @@ pub trait Block {
 }
 
 pub struct BlockManager {
-    blocks: Vec<Box<dyn Block>>,
+    blocks: Vec<String>,
 }
 
 impl Default for BlockManager {
@@ -27,12 +27,12 @@ impl BlockManager {
         Self { blocks: Vec::new() }
     }
 
-    pub fn get(&self, id: usize) -> Option<&dyn Block> {
+    pub fn get(&self, id: usize) -> Option<&str> {
         self.blocks.get(id).map(|v| &**v)
     }
 
-    pub fn register<T: Block + 'static>(&mut self, block: T) {
-        self.blocks.push(Box::new(block) as Box<dyn Block>);
+    pub fn register<T: Block + 'static>(&mut self, block: &T) {
+        self.blocks.push(block.id().to_string());
     }
 
     fn load_block<P: AsRef<Path>, R: AsRef<Path>>(root: R, path: P) -> LoadingResult<BlockModel> {

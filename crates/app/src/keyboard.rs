@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-
+use ahash::HashSet;
 use meralus_engine::KeyCode;
 
 #[derive(Debug, Default)]

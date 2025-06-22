@@ -2,7 +2,7 @@ use glium::Program;
 use meralus_engine::WindowDisplay;
 
 pub use self::{
-    shape::{Line, Rectangle, ShapeRenderer},
+    shape::{Line, Rectangle, ShapeTessellator, ShapeRenderer},
     text::{FONT, FONT_BOLD, TextRenderer},
     voxel::{Voxel, VoxelRenderer},
 };

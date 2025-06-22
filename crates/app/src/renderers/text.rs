@@ -1,23 +1,26 @@
-use std::{borrow::Borrow, collections::HashMap};
+use std::borrow::Borrow;
 
+use ahash::{HashMap, HashMapExt};
 use fontdue::{
     Font, FontSettings,
     layout::{CoordinateSystem, GlyphRasterConfig, Layout, TextStyle},
 };
 use glam::{Mat4, Vec2, Vec3, vec2, vec3};
 use glium::{
-    DrawParameters, Frame, Program, Rect, Surface, VertexBuffer,
+    DrawParameters, Frame, Program, Rect, Surface, Texture2d, VertexBuffer,
     index::{NoIndices, PrimitiveType},
+    texture::RawImage2d,
     uniform,
     uniforms::MagnifySamplerFilter,
     vertex::BufferCreationError,
 };
 use image::ImageBuffer;
+use meck::TextureAtlas;
 use meralus_engine::WindowDisplay;
 use meralus_shared::{Color, FromValue};
 
 use super::Shader;
-use crate::{BLENDING, Point2D, Size2D, impl_vertex, loaders::TextureAtlas};
+use crate::{BLENDING, Point2D, Size2D, impl_vertex};
 
 pub const FONT: &[u8] = include_bytes!("../../resources/PixeloidSans.ttf");
 pub const FONT_BOLD: &[u8] = include_bytes!("../../resources/PixeloidSans-Bold.ttf");
@@ -70,6 +73,7 @@ impl Shader for TextShader {
 pub struct FontInfo {
     pub font: Font,
     pub atlas: TextureAtlas<GlyphRasterConfig>,
+    pub texture: Texture2d,
 }
 
 impl Borrow<Font> for FontInfo {
@@ -128,22 +132,28 @@ impl TextRenderer {
         })
     }
 
+    pub fn fonts(&self) -> &[FontInfo] {
+        &self.fonts
+    }
+
     pub fn add_font<T: Into<String>>(&mut self, display: &WindowDisplay, name: T, data: &[u8]) {
         if let Ok(font) = Font::from_bytes(data, FontSettings::default()) {
             self.font_name_map.insert(name.into(), self.fonts.len());
 
             self.fonts.push(FontInfo {
                 font,
-                atlas: TextureAtlas::new(display, 4096),
+                atlas: TextureAtlas::new(4096).with_spacing(4),
+                texture: Texture2d::empty(display, 4096, 4096).unwrap(),
             });
         }
     }
 
     pub fn measure<F: AsRef<str>, T: AsRef<str>>(
-        &mut self,
+        &self,
         font: F,
         text: T,
         size: f32,
+        max_width: Option<f32>,
     ) -> Option<Size2D> {
         self.font_name_map
             .get(font.as_ref())
@@ -151,13 +161,13 @@ impl TextRenderer {
             .map(|font_index| {
                 let text = text.as_ref();
 
-                self.layout.clear();
                 self.layout
-                    .append(&self.fonts, &TextStyle::new(text, size, font_index));
-
-                self.layout
-                    .glyphs()
-                    .iter()
+                    .measure(
+                        &self.fonts,
+                        &TextStyle::new(text, size, font_index),
+                        max_width,
+                    )
+                    .into_iter()
                     .fold(Size2D::ZERO, |mut metrics, glyph| {
                         metrics.width = metrics.width.max(glyph.x + glyph.width as f32);
                         metrics.height = metrics.height.max(glyph.y + glyph.height as f32);
@@ -176,6 +186,7 @@ impl TextRenderer {
         font: F,
         text: T,
         size: f32,
+        max_width: Option<f32>,
         color: Color,
         clip_area: Option<Rect>,
         draw_calls: &mut usize,
@@ -184,10 +195,12 @@ impl TextRenderer {
             let text = text.as_ref();
 
             self.layout.clear();
+            self.layout.set_max_width(max_width);
             self.layout
                 .append(&self.fonts, &TextStyle::new(text, size, font_index));
 
             let glyphs = self.layout.glyphs();
+
             let font_info = &mut self.fonts[font_index];
 
             for (i, vertex) in self.character_offset.map().iter_mut().enumerate() {
@@ -200,7 +213,8 @@ impl TextRenderer {
                         continue;
                     }
 
-                    let (offset, size, _) = if let Some(rect) = font_info.atlas.get_rect(&glyph.key)
+                    let (offset, size, _) = if let Some(rect) =
+                        font_info.atlas.get_texture_uv(&glyph.key)
                     {
                         rect
                     } else {
@@ -215,10 +229,22 @@ impl TextRenderer {
                             *pixel = image::Rgba([255, 255, 255, alpha]);
                         }
 
-                        font_info.atlas.append(glyph.key, image)
+                        let result = font_info.atlas.append(glyph.key, &image).unwrap();
+
+                        font_info.texture.write(
+                            Rect {
+                                left: (result.0.x * 4096.0) as u32,
+                                bottom: (result.0.y * 4096.0) as u32,
+                                width: (result.1.x * 4096.0) as u32,
+                                height: (result.1.y * 4096.0) as u32,
+                            },
+                            RawImage2d::from_raw_rgba_reversed(image.as_raw(), image.dimensions()),
+                        );
+
+                        result
                     };
 
-                    vertex.screen_position = position + Point2D::new(glyph.x, glyph.y).into();
+                    vertex.screen_position = position + Point2D::new(glyph.x, glyph.y);
 
                     vertex.offset = offset;
                     vertex.size = size;
@@ -232,8 +258,7 @@ impl TextRenderer {
             let uniforms = uniform! {
                 matrix: matrix.to_cols_array_2d(),
                 font: font_info
-                    .atlas
-                    .get_texture()
+                    .texture
                     .sampled()
                     .magnify_filter(MagnifySamplerFilter::Nearest),
                 text_color: <[f32; 4]>::from_value(&color),

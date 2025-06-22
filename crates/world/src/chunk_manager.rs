@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::{HashMap, HashMapExt};
 use glam::{IVec2, IVec3, U16Vec3, Vec3};
 use owo_colors::OwoColorize;
 
@@ -10,6 +9,16 @@ pub struct ChunkManager {
 }
 
 impl ChunkManager {
+    pub fn new() -> Self {
+        Self {
+            chunks: HashMap::new(),
+        }
+    }
+
+    pub fn push(&mut self, chunk: Chunk) {
+        self.chunks.insert(chunk.origin, chunk);
+    }
+
     pub fn from_range<T: Iterator<Item = i32> + Clone>(x: T, z: &T) -> Self {
         Self {
             chunks: x
@@ -188,5 +197,11 @@ impl ChunkManager {
 
     pub fn chunks_mut(&mut self) -> impl Iterator<Item = &mut Chunk> {
         self.chunks.values_mut()
+    }
+}
+
+impl Default for ChunkManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

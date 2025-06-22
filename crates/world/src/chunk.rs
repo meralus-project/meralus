@@ -55,11 +55,11 @@ impl Chunk {
     };
 
     pub fn deserialize<T: AsRef<[u8]>>(data: T) -> io::Result<Self> {
-        let mut value = Self::EMPTY;
+        let mut chunk = Self::EMPTY;
 
         let mut data = data.as_ref();
 
-        value.origin = {
+        chunk.origin = {
             let mut x = [0; 4];
             let mut z = [0; 4];
 
@@ -72,20 +72,22 @@ impl Chunk {
             IVec2::new(x, z)
         };
 
-        // for y in 0..CHUNK_HEIGHT {
-        //     for z in 0..CHUNK_SIZE {
-        //         for x in 0..CHUNK_SIZE {
-        //             let mut buf = [0; 2];
+        for y in 0..CHUNK_HEIGHT {
+            for z in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let mut buf = [0; 2];
 
-        //             data.read_exact(&mut buf)?;
+                    data.read_exact(&mut buf)?;
 
-        //             value.blocks[y][z][x] = buf[0];
-        //             value.light_levels[y][z][x] = buf[1];
-        //         }
-        //     }
-        // }
+                    let [subchunk, y] = Self::get_subchunk_index(y);
 
-        Ok(value)
+                    chunk.subchunks[subchunk].blocks[y][z][x] = buf[0];
+                    chunk.subchunks[subchunk].light_levels[y][z][x] = buf[1];
+                }
+            }
+        }
+
+        Ok(chunk)
     }
 
     #[must_use]
@@ -95,14 +97,16 @@ impl Chunk {
         data.extend_from_slice(&self.origin.x.to_be_bytes());
         data.extend_from_slice(&self.origin.y.to_be_bytes());
 
-        // for y in 0..CHUNK_HEIGHT {
-        //     for z in 0..CHUNK_SIZE {
-        //         for x in 0..CHUNK_SIZE {
-        //             data.push(self.blocks[y][z][x]);
-        //             data.push(self.light_levels[y][z][x]);
-        //         }
-        //     }
-        // }
+        for y in 0..CHUNK_HEIGHT {
+            for z in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let [subchunk, y] = Self::get_subchunk_index(y);
+
+                    data.push(self.subchunks[subchunk].blocks[y][z][x]);
+                    data.push(self.subchunks[subchunk].light_levels[y][z][x]);
+                }
+            }
+        }
 
         data
     }
@@ -117,7 +121,7 @@ impl Chunk {
         U16Vec3::new(x, y, z)
     }
 
-    pub const fn get_subchunk_index(&self, y: usize) -> [usize; 2] {
+    pub const fn get_subchunk_index(y: usize) -> [usize; 2] {
         [y >> 4, y.rem_euclid(CHUNK_SIZE)]
     }
 
@@ -149,7 +153,7 @@ impl Chunk {
 
     pub fn set_block_unchecked(&mut self, position: U16Vec3, block: u8) {
         let [x, y, z] = position.to_array().map(usize::from);
-        let [subchunk, y] = self.get_subchunk_index(y);
+        let [subchunk, y] = Self::get_subchunk_index(y);
 
         self.subchunks[subchunk].blocks[y][z][x] = block;
     }
@@ -165,7 +169,7 @@ impl Chunk {
     #[must_use]
     pub fn get_block_unchecked(&self, position: U16Vec3) -> Option<u8> {
         let [x, orig_y, z] = position.to_array().map(usize::from);
-        let [subchunk, y] = self.get_subchunk_index(orig_y);
+        let [subchunk, y] = Self::get_subchunk_index(orig_y);
 
         let block_id = self.subchunks[subchunk].blocks[y][z][x];
 
@@ -182,14 +186,14 @@ impl Chunk {
 
     pub fn get_light_level(&self, position: U16Vec3) -> u8 {
         let [x, y, z] = position.to_array().map(usize::from);
-        let [subchunk, y] = self.get_subchunk_index(y);
+        let [subchunk, y] = Self::get_subchunk_index(y);
 
         self.subchunks[subchunk].light_levels[y][z][x]
     }
 
     pub fn get_light_level_mut(&mut self, position: U16Vec3) -> &mut u8 {
         let [x, y, z] = position.to_array().map(usize::from);
-        let [subchunk, y] = self.get_subchunk_index(y);
+        let [subchunk, y] = Self::get_subchunk_index(y);
 
         &mut self.subchunks[subchunk].light_levels[y][z][x]
     }
@@ -197,7 +201,7 @@ impl Chunk {
     pub fn check_for_block(&self, position: Vec3) -> bool {
         if self.contains_position(position) {
             let [x, y, z] = self.to_local(position).to_array().map(usize::from);
-            let [subchunk, y] = self.get_subchunk_index(y);
+            let [subchunk, y] = Self::get_subchunk_index(y);
 
             self.subchunks[subchunk].blocks[y][z][x] != 0
         } else {

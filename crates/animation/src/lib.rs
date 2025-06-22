@@ -2,8 +2,9 @@ mod curves;
 mod player;
 mod value;
 
-use std::time::Duration;
+use std::{ops::Range, time::Duration};
 
+use ahash::{HashMap, HashMapExt};
 use meralus_shared::Lerp;
 
 pub use self::{
@@ -35,6 +36,12 @@ pub enum RestartBehaviour {
     EndValue,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FinishBehaviour {
+    Reset,
+    StaySame,
+}
+
 impl RestartBehaviour {
     /// Returns `true` if the restart behaviour is [`EndValue`].
     ///
@@ -45,21 +52,58 @@ impl RestartBehaviour {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Animation {
+    Transition(Transition),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame {
+    values: HashMap<String, (Curve, TweenValue)>,
+}
+
+impl Frame {
+    pub fn new() -> Self {
+        Self {
+            values: HashMap::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_value<T: Into<String>, V: Into<TweenValue>>(
+        mut self,
+        name: T,
+        value: V,
+        curve: Curve,
+    ) -> Self {
+        self.values.insert(name.into(), (curve, value.into()));
+
+        self
+    }
+}
+
+impl Default for Frame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Animation {
+pub struct Transition {
     elapsed: f32,
     duration: f32,
     delay: f32,
     curve: Curve,
     repeat: RepeatMode,
     restart_behaviour: RestartBehaviour,
+    finish_behaviour: FinishBehaviour,
 
     origin: TweenValue,
     value: TweenValue,
     destination: TweenValue,
 }
 
-impl Animation {
+impl Transition {
     #[must_use]
     pub fn new<T: Into<TweenValue>>(
         start: T,
@@ -77,6 +121,7 @@ impl Animation {
             curve,
             repeat,
             restart_behaviour: RestartBehaviour::StartValue,
+            finish_behaviour: FinishBehaviour::StaySame,
             origin,
             value: origin,
             destination,
@@ -101,6 +146,7 @@ impl Animation {
             curve,
             repeat,
             restart_behaviour: RestartBehaviour::StartValue,
+            finish_behaviour: FinishBehaviour::StaySame,
             origin,
             value: origin,
             destination,
@@ -112,6 +158,24 @@ impl Animation {
         self.restart_behaviour = behaviour;
 
         self
+    }
+
+    #[must_use]
+    pub const fn with_finish_behaviour(mut self, behaviour: FinishBehaviour) -> Self {
+        self.finish_behaviour = behaviour;
+
+        self
+    }
+
+    pub fn set<T: Into<TweenValue>>(&mut self, value: T) {
+        let value = value.into();
+
+        self.origin = value;
+        self.value = value;
+    }
+
+    pub fn set_value<T: Into<TweenValue>>(&mut self, value: T) {
+        self.value = value.into();
     }
 
     pub fn to<T: Into<TweenValue>>(&mut self, value: T) {

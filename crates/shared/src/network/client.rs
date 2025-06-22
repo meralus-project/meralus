@@ -1,7 +1,7 @@
 use std::io;
 
 use futures::{SinkExt, StreamExt};
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, ToSocketAddrs};
 
 use super::{InStream, IncomingPacket, OutSink, OutgoingPacket, wrap_stream};
 
@@ -12,6 +12,10 @@ impl Client {
         let (in_stream, out_stream) = wrap_stream(stream);
 
         Self(in_stream, out_stream)
+    }
+
+    pub async fn connect<T: ToSocketAddrs>(addr: T) -> Result<Self, io::Error> {
+        TcpStream::connect(addr).await.map(Self::new)
     }
 
     pub async fn receive(&mut self) -> Option<Result<OutgoingPacket, io::Error>> {

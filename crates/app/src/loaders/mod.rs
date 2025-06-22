@@ -6,7 +6,7 @@ mod texture;
 pub use self::{
     block::{Block, BlockManager},
     block_model::{BakedBlockModel, BakedBlockModelLoader, ModelLoadingError},
-    texture::{TextureAtlas, TextureLoader, TextureLoadingError},
+    texture::{TextureLoader, TextureLoadingError},
 };
 
 pub type LoadingResult<T> = Result<T, LoadingError>;

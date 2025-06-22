@@ -44,6 +44,15 @@ pub enum Corner {
 }
 
 impl Corner {
+    pub const fn index(&self) -> usize {
+        match self {
+            Self::LeftTop => 0,
+            Self::RightTop => 1,
+            Self::LeftBottom => 2,
+            Self::RightBottom => 3,
+        }
+    }
+
     pub const fn from_array([x, y]: [f32; 2]) -> Self {
         let [x, y] = [x > 0.0, y > 0.0];
 

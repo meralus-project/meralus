@@ -1,0 +1,15 @@
+[package]
+name = "lessor"
+description = "Lightweight layout library"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glam = { workspace = true }
+glamour = { workspace = true }
+
+[dev-dependencies]
+float-cmp = "0.10.0"
+
+[lints]
+workspace = true

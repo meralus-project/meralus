@@ -62,7 +62,7 @@ impl Add<Point3D> for Cube3D {
 
     fn add(self, rhs: Point3D) -> Self::Output {
         Self {
-            origin: self.origin + rhs.into(),
+            origin: self.origin + rhs,
             size: self.size,
         }
     }
@@ -82,5 +82,17 @@ where
 {
     fn from_value(value: &T) -> Self {
         value.as_value()
+    }
+}
+
+pub trait InspectMut<T> {
+    fn inspect_mut<F: FnOnce(&mut T)>(&mut self, func: F);
+}
+
+impl<T> InspectMut<T> for Option<T> {
+    fn inspect_mut<F: FnOnce(&mut T)>(&mut self, func: F) {
+        if let Some(data) = self {
+            func(data);
+        }
     }
 }

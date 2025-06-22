@@ -8,6 +8,8 @@ meralus-animation = { workspace = true }
 meralus-world = { workspace = true }
 meralus-engine = { workspace = true }
 meralus-shared = { workspace = true, features = ["network"] }
+meck = { workspace = true }
+lessor = { workspace = true }
 glium = { workspace = true }
 glam = { workspace = true }
 glamour = { workspace = true }
@@ -17,8 +19,13 @@ futures = { workspace = true }
 async-compression = { workspace = true }
 clap = { version = "4.5.35", features = ["derive"] }
 image = "0.25.6"
-fontdue = { version = "0.9.3", features = ["std"] }
+fontdue = { git = "https://github.com/Aiving/fontdue.git", features = ["std"] }
 owo-colors = "4.2.0"
+ahash = { workspace = true }
+lyon_tessellation = "1.0.15"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+float-cmp = "0.10.0"

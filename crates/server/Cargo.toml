@@ -10,6 +10,8 @@ glam = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-compression = { workspace = true }
+ahash = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

@@ -13,11 +13,16 @@ meralus-animation = { path = "./crates/animation" }
 meralus-world = { path = "./crates/world" }
 meralus-engine = { path = "./crates/engine" }
 meralus-shared = { path = "./crates/shared" }
+meck = { path = "./crates/meck" }
+lessor = { path = "./crates/lessor" }
 
 glium = "0.36.0"
 
-glam = { version = "0.27.0", features = ["serde"] }
-glamour = "0.11.0"
+glam = { version = "0.30.4", features = ["serde"] }
+glamour = "0.18.0"
+
+ahash = "0.8.12"
+uuid = { version = "1.17.0", features = ["v4"] }
 
 noise = "0.9.0"
 splines = { version = "5.0.0", features = ["glam"] }
@@ -32,10 +37,11 @@ tokio = { version = "1.45.1", features = [
     "parking_lot",
     "net",
     "io-util",
+    "time",
 ] }
 tokio-util = { version = "0.7.15", features = ["codec"] }
 tokio-serde = "0.9.0"
-async-compression = { version = "0.4.23", features = ["zlib", "tokio"] }
+async-compression = { version = "0.4.25", features = ["zlib", "tokio"] }
 bson = "2.15.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

@@ -361,6 +361,27 @@ impl Color {
         Self([red, green, blue, alpha])
     }
 
+    pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
+        Self::new(red, green, blue, 255)
+    }
+
+    pub const fn from_u32_rgb(rgb: u32) -> Self {
+        Self::new(
+            ((rgb >> 16) & 0xFF) as u8,
+            ((rgb >> 8) & 0xFF) as u8,
+            (rgb & 0xFF) as u8,
+            255,
+        )
+    }
+
+    pub const fn as_u32(&self) -> u32 {
+        let red = (self.0[0] as u32) << 16;
+        let green = (self.0[1] as u32) << 8;
+        let blue = self.0[2] as u32;
+
+        red | green | blue
+    }
+
     pub const fn new_f32(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self([
             (255.0 * red) as u8,

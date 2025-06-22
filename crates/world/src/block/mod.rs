@@ -1,8 +1,9 @@
 mod face;
 mod state;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
+use ahash::HashMap;
 pub use face::{Axis, Corner, Face};
 use glam::{Vec2, Vec3};
 use serde::{

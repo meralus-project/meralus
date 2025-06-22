@@ -10,6 +10,7 @@ owo-colors = "4.2.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 splines = { workspace = true }
+ahash = { workspace = true }
 
 [lints]
 workspace = true

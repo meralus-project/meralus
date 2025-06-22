@@ -1,13 +1,15 @@
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
+use ahash::HashMap;
 use glam::{Vec2, Vec3};
-use glamour::ToRaw;
 use meralus_shared::Cube3D;
-use meralus_world::{ElementRotation, Face, Faces, JsonError, TexturePath, TextureRef};
+use meralus_world::{
+    ChunkManager, ElementRotation, Face, Faces, JsonError, TexturePath, TextureRef,
+};
 use owo_colors::OwoColorize;
 
 use super::{LoadingResult, block::BlockManager, texture::TextureLoader};
-use crate::{Game, loaders::LoadingError};
+use crate::loaders::LoadingError;
 
 #[derive(Debug, PartialEq)]
 pub struct FaceUV {
@@ -26,10 +28,9 @@ pub struct BlockModelFace {
 }
 
 impl BlockModelFace {
-    pub fn culled(&self, game: &Game, position: Vec3) -> bool {
+    pub fn culled(&self, chunk_manager: &ChunkManager, position: Vec3) -> bool {
         self.cull_face.is_some_and(|cull_face| {
-            game.chunk_manager()
-                .contains_block(position + cull_face.as_normal().as_vec3())
+            chunk_manager.contains_block(position + cull_face.as_normal().as_vec3())
         })
     }
 }

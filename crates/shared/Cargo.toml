@@ -12,10 +12,12 @@ tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 tokio-serde = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
 
 [features]
 default = []
 network = [
+    "dep:uuid",
     "dep:serde",
     "dep:bson",
     "dep:tokio",

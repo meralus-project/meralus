@@ -1,12 +1,11 @@
-use std::collections::HashSet;
-
+use ahash::HashSet;
 use indexmap::IndexMap;
 
-use crate::{Animation, TweenValue};
+use crate::{Transition, FinishBehaviour, TweenValue};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimationPlayer {
-    animations: IndexMap<String, Animation>,
+    animations: IndexMap<String, Transition>,
     running: HashSet<String>,
     enabled: bool,
 }
@@ -37,6 +36,10 @@ impl AnimationPlayer {
                     animation.advance(delta);
 
                     if animation.is_finished() {
+                        if animation.finish_behaviour == FinishBehaviour::Reset {
+                            animation.value = animation.origin;
+                        }
+
                         self.running.remove(name);
                     }
                 }
@@ -44,21 +47,21 @@ impl AnimationPlayer {
         }
     }
 
-    pub fn add<T: Into<String>>(&mut self, name: T, animation: Animation) {
+    pub fn add<T: Into<String>>(&mut self, name: T, animation: Transition) {
         self.animations.insert(name.into(), animation);
     }
 
-    pub fn get_at(&self, index: usize) -> Option<(&str, &Animation)> {
+    pub fn get_at(&self, index: usize) -> Option<(&str, &Transition)> {
         self.animations
             .get_index(index)
             .map(|(name, animation)| (name.as_str(), animation))
     }
 
-    pub fn get<T: AsRef<str>>(&mut self, name: T) -> Option<&Animation> {
+    pub fn get<T: AsRef<str>>(&mut self, name: T) -> Option<&Transition> {
         self.animations.get(name.as_ref())
     }
 
-    pub fn get_mut<T: AsRef<str>>(&mut self, name: T) -> Option<&mut Animation> {
+    pub fn get_mut<T: AsRef<str>>(&mut self, name: T) -> Option<&mut Transition> {
         self.animations.get_mut(name.as_ref())
     }
 
@@ -72,10 +75,21 @@ impl AnimationPlayer {
         }
     }
 
+    pub fn play_transition_to<T: Into<String>, V: Into<TweenValue>>(&mut self, name: T, value: V) {
+        let name = name.into();
+
+        if let Some(animation) = self.animations.get_mut(&name) {
+            animation.to(value);
+            animation.reset();
+
+            self.running.insert(name);
+        }
+    }
+
     pub fn get_elapsed<T: AsRef<str>>(&self, name: T) -> Option<f32> {
         self.animations
             .get(name.as_ref())
-            .map(Animation::get_elapsed)
+            .map(Transition::get_elapsed)
     }
 
     pub fn get_duration<T: AsRef<str>>(&self, name: T) -> Option<f32> {
@@ -85,10 +99,10 @@ impl AnimationPlayer {
     }
 
     pub fn get_value<T: AsRef<str>, V: From<TweenValue>>(&self, name: T) -> Option<V> {
-        self.animations.get(name.as_ref()).map(Animation::get)
+        self.animations.get(name.as_ref()).map(Transition::get)
     }
 
-    pub fn animations(&self) -> impl Iterator<Item = (&str, &Animation)> {
+    pub fn animations(&self) -> impl Iterator<Item = (&str, &Transition)> {
         self.animations
             .iter()
             .map(|(name, animation)| (name.as_str(), animation))
@@ -107,6 +121,6 @@ impl AnimationPlayer {
             && self
                 .animations
                 .get(name.as_ref())
-                .is_some_and(Animation::is_finished)
+                .is_some_and(Transition::is_finished)
     }
 }

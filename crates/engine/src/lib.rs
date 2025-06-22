@@ -15,6 +15,7 @@ use glutin::{
     surface::{SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use meralus_shared::InspectMut;
 use winit::{
     application::ApplicationHandler,
     error::EventLoopError,
@@ -182,18 +183,6 @@ impl<T: State> ApplicationWindow<T> {
     }
 }
 
-trait InspectMut<T> {
-    fn inspect_mut<F: FnOnce(&mut T)>(&mut self, func: F);
-}
-
-impl<T> InspectMut<T> for Option<T> {
-    fn inspect_mut<F: FnOnce(&mut T)>(&mut self, func: F) {
-        if let Some(data) = self {
-            func(data);
-        }
-    }
-}
-
 impl<T: State> ApplicationHandler for Application<T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window.replace(ApplicationWindow::new(event_loop));
@@ -267,13 +256,21 @@ impl<T: State> ApplicationHandler for Application<T> {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         self.window.inspect_mut(|window| {
+            // let update = Instant::now();
+
             window.state.update(
                 WindowContext::new(event_loop, &window.window),
                 &window.display,
                 window.delta,
             );
 
+            // println!("update took {:?}", update.elapsed());
+
+            // let render = Instant::now();
+
             window.state.render(&window.display, window.delta);
+
+            // println!("render took {:?}", render.elapsed());
 
             window.delta = window
                 .last_time

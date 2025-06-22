@@ -1,8 +1,13 @@
 use glam::{Mat4, Vec2, Vec3};
 use glium::{
-    DrawParameters, Frame, Program, Surface, VertexBuffer,
-    index::{NoIndices, PrimitiveType},
+    DrawParameters, Frame, IndexBuffer, Program, Surface, VertexBuffer,
+    index::{IndicesSource, NoIndices, PrimitiveType},
     uniform,
+};
+use lyon_tessellation::{
+    FillBuilder, FillGeometryBuilder, FillOptions, FillTessellator, FillVertex, GeometryBuilder,
+    GeometryBuilderError, StrokeGeometryBuilder, StrokeVertex, TessellationError, VertexBuffers,
+    VertexId, path::builder::NoAttributes,
 };
 use meralus_engine::WindowDisplay;
 use meralus_shared::Color;
@@ -61,20 +66,38 @@ impl Line {
 }
 
 pub struct Rectangle {
-    pub position: Vec2,
+    pub position: Vec3,
     pub size: Vec2,
     pub color: Color,
     pub matrix: Option<Mat4>,
+    pub rotation_matrix: Option<Mat4>,
 }
 
 impl Rectangle {
     pub const fn new(x: f32, y: f32, width: f32, height: f32, color: Color) -> Self {
         Self {
-            position: Vec2::new(x, y),
+            position: Vec3::new(x, y, 0.0),
             size: Vec2::new(width, height),
             color,
             matrix: None,
+            rotation_matrix: None,
         }
+    }
+
+    pub const fn new_3d(x: f32, y: f32, z: f32, width: f32, height: f32, color: Color) -> Self {
+        Self {
+            position: Vec3::new(x, y, z),
+            size: Vec2::new(width, height),
+            color,
+            matrix: None,
+            rotation_matrix: None,
+        }
+    }
+
+    pub const fn with_rotation_matrix(mut self, matrix: Option<Mat4>) -> Self {
+        self.rotation_matrix = matrix;
+
+        self
     }
 
     pub const fn with_matrix(mut self, matrix: Option<Mat4>) -> Self {
@@ -84,25 +107,168 @@ impl Rectangle {
     }
 
     pub fn as_vertices(&self) -> [ShapeVertex; 6] {
-        let position = self.position.extend(0.0);
+        let position = self.position;
+        let matrix = self.rotation_matrix.unwrap_or(Mat4::IDENTITY);
 
         [
-            [0.0, 0.0],
-            [0.0, self.size.y],
-            [self.size.x, self.size.y],
-            [0.0, 0.0],
-            [self.size.x, 0.0],
-            [self.size.x, self.size.y],
+            [0.0, 0.0, 0.0],
+            [0.0, self.size.y, 0.0],
+            [self.size.x, self.size.y, 0.0],
+            [0.0, 0.0, 0.0],
+            [self.size.x, 0.0, 0.0],
+            [self.size.x, self.size.y, 0.0],
         ]
-        .map(|offset| {
-            let offset = Vec2::from_array(offset).extend(0.0);
-
-            ShapeVertex {
-                position: position + offset,
-                color: self.color,
-                transform: self.matrix.unwrap_or_default(),
-            }
+        .map(|offset| ShapeVertex {
+            position: position
+                + matrix.transform_point3(Vec3::from_array(offset) - position)
+                + position,
+            color: self.color,
+            transform: self.matrix.unwrap_or_default(),
         })
+    }
+}
+
+pub struct ShapeGeometryBuilder {
+    buffers: VertexBuffers<ShapeVertex, u32>,
+    first_vertex: u32,
+    first_index: u32,
+    vertex_offset: u32,
+    color: Color,
+}
+
+impl ShapeGeometryBuilder {
+    pub const fn new(buffers: VertexBuffers<ShapeVertex, u32>, color: Color) -> Self {
+        let first_vertex = buffers.vertices.len() as u32;
+        let first_index = buffers.indices.len() as u32;
+
+        Self {
+            buffers,
+            first_vertex,
+            first_index,
+            vertex_offset: 0,
+            color,
+        }
+    }
+
+    pub const fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
+
+    fn get_mesh(&self) -> &VertexBuffers<ShapeVertex, u32> {
+        &self.buffers
+    }
+}
+
+impl GeometryBuilder for ShapeGeometryBuilder {
+    fn begin_geometry(&mut self) {
+        self.first_vertex = self.buffers.vertices.len() as u32;
+        self.first_index = self.buffers.indices.len() as u32;
+    }
+
+    fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
+        debug_assert!(a != b);
+        debug_assert!(a != c);
+        debug_assert!(b != c);
+        debug_assert!(a != VertexId::INVALID);
+        debug_assert!(b != VertexId::INVALID);
+        debug_assert!(c != VertexId::INVALID);
+
+        self.buffers.indices.push((a + self.vertex_offset).into());
+        self.buffers.indices.push((b + self.vertex_offset).into());
+        self.buffers.indices.push((c + self.vertex_offset).into());
+    }
+
+    fn abort_geometry(&mut self) {
+        self.buffers.vertices.truncate(self.first_vertex as usize);
+        self.buffers.indices.truncate(self.first_index as usize);
+    }
+}
+
+impl FillGeometryBuilder for ShapeGeometryBuilder {
+    fn add_fill_vertex(&mut self, vertex: FillVertex) -> Result<VertexId, GeometryBuilderError> {
+        self.buffers.vertices.push(ShapeVertex {
+            position: Vec3::from_array(vertex.position().extend(0.0).to_array()),
+            color: self.color,
+            transform: Mat4::IDENTITY,
+        });
+
+        let len = self.buffers.vertices.len();
+
+        if len > u32::MAX as usize {
+            return Err(GeometryBuilderError::TooManyVertices);
+        }
+
+        Ok(VertexId((len - 1) as u32))
+    }
+}
+
+impl StrokeGeometryBuilder for ShapeGeometryBuilder {
+    fn add_stroke_vertex(
+        &mut self,
+        vertex: StrokeVertex,
+    ) -> Result<VertexId, GeometryBuilderError> {
+        self.buffers.vertices.push(ShapeVertex {
+            position: Vec3::from_array(vertex.position().extend(0.0).to_array()),
+            color: self.color,
+            transform: Mat4::IDENTITY,
+        });
+
+        let len = self.buffers.vertices.len();
+
+        if len > u32::MAX as usize {
+            return Err(GeometryBuilderError::TooManyVertices);
+        }
+
+        Ok(VertexId((len - 1) as u32))
+    }
+}
+
+pub struct ShapeTessellator {
+    builder: ShapeGeometryBuilder,
+    tessellator: FillTessellator,
+    options: FillOptions,
+}
+
+impl ShapeTessellator {
+    pub fn new() -> Self {
+        let builder = ShapeGeometryBuilder::new(VertexBuffers::new(), Color::RED);
+        let tessellator = FillTessellator::new();
+        let options = FillOptions::default();
+
+        Self {
+            builder,
+            tessellator,
+            options,
+        }
+    }
+
+    pub fn tessellate_with_color<F: FnOnce(&mut NoAttributes<FillBuilder>)>(
+        &mut self,
+        color: Color,
+        tessellate: F,
+    ) -> Result<(), TessellationError> {
+        self.builder.set_color(color);
+
+        let mut builder = self.tessellator.builder(&self.options, &mut self.builder);
+
+        tessellate(&mut builder);
+
+        builder.build()
+    }
+
+    pub fn build(self, display: &WindowDisplay) -> (VertexBuffer<ShapeVertex>, IndexBuffer<u32>) {
+        let mesh = self.builder.get_mesh();
+
+        (
+            glium::VertexBuffer::new(display, &mesh.vertices)
+                .expect("Could not create vertex buffer"),
+            glium::IndexBuffer::new(
+                display,
+                glium::index::PrimitiveType::TrianglesList,
+                &mesh.indices,
+            )
+            .expect("Could not create index buffer"),
+        )
     }
 }
 
@@ -125,6 +291,37 @@ impl ShapeRenderer {
 
     pub const fn set_default_matrix(&mut self) {
         self.matrix = None;
+    }
+
+    pub fn draw<'a, I: Into<IndicesSource<'a>>>(
+        &self,
+        frame: &mut Frame,
+        display: &WindowDisplay,
+        vertex_buffer: &VertexBuffer<ShapeVertex>,
+        index_buffer: I,
+    ) {
+        let (width, height) = display.get_framebuffer_dimensions();
+
+        let matrix = self.matrix.unwrap_or_else(|| {
+            Mat4::orthographic_rh_gl(0., width as f32, height as f32, 0., -1., 1.)
+        });
+
+        let uniforms = uniform! {
+            matrix: matrix.to_cols_array_2d(),
+        };
+
+        frame
+            .draw(
+                vertex_buffer,
+                index_buffer,
+                &self.shader,
+                &uniforms,
+                &DrawParameters {
+                    blend: BLENDING,
+                    ..DrawParameters::default()
+                },
+            )
+            .expect("failed to draw!");
     }
 
     fn draw_shapes(
