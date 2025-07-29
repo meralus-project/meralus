@@ -13,5 +13,7 @@ overflow_delimited_expr = true
 reorder_impl_items = true
 group_imports = "StdExternalCrate"
 style_edition = "2024"
+max_width = 160
+float_literal_trailing_zero = "IfNoPostfix"
 unstable_features = true
 use_field_init_shorthand = true

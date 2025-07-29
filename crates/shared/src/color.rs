@@ -20,11 +20,7 @@ impl AsValue<[f32; 4]> for Color {
 
 impl AsValue<[f32; 3]> for Color {
     fn as_value(&self) -> [f32; 3] {
-        [
-            f32::from(self.0[0]) / 255.0,
-            f32::from(self.0[1]) / 255.0,
-            f32::from(self.0[2]) / 255.0,
-        ]
+        [f32::from(self.0[0]) / 255.0, f32::from(self.0[1]) / 255.0, f32::from(self.0[2]) / 255.0]
     }
 }
 
@@ -53,12 +49,7 @@ impl From<Vec4> for Color {
 
 impl From<Vec3> for Color {
     fn from(value: Vec3) -> Self {
-        Self([
-            (255.0 * value.x) as u8,
-            (255.0 * value.y) as u8,
-            (255.0 * value.z) as u8,
-            255,
-        ])
+        Self([(255.0 * value.x) as u8, (255.0 * value.y) as u8, (255.0 * value.z) as u8, 255])
     }
 }
 
@@ -366,12 +357,7 @@ impl Color {
     }
 
     pub const fn from_u32_rgb(rgb: u32) -> Self {
-        Self::new(
-            ((rgb >> 16) & 0xFF) as u8,
-            ((rgb >> 8) & 0xFF) as u8,
-            (rgb & 0xFF) as u8,
-            255,
-        )
+        Self::new(((rgb >> 16) & 0xFF) as u8, ((rgb >> 8) & 0xFF) as u8, (rgb & 0xFF) as u8, 255)
     }
 
     pub const fn as_u32(&self) -> u32 {
@@ -383,12 +369,7 @@ impl Color {
     }
 
     pub const fn new_f32(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-        Self([
-            (255.0 * red) as u8,
-            (255.0 * green) as u8,
-            (255.0 * blue) as u8,
-            (255.0 * alpha) as u8,
-        ])
+        Self([(255.0 * red) as u8, (255.0 * green) as u8, (255.0 * blue) as u8, (255.0 * alpha) as u8])
     }
 
     #[must_use]
@@ -425,7 +406,7 @@ impl Color {
                 lightness * -saturation + (lightness + saturation)
             };
 
-            let p = 2.0f32 * lightness - q;
+            let p = 2f32 * lightness - q;
 
             [
                 hue_to_rgb(p, q, (hue / 360.0) + 1.0 / 3.0),
@@ -438,11 +419,7 @@ impl Color {
     }
 
     pub const fn to_linear(&self) -> [f32; 3] {
-        [
-            color_to_linear(self.0[0]),
-            color_to_linear(self.0[1]),
-            color_to_linear(self.0[2]),
-        ]
+        [color_to_linear(self.0[0]), color_to_linear(self.0[1]), color_to_linear(self.0[2])]
     }
 
     #[must_use]
@@ -450,5 +427,9 @@ impl Color {
         let value: Vec3 = self.as_value();
 
         (value * factor).into()
+    }
+
+    pub fn as_rgb_hex(&self) -> String {
+        format!("{:02x}{:02x}{:02x}", self.0[0], self.0[1], self.0[2])
     }
 }

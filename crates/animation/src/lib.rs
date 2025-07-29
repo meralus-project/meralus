@@ -2,7 +2,7 @@ mod curves;
 mod player;
 mod value;
 
-use std::{ops::Range, time::Duration};
+use std::time::Duration;
 
 use ahash::{HashMap, HashMapExt};
 use meralus_shared::Lerp;
@@ -64,18 +64,11 @@ pub struct Frame {
 
 impl Frame {
     pub fn new() -> Self {
-        Self {
-            values: HashMap::new(),
-        }
+        Self { values: HashMap::new() }
     }
 
     #[must_use]
-    pub fn with_value<T: Into<String>, V: Into<TweenValue>>(
-        mut self,
-        name: T,
-        value: V,
-        curve: Curve,
-    ) -> Self {
+    pub fn with_value<T: Into<String>, V: Into<TweenValue>>(mut self, name: T, value: V, curve: Curve) -> Self {
         self.values.insert(name.into(), (curve, value.into()));
 
         self
@@ -105,13 +98,7 @@ pub struct Transition {
 
 impl Transition {
     #[must_use]
-    pub fn new<T: Into<TweenValue>>(
-        start: T,
-        end: T,
-        duration: u64,
-        curve: Curve,
-        repeat: RepeatMode,
-    ) -> Self {
+    pub fn new<T: Into<TweenValue>>(start: T, end: T, duration: u64, curve: Curve, repeat: RepeatMode) -> Self {
         let [origin, destination] = [start.into(), end.into()];
 
         Self {
@@ -129,14 +116,7 @@ impl Transition {
     }
 
     #[must_use]
-    pub fn new_with_delay<T: Into<TweenValue>>(
-        start: T,
-        end: T,
-        duration: u64,
-        delay: u64,
-        curve: Curve,
-        repeat: RepeatMode,
-    ) -> Self {
+    pub fn new_with_delay<T: Into<TweenValue>>(start: T, end: T, duration: u64, delay: u64, curve: Curve, repeat: RepeatMode) -> Self {
         let [origin, destination] = [start.into(), end.into()];
 
         Self {
@@ -198,19 +178,13 @@ impl Transition {
     pub const fn get_elapsed(&self) -> f32 {
         match self.repeat {
             RepeatMode::Once | RepeatMode::Infinite => {
-                if self.repeat.is_infinite()
-                    && self.is_backwards()
-                    && self.elapsed >= self.get_duration()
-                {
-                    self.get_duration()
-                        - (self.elapsed.min(self.get_duration() * 2.0) - self.get_duration())
+                if self.repeat.is_infinite() && self.is_backwards() && self.elapsed >= self.get_duration() {
+                    self.get_duration() - (self.elapsed.min(self.get_duration() * 2.0) - self.get_duration())
                 } else {
                     self.elapsed.min(self.get_duration())
                 }
             }
-            RepeatMode::Times(_) => {
-                self.elapsed.min(self.get_duration()) % (self.get_duration() + 1.0)
-            }
+            RepeatMode::Times(_) => self.elapsed.min(self.get_duration()) % (self.get_duration() + 1.0),
         }
     }
 
@@ -233,16 +207,11 @@ impl Transition {
         let elapsed = self.elapsed - self.delay;
 
         let t = match (self.repeat, self.restart_behaviour) {
-            (RepeatMode::Once, _) | (RepeatMode::Infinite, RestartBehaviour::StartValue) => {
-                elapsed.min(self.duration) / self.duration
-            }
-            (RepeatMode::Times(_), _) => {
-                (elapsed.min(self.duration) % (self.duration + 1.0)) / self.duration
-            }
+            (RepeatMode::Once, _) | (RepeatMode::Infinite, RestartBehaviour::StartValue) => elapsed.min(self.duration) / self.duration,
+            (RepeatMode::Times(_), _) => (elapsed.min(self.duration) % (self.duration + 1.0)) / self.duration,
             (RepeatMode::Infinite, RestartBehaviour::EndValue) => {
                 if elapsed >= self.duration {
-                    (self.duration - (elapsed.min(self.duration * 2.0) - self.duration))
-                        / self.duration
+                    (self.duration - (elapsed.min(self.duration * 2.0) - self.duration)) / self.duration
                 } else {
                     elapsed.min(self.duration) / self.duration
                 }

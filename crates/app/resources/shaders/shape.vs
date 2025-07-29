@@ -8,15 +8,15 @@ out vec4 v_color;
 
 uniform mat4 matrix;
 
-vec4 toLinear(vec4 sRGB) {
-  bvec3 cutoff = lessThan(sRGB.rgb, vec3(0.04045));
-  vec3 higher = pow((sRGB.rgb + vec3(0.055)) / vec3(1.055), vec3(2.4));
-  vec3 lower = sRGB.rgb / vec3(12.92);
-
-  return vec4(mix(higher, lower, cutoff), sRGB.a);
+vec3 linearize(vec3 rgb) {
+  return mix(pow((rgb + 0.055) * (1.0 / 1.055), vec3(2.4)), rgb * (1.0 / 12.92),
+             lessThanEqual(rgb, vec3(0.04045)));
 }
 
 void main() {
   gl_Position = matrix * transform * vec4(position, 1.0);
-  v_color = toLinear(color / 255.0);
+
+  vec4 f_color = color / 255.0;
+
+  v_color = f_color;//  vec4(linearize(f_color.rgb), f_color.a);
 }

@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.lints.clippy]
+all = "warn"
+nursery = "warn"
+pedantic = "warn"
+must_use_candidate = { level = "allow", priority = 1 }
+
+[workspace.dependencies]
+mollie-shared = { path = "./crates/shared" }
+mollie-lexer = { path = "./crates/lexer" }
+mollie-parser = { path = "./crates/parser" }
+mollie-compiler = { path = "./crates/compiler" }
+mollie-vm = { path = "./crates/vm" }
+
+ariadne = "0.5.1"
+derive_more = { version = "2.0.1", features = [
+    "display",
+    "is_variant",
+    "unwrap",
+] }
+indexmap = "2.10.0"
+peekmore = { version = "1.3.0", features = ["smallvec"] }

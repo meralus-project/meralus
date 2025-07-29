@@ -1,7 +1,7 @@
 use ahash::HashSet;
 use indexmap::IndexMap;
 
-use crate::{Transition, FinishBehaviour, TweenValue};
+use crate::{FinishBehaviour, Transition, TweenValue};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimationPlayer {
@@ -52,9 +52,7 @@ impl AnimationPlayer {
     }
 
     pub fn get_at(&self, index: usize) -> Option<(&str, &Transition)> {
-        self.animations
-            .get_index(index)
-            .map(|(name, animation)| (name.as_str(), animation))
+        self.animations.get_index(index).map(|(name, animation)| (name.as_str(), animation))
     }
 
     pub fn get<T: AsRef<str>>(&mut self, name: T) -> Option<&Transition> {
@@ -87,15 +85,11 @@ impl AnimationPlayer {
     }
 
     pub fn get_elapsed<T: AsRef<str>>(&self, name: T) -> Option<f32> {
-        self.animations
-            .get(name.as_ref())
-            .map(Transition::get_elapsed)
+        self.animations.get(name.as_ref()).map(Transition::get_elapsed)
     }
 
     pub fn get_duration<T: AsRef<str>>(&self, name: T) -> Option<f32> {
-        self.animations
-            .get(name.as_ref())
-            .map(|animation| animation.duration)
+        self.animations.get(name.as_ref()).map(|animation| animation.duration)
     }
 
     pub fn get_value<T: AsRef<str>, V: From<TweenValue>>(&self, name: T) -> Option<V> {
@@ -103,9 +97,11 @@ impl AnimationPlayer {
     }
 
     pub fn animations(&self) -> impl Iterator<Item = (&str, &Transition)> {
-        self.animations
-            .iter()
-            .map(|(name, animation)| (name.as_str(), animation))
+        self.animations.iter().map(|(name, animation)| (name.as_str(), animation))
+    }
+
+    pub fn contains<T: AsRef<str>>(&self, name: T) -> bool {
+        self.animations.contains_key(name.as_ref())
     }
 
     pub fn len(&self) -> usize {
@@ -117,10 +113,6 @@ impl AnimationPlayer {
     }
 
     pub fn is_finished<T: AsRef<str>>(&self, name: T) -> bool {
-        self.enabled
-            && self
-                .animations
-                .get(name.as_ref())
-                .is_some_and(Transition::is_finished)
+        self.enabled && self.animations.get(name.as_ref()).is_some_and(Transition::is_finished)
     }
 }

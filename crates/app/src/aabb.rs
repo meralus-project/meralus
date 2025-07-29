@@ -16,11 +16,7 @@ impl Aabb {
     }
 
     pub const fn get_center(&self, size: DVec3) -> DVec3 {
-        DVec3::new(
-            self.min.x + size.x / 2.0,
-            self.min.y + size.y / 2.0,
-            self.min.z + size.z / 2.0,
-        )
+        DVec3::new(self.min.x + size.x / 2.0, self.min.y + size.y / 2.0, self.min.z + size.z / 2.0)
     }
 
     pub const fn intersects_with_x(&self, against: Self) -> bool {
@@ -48,18 +44,15 @@ impl Aabb {
     }
 
     fn collide_with_x_plane(&self, value: f64, a: DVec3, b: DVec3) -> Option<DVec3> {
-        a.get_intermediate_with_x_value(b, value)
-            .filter(|vec3d| self.intersects_with_yz(*vec3d))
+        a.get_intermediate_with_x_value(b, value).filter(|vec3d| self.intersects_with_yz(*vec3d))
     }
 
     fn collide_with_y_plane(&self, value: f64, a: DVec3, b: DVec3) -> Option<DVec3> {
-        a.get_intermediate_with_y_value(b, value)
-            .filter(|vec3d| self.intersects_with_xz(*vec3d))
+        a.get_intermediate_with_y_value(b, value).filter(|vec3d| self.intersects_with_xz(*vec3d))
     }
 
     fn collide_with_z_plane(&self, value: f64, a: DVec3, b: DVec3) -> Option<DVec3> {
-        a.get_intermediate_with_z_value(b, value)
-            .filter(|vec3d| self.intersects_with_xy(*vec3d))
+        a.get_intermediate_with_z_value(b, value).filter(|vec3d| self.intersects_with_xy(*vec3d))
     }
 
     fn is_closest(a: DVec3, b: Option<DVec3>, c: DVec3) -> bool {

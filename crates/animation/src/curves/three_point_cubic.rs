@@ -28,13 +28,7 @@ pub struct ThreePointCubic {
 }
 
 impl ThreePointCubic {
-    pub const fn new(
-        a1: (f32, f32),
-        b1: (f32, f32),
-        midpoint: (f32, f32),
-        a2: (f32, f32),
-        b2: (f32, f32),
-    ) -> Self {
+    pub const fn new(a1: (f32, f32), b1: (f32, f32), midpoint: (f32, f32), a2: (f32, f32), b2: (f32, f32)) -> Self {
         Self {
             a1: Offset::from_tuple(a1),
             b1: Offset::from_tuple(b1),
@@ -48,29 +42,14 @@ impl ThreePointCubic {
 impl ParametricCurve<f32> for ThreePointCubic {
     fn transform_internal(&self, t: f32) -> f32 {
         let first_curve = t < self.midpoint.dx;
-        let scale_x = if first_curve {
-            self.midpoint.dx
-        } else {
-            1.0 - self.midpoint.dx
-        };
+        let scale_x = if first_curve { self.midpoint.dx } else { 1.0 - self.midpoint.dx };
 
-        let scale_y = if first_curve {
-            self.midpoint.dy
-        } else {
-            1.0 - self.midpoint.dy
-        };
+        let scale_y = if first_curve { self.midpoint.dy } else { 1.0 - self.midpoint.dy };
 
         let scaled_t = (t - (if first_curve { 0.0 } else { self.midpoint.dx })) / scale_x;
 
         if first_curve {
-            Cubic::new(
-                self.a1.dx / scale_x,
-                self.a1.dy / scale_y,
-                self.b1.dx / scale_x,
-                self.b1.dy / scale_y,
-            )
-            .transform(scaled_t)
-                * scale_y
+            Cubic::new(self.a1.dx / scale_x, self.a1.dy / scale_y, self.b1.dx / scale_x, self.b1.dy / scale_y).transform(scaled_t) * scale_y
         } else {
             Cubic::new(
                 (self.a2.dx - self.midpoint.dx) / scale_x,

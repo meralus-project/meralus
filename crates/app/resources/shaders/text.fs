@@ -15,4 +15,4 @@ vec4 toLinear(vec4 sRGB) {
   return vec4(mix(higher, lower, cutoff), sRGB.a);
 }
 
-void main() { f_color = texture2D(font, v_character) * toLinear(text_color); }
+void main() { f_color = texture2D(font, v_character) * /* toLinear( */text_color/* ) */; }

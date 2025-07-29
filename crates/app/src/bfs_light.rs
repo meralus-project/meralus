@@ -24,12 +24,7 @@ impl BfsLight {
         self.queue.push(node);
     }
 
-    pub fn calculate(
-        &mut self,
-        chunk_manager: &mut ChunkManager,
-        blocks: &BakedBlockModelLoader,
-        is_sky_light: bool,
-    ) {
+    pub fn calculate(&mut self, chunk_manager: &mut ChunkManager, blocks: &BakedBlockModelLoader, is_sky_light: bool) {
         while let Some(node) = self.queue.pop() {
             if let Some(chunk) = chunk_manager.get_chunk_mut(&node.1) {
                 let local_position = node.get_position();
@@ -41,9 +36,7 @@ impl BfsLight {
                     let neighbour_pos = world_position + face.as_normal();
                     let neighbour_position = neighbour_pos.as_vec3();
 
-                    if let Some(chunk) =
-                        chunk_manager.get_chunk_mut(&ChunkManager::to_local(neighbour_position))
-                    {
+                    if let Some(chunk) = chunk_manager.get_chunk_mut(&ChunkManager::to_local(neighbour_position)) {
                         let local_position = chunk.to_local(neighbour_position);
 
                         if !chunk.contains_local_position(local_position) {

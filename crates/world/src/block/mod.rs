@@ -105,9 +105,7 @@ impl<'de> Deserialize<'de> for TexturePath {
             where
                 E: Error,
             {
-                let (mod_name, path) = v
-                    .split_once(':')
-                    .ok_or_else(|| Error::custom("invalid texture path format"))?;
+                let (mod_name, path) = v.split_once(':').ok_or_else(|| Error::custom("invalid texture path format"))?;
 
                 Ok(TexturePath(mod_name.to_string(), PathBuf::from(path)))
             }
@@ -150,9 +148,7 @@ impl<'de> Deserialize<'de> for TextureId {
             where
                 E: Error,
             {
-                let id = v
-                    .strip_prefix('#')
-                    .ok_or_else(|| Error::custom("invalid texture id format"))?;
+                let id = v.strip_prefix('#').ok_or_else(|| Error::custom("invalid texture id format"))?;
 
                 Ok(TextureId(id.to_string()))
             }
@@ -218,9 +214,7 @@ impl BlockModel {
     }
 
     pub fn is_opaque(&self) -> bool {
-        self.elements
-            .iter()
-            .any(|element| element.start == Vec3::ZERO && element.end == Vec3::ONE)
+        self.elements.iter().any(|element| element.start == Vec3::ZERO && element.end == Vec3::ONE)
     }
 }
 

@@ -10,9 +10,7 @@ pub struct ChunkManager {
 
 impl ChunkManager {
     pub fn new() -> Self {
-        Self {
-            chunks: HashMap::new(),
-        }
+        Self { chunks: HashMap::new() }
     }
 
     pub fn push(&mut self, chunk: Chunk) {
@@ -42,18 +40,14 @@ impl ChunkManager {
             println!(
                 "[{:18}] Generated chunk at {}: {} opaque blocks ({} / {chunks})",
                 "INFO/WorldGen".bright_green(),
-                format!("{:>2} {:>2}", chunk.origin.x, chunk.origin.y)
-                    .bright_blue()
-                    .bold(),
+                format!("{:>2} {:>2}", chunk.origin.x, chunk.origin.y).bright_blue().bold(),
                 chunk
                     .subchunks
                     .iter()
-                    .fold(0, |c, subchunk| c + subchunk.blocks.iter().fold(
-                        0,
-                        |c, y| c + y
-                            .iter()
-                            .fold(0, |c, z| c + z.iter().filter(|&&x| x != 0).count())
-                    ))
+                    .fold(0, |c, subchunk| c + subchunk
+                        .blocks
+                        .iter()
+                        .fold(0, |c, y| c + y.iter().fold(0, |c, z| c + z.iter().filter(|&&x| x != 0).count())))
                     .bright_blue()
                     .bold(),
                 i + 1
@@ -72,11 +66,7 @@ impl ChunkManager {
 
         let size = (max - min) * 16;
 
-        IVec3::new(
-            size.x + CHUNK_SIZE_I32,
-            CHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32,
-            size.y + CHUNK_SIZE_I32,
-        )
+        IVec3::new(size.x + CHUNK_SIZE_I32, CHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32, size.y + CHUNK_SIZE_I32)
     }
 
     pub fn bounds(&self) -> (IVec2, IVec2) {
@@ -92,15 +82,11 @@ impl ChunkManager {
     }
 
     pub fn to_local(position: Vec3) -> IVec2 {
-        IVec2::new(
-            position.x.floor() as i32 >> 4,
-            position.z.floor() as i32 >> 4,
-        )
+        IVec2::new(position.x.floor() as i32 >> 4, position.z.floor() as i32 >> 4)
     }
 
     pub fn to_chunk_local(&self, position: Vec3) -> Option<U16Vec3> {
-        self.get_chunk(&Self::to_local(position))
-            .map(|chunk| chunk.to_local(position))
+        self.get_chunk(&Self::to_local(position)).map(|chunk| chunk.to_local(position))
     }
 
     pub fn get_chunk(&self, position: &IVec2) -> Option<&Chunk> {
@@ -136,8 +122,7 @@ impl ChunkManager {
     }
 
     pub fn contains_block(&self, position: Vec3) -> bool {
-        self.get_chunk(&Self::to_local(position))
-            .is_some_and(|chunk| chunk.check_for_block(position))
+        self.get_chunk(&Self::to_local(position)).is_some_and(|chunk| chunk.check_for_block(position))
     }
 
     pub fn contains_chunk(&self, origin: &IVec2) -> bool {
@@ -145,42 +130,39 @@ impl ChunkManager {
     }
 
     pub fn get_block_light(&self, position: Vec3) -> u8 {
-        self.get_chunk(&Self::to_local(position))
-            .map_or(15, |chunk| {
-                let local_position = chunk.to_local(position);
+        self.get_chunk(&Self::to_local(position)).map_or(15, |chunk| {
+            let local_position = chunk.to_local(position);
 
-                if chunk.contains_local_position(local_position) {
-                    chunk.get_block_light(local_position)
-                } else {
-                    15
-                }
-            })
+            if chunk.contains_local_position(local_position) {
+                chunk.get_block_light(local_position)
+            } else {
+                15
+            }
+        })
     }
 
     pub fn get_sky_light(&self, position: Vec3) -> u8 {
-        self.get_chunk(&Self::to_local(position))
-            .map_or(15, |chunk| {
-                let local_position = chunk.to_local(position);
+        self.get_chunk(&Self::to_local(position)).map_or(15, |chunk| {
+            let local_position = chunk.to_local(position);
 
-                if chunk.contains_local_position(local_position) {
-                    chunk.get_sky_light(local_position)
-                } else {
-                    15
-                }
-            })
+            if chunk.contains_local_position(local_position) {
+                chunk.get_sky_light(local_position)
+            } else {
+                15
+            }
+        })
     }
 
     pub fn get_light(&self, position: Vec3) -> u8 {
-        self.get_chunk(&Self::to_local(position))
-            .map_or(240, |chunk| {
-                let local_position = chunk.to_local(position);
+        self.get_chunk(&Self::to_local(position)).map_or(240, |chunk| {
+            let local_position = chunk.to_local(position);
 
-                if chunk.contains_local_position(local_position) {
-                    chunk.get_light_level(local_position)
-                } else {
-                    240
-                }
-            })
+            if chunk.contains_local_position(local_position) {
+                chunk.get_light_level(local_position)
+            } else {
+                240
+            }
+        })
     }
 
     pub fn len(&self) -> usize {

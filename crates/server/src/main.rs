@@ -31,18 +31,14 @@ impl ServerState {
     pub fn load_chunk(&mut self, origin: IVec2) -> &Chunk {
         self.chunks.push(Chunk::new(origin));
 
-        let Some(chunk) = self.chunks.get_chunk(&origin) else {
-            unreachable!()
-        };
+        let Some(chunk) = self.chunks.get_chunk(&origin) else { unreachable!() };
 
         chunk
     }
 
     pub fn try_load_chunk(&mut self, origin: IVec2) -> &Chunk {
         if self.chunks.contains_chunk(&origin) {
-            let Some(chunk) = self.chunks.get_chunk(&origin) else {
-                unreachable!()
-            };
+            let Some(chunk) = self.chunks.get_chunk(&origin) else { unreachable!() };
 
             chunk
         } else {
@@ -51,11 +47,9 @@ impl ServerState {
     }
 
     pub fn players_excluding(&self, uuid: Uuid) -> impl Iterator<Item = &Sender<OutgoingPacket>> {
-        self.player_channels.iter().filter_map(
-            move |(key, value)| {
-                if key == &uuid { Some(value) } else { None }
-            },
-        )
+        self.player_channels
+            .iter()
+            .filter_map(move |(key, value)| if key == &uuid { Some(value) } else { None })
     }
 }
 
@@ -101,19 +95,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 state.players.insert(uuid, player);
                             }
 
-                            connection
-                                .send(OutgoingPacket::UuidAssigned { uuid })
-                                .await
-                                .unwrap();
+                            connection.send(OutgoingPacket::UuidAssigned { uuid }).await.unwrap();
 
                             for player in state.read().await.players_excluding(uuid) {
-                                player
-                                    .send(OutgoingPacket::PlayerConnected {
-                                        uuid,
-                                        name: name.clone(),
-                                    })
-                                    .await
-                                    .unwrap();
+                                player.send(OutgoingPacket::PlayerConnected { uuid, name: name.clone() }).await.unwrap();
                             }
                         }
                         packet => {
@@ -123,39 +108,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                             match packet {
                                 IncomingPacket::PlayerMoved { uuid, position } => {
-                                    if let Some(player) = state.write().await.players.get_mut(&uuid)
-                                    {
+                                    if let Some(player) = state.write().await.players.get_mut(&uuid) {
                                         player.position = position;
                                     }
 
-                                    for player in state.read().await.players_excluding(current_uuid)
-                                    {
-                                        player
-                                            .send(OutgoingPacket::PlayerMoved { uuid, position })
-                                            .await
-                                            .unwrap();
+                                    for player in state.read().await.players_excluding(current_uuid) {
+                                        player.send(OutgoingPacket::PlayerMoved { uuid, position }).await.unwrap();
                                     }
                                 }
                                 IncomingPacket::GetPlayers => connection
                                     .send(OutgoingPacket::PlayersList {
-                                        players: state
-                                            .read()
-                                            .await
-                                            .players
-                                            .values()
-                                            .cloned()
-                                            .collect(),
+                                        players: state.read().await.players.values().cloned().collect(),
                                     })
                                     .await
                                     .unwrap(),
                                 IncomingPacket::RequestChunk { origin } => {
-                                    let data =
-                                        state.write().await.try_load_chunk(origin).serialize();
+                                    let data = state.write().await.try_load_chunk(origin).serialize();
 
-                                    connection
-                                        .send(OutgoingPacket::ChunkData { data })
-                                        .await
-                                        .unwrap();
+                                    connection.send(OutgoingPacket::ChunkData { data }).await.unwrap();
                                 }
                                 IncomingPacket::PlayerConnected { .. } => unreachable!(),
                             }
@@ -172,10 +142,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 state.write().await.player_channels.remove(&uuid);
 
                 for player in state.read().await.player_channels.values() {
-                    player
-                        .send(OutgoingPacket::PlayerDisonnected { uuid })
-                        .await
-                        .unwrap();
+                    player.send(OutgoingPacket::PlayerDisonnected { uuid }).await.unwrap();
                 }
             }
         });
@@ -203,11 +170,7 @@ mod tests {
         encoder.write_all(&serialized).await.unwrap();
         encoder.shutdown().await.unwrap();
 
-        println!(
-            "Serialized: {} bytes. Compressed: {} bytes.",
-            serialized.len(),
-            compressed.len()
-        );
+        println!("Serialized: {} bytes. Compressed: {} bytes.", serialized.len(), compressed.len());
 
         let mut data = Vec::new();
         let mut decoder = ZlibDecoder::new(&mut data);

@@ -96,14 +96,7 @@ impl Corner {
 }
 
 impl Face {
-    pub const ALL: [Self; 6] = [
-        Self::Bottom,
-        Self::Top,
-        Self::Left,
-        Self::Right,
-        Self::Front,
-        Self::Back,
-    ];
+    pub const ALL: [Self; 6] = [Self::Bottom, Self::Top, Self::Left, Self::Right, Self::Front, Self::Back];
     pub const BOOL_VERTICES: [[bool; 3]; 8] = [
         [false, false, true],  // 0 LEFT  BOTTOM FRONT
         [true, false, true],   // 1 RIGHT BOTTOM FRONT
@@ -200,120 +193,39 @@ impl Face {
     }
 
     pub fn as_vertice_corners(self) -> [Corner; 4] {
-        self.as_vertices()
-            .map(|vertice| Corner::from_vec(self, vertice))
+        self.as_vertices().map(|vertice| Corner::from_vec(self, vertice))
     }
 
     pub const fn as_bool_vertices(self) -> [[bool; 3]; 4] {
         match self {
-            Self::Top => [
-                Self::BOOL_VERTICES[2],
-                Self::BOOL_VERTICES[6],
-                Self::BOOL_VERTICES[7],
-                Self::BOOL_VERTICES[3],
-            ],
-            Self::Bottom => [
-                Self::BOOL_VERTICES[1],
-                Self::BOOL_VERTICES[5],
-                Self::BOOL_VERTICES[4],
-                Self::BOOL_VERTICES[0],
-            ],
-            Self::Left => [
-                Self::BOOL_VERTICES[4],
-                Self::BOOL_VERTICES[6],
-                Self::BOOL_VERTICES[2],
-                Self::BOOL_VERTICES[0],
-            ],
-            Self::Right => [
-                Self::BOOL_VERTICES[1],
-                Self::BOOL_VERTICES[3],
-                Self::BOOL_VERTICES[7],
-                Self::BOOL_VERTICES[5],
-            ],
-            Self::Front => [
-                Self::BOOL_VERTICES[1],
-                Self::BOOL_VERTICES[0],
-                Self::BOOL_VERTICES[2],
-                Self::BOOL_VERTICES[3],
-            ],
-            Self::Back => [
-                Self::BOOL_VERTICES[5],
-                Self::BOOL_VERTICES[7],
-                Self::BOOL_VERTICES[6],
-                Self::BOOL_VERTICES[4],
-            ],
+            Self::Top => [Self::BOOL_VERTICES[2], Self::BOOL_VERTICES[6], Self::BOOL_VERTICES[7], Self::BOOL_VERTICES[3]],
+            Self::Bottom => [Self::BOOL_VERTICES[1], Self::BOOL_VERTICES[5], Self::BOOL_VERTICES[4], Self::BOOL_VERTICES[0]],
+            Self::Left => [Self::BOOL_VERTICES[4], Self::BOOL_VERTICES[6], Self::BOOL_VERTICES[2], Self::BOOL_VERTICES[0]],
+            Self::Right => [Self::BOOL_VERTICES[1], Self::BOOL_VERTICES[3], Self::BOOL_VERTICES[7], Self::BOOL_VERTICES[5]],
+            Self::Front => [Self::BOOL_VERTICES[1], Self::BOOL_VERTICES[0], Self::BOOL_VERTICES[2], Self::BOOL_VERTICES[3]],
+            Self::Back => [Self::BOOL_VERTICES[5], Self::BOOL_VERTICES[7], Self::BOOL_VERTICES[6], Self::BOOL_VERTICES[4]],
         }
     }
 
     #[must_use]
     pub const fn as_vertices(self) -> [Vec3; 4] {
         match self {
-            Self::Top => [
-                Self::VERTICES[2],
-                Self::VERTICES[6],
-                Self::VERTICES[7],
-                Self::VERTICES[3],
-            ],
-            Self::Bottom => [
-                Self::VERTICES[1],
-                Self::VERTICES[5],
-                Self::VERTICES[4],
-                Self::VERTICES[0],
-            ],
-            Self::Left => [
-                Self::VERTICES[4],
-                Self::VERTICES[6],
-                Self::VERTICES[2],
-                Self::VERTICES[0],
-            ],
-            Self::Right => [
-                Self::VERTICES[1],
-                Self::VERTICES[3],
-                Self::VERTICES[7],
-                Self::VERTICES[5],
-            ],
-            Self::Front => [
-                Self::VERTICES[1],
-                Self::VERTICES[0],
-                Self::VERTICES[2],
-                Self::VERTICES[3],
-            ],
-            Self::Back => [
-                Self::VERTICES[5],
-                Self::VERTICES[7],
-                Self::VERTICES[6],
-                Self::VERTICES[4],
-            ],
+            Self::Top => [Self::VERTICES[2], Self::VERTICES[6], Self::VERTICES[7], Self::VERTICES[3]],
+            Self::Bottom => [Self::VERTICES[1], Self::VERTICES[5], Self::VERTICES[4], Self::VERTICES[0]],
+            Self::Left => [Self::VERTICES[4], Self::VERTICES[6], Self::VERTICES[2], Self::VERTICES[0]],
+            Self::Right => [Self::VERTICES[1], Self::VERTICES[3], Self::VERTICES[7], Self::VERTICES[5]],
+            Self::Front => [Self::VERTICES[1], Self::VERTICES[0], Self::VERTICES[2], Self::VERTICES[3]],
+            Self::Back => [Self::VERTICES[5], Self::VERTICES[7], Self::VERTICES[6], Self::VERTICES[4]],
         }
     }
 
     #[must_use]
     pub const fn as_uv(self) -> [Vec2; 4] {
         match self {
-            Self::Top | Self::Front => [
-                vec2(0.0, 0.0),
-                vec2(1.0, 0.0),
-                vec2(1.0, 1.0),
-                vec2(0.0, 1.0),
-            ],
-            Self::Bottom => [
-                vec2(0.0, 1.0),
-                vec2(1.0, 1.0),
-                vec2(1.0, 0.0),
-                vec2(0.0, 0.0),
-            ],
-            Self::Right => [
-                vec2(1.0, 0.0),
-                vec2(1.0, 1.0),
-                vec2(0.0, 1.0),
-                vec2(0.0, 0.0),
-            ],
-            Self::Left | Self::Back => [
-                vec2(0.0, 0.0),
-                vec2(0.0, 1.0),
-                vec2(1.0, 1.0),
-                vec2(1.0, 0.0),
-            ],
+            Self::Top | Self::Front => [vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0)],
+            Self::Bottom => [vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, 0.0), vec2(0.0, 0.0)],
+            Self::Right => [vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(0.0, 0.0)],
+            Self::Left | Self::Back => [vec2(0.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, 0.0)],
         }
     }
 
@@ -374,9 +286,6 @@ mod tests {
         let top = Face::Top.as_vertices();
         let bottom = Face::Bottom.as_vertices();
 
-        println!(
-            "{top:?} - {bottom:?} = {:?}",
-            array::from_fn::<_, 4, _>(|i| top[i] - bottom[i])
-        );
+        println!("{top:?} - {bottom:?} = {:?}", array::from_fn::<_, 4, _>(|i| top[i] - bottom[i]));
     }
 }

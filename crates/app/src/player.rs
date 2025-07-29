@@ -5,8 +5,7 @@ use meralus_engine::KeyCode;
 use meralus_world::ChunkManager;
 
 use crate::{
-    Aabb, BakedBlockModelLoader, Camera, KeyboardController, get_movement_direction,
-    get_rotation_directions,
+    Aabb, BakedBlockModelLoader, Camera, KeyboardController, get_movement_direction, get_rotation_directions,
     raycast::{HitType, RayCastResult},
     util::ChunkManagerPhysics,
 };
@@ -30,12 +29,7 @@ impl Default for PlayerController {
         let yaw: f32 = 0.0;
         let pitch: f32 = 0.0;
 
-        let front = vec3(
-            yaw.cos() * pitch.cos(),
-            pitch.sin(),
-            yaw.sin() * pitch.cos(),
-        )
-        .normalize();
+        let front = vec3(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
 
         let right = front.cross(Vec3::Y).normalize();
         let up = right.cross(front).normalize();
@@ -59,7 +53,7 @@ impl PlayerController {
     pub const GRAVITY: f32 = 9.81 * 1.5;
     pub const LOOK_SPEED: f32 = 0.1;
     pub const MOUSE_SENSE: f32 = 0.05;
-    pub const MOVE_SPEED: f32 = 4.;
+    pub const MOVE_SPEED: f32 = 4.0;
 
     pub fn get_vector_for_rotation(&self) -> DVec3 {
         let f = (self.yaw - f32::consts::PI).cos();
@@ -84,11 +78,11 @@ impl PlayerController {
 
         let velocity = ((front * direction.z) + (right * direction.x))
             * if keyboard.is_key_pressed(KeyCode::ShiftLeft) && direction.z > 0.0 {
-                camera.fov = camera.fov.lerp(65.0_f32.to_radians(), 0.15);
+                camera.fov = camera.fov.lerp(65f32.to_radians(), 0.15);
 
                 Self::MOVE_SPEED * 1.5
             } else {
-                camera.fov = camera.fov.lerp(55.0_f32.to_radians(), 0.15);
+                camera.fov = camera.fov.lerp(55f32.to_radians(), 0.15);
 
                 Self::MOVE_SPEED
             };
@@ -104,8 +98,7 @@ impl PlayerController {
             self.velocity.y = 0.0;
         }
 
-        if keyboard.is_key_pressed(KeyCode::Space) && self.is_on_ground && Self::AFFECTED_BY_PHYSICS
-        {
+        if keyboard.is_key_pressed(KeyCode::Space) && self.is_on_ground && Self::AFFECTED_BY_PHYSICS {
             self.velocity.y = 5.0;
         } else if keyboard.is_key_pressed(KeyCode::Space) && !Self::AFFECTED_BY_PHYSICS {
             self.position.y += 0.5;
@@ -118,12 +111,8 @@ impl PlayerController {
         self.move_and_collide(chunk_manager, models, delta);
     }
 
-    pub fn update_looking_at(
-        &mut self,
-        chunk_manager: &ChunkManager,
-        models: &BakedBlockModelLoader,
-    ) {
-        let block_reach_distance = 20.0f32;
+    pub fn update_looking_at(&mut self, chunk_manager: &ChunkManager, models: &BakedBlockModelLoader) {
+        let block_reach_distance = 20f32;
 
         let origin = self.position;
         let target = origin + (self.front * block_reach_distance);
@@ -133,12 +122,7 @@ impl PlayerController {
             .filter(|result| result.hit_type == HitType::Block);
     }
 
-    pub fn move_and_collide(
-        &mut self,
-        chunk_manager: &ChunkManager,
-        models: &BakedBlockModelLoader,
-        delta: f32,
-    ) {
+    pub fn move_and_collide(&mut self, chunk_manager: &ChunkManager, models: &BakedBlockModelLoader, delta: f32) {
         let mut remaining_movement = self.velocity.as_dvec3() * f64::from(delta);
         let mut actual_movement = [0.0; 3];
 
@@ -151,16 +135,10 @@ impl PlayerController {
 
             test_pos[axis] += remaining_movement[axis];
 
-            let test_aabb = Aabb::new(
-                test_pos - dvec3(0.5, 2.0, 0.5),
-                test_pos + dvec3(0.5, 0.0, 0.5),
-            );
+            let test_aabb = Aabb::new(test_pos - dvec3(0.5, 2.0, 0.5), test_pos + dvec3(0.5, 0.0, 0.5));
 
             if chunk_manager.collides(test_aabb) {
-                self.is_on_ground = chunk_manager
-                    .get_colliders(test_pos, test_aabb)
-                    .bottom
-                    .is_some();
+                self.is_on_ground = chunk_manager.get_colliders(test_pos, test_aabb).bottom.is_some();
 
                 // Try smaller steps for more precision
                 let mut step = remaining_movement[axis].abs();
@@ -170,10 +148,7 @@ impl PlayerController {
                 while step > 0.001 {
                     test_pos[axis] = direction.mul_add(step, self.position[axis].into());
 
-                    let test_aabb = Aabb::new(
-                        test_pos - dvec3(0.5, 2.0, 0.5),
-                        test_pos + dvec3(0.5, 0.0, 0.5),
-                    );
+                    let test_aabb = Aabb::new(test_pos - dvec3(0.5, 2.0, 0.5), test_pos + dvec3(0.5, 0.0, 0.5));
 
                     if !chunk_manager.collides(test_aabb) {
                         self.position[axis] = test_pos[axis] as f32;
@@ -198,24 +173,14 @@ impl PlayerController {
         self.update_looking_at(chunk_manager, models);
     }
 
-    pub fn handle_mouse(
-        &mut self,
-        chunk_manager: &ChunkManager,
-        models: &BakedBlockModelLoader,
-        mouse_delta: Vec2,
-    ) {
+    pub fn handle_mouse(&mut self, chunk_manager: &ChunkManager, models: &BakedBlockModelLoader, mouse_delta: Vec2) {
         self.yaw += mouse_delta.x * Self::MOUSE_SENSE * Self::LOOK_SPEED;
         self.pitch += mouse_delta.y * Self::MOUSE_SENSE * -Self::LOOK_SPEED;
 
         self.pitch = if self.pitch > 1.5 { 1.5 } else { self.pitch };
         self.pitch = if self.pitch < -1.5 { -1.5 } else { self.pitch };
 
-        self.front = vec3(
-            self.yaw.cos() * self.pitch.cos(),
-            self.pitch.sin(),
-            self.yaw.sin() * self.pitch.cos(),
-        )
-        .normalize();
+        self.front = vec3(self.yaw.cos() * self.pitch.cos(), self.pitch.sin(), self.yaw.sin() * self.pitch.cos()).normalize();
 
         self.update_looking_at(chunk_manager, models);
 

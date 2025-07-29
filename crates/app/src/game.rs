@@ -6,9 +6,10 @@ use std::{
 use ahash::HashMap;
 use glam::{IVec2, Vec2, Vec3};
 use image::RgbaImage;
+use meralus_graphics::Voxel;
 use meralus_world::Face;
 
-use crate::{BakedBlockModelLoader, Block, BlockManager, TextureLoader, renderers::Voxel};
+use crate::{BakedBlockModelLoader, Block, BlockManager, TextureLoader};
 
 pub struct ResourceManager {
     textures: TextureLoader,
@@ -43,7 +44,7 @@ impl ResourceManager {
     // pub fn players(&self) -> &[Player] {
     //     &self.players
     // }
-    
+
     pub fn register_block<T: Block + 'static>(&mut self, block: T) {
         let id = block.id();
 
@@ -53,9 +54,7 @@ impl ResourceManager {
     }
 
     pub fn load_block<P: AsRef<Path>>(&mut self, path: P) {
-        self.models
-            .load(&mut self.textures, &self.root, path)
-            .unwrap();
+        self.models.load(&mut self.textures, &self.root, path).unwrap();
     }
 
     pub fn load_buitlin_blocks(&mut self) {
@@ -65,12 +64,8 @@ impl ResourceManager {
             root.sort_by_key(DirEntry::file_name);
 
             for entry in root {
-                if entry.metadata().is_ok_and(|metadata| metadata.is_file())
-                    && !entry.file_name().to_string_lossy().starts_with("cuboid")
-                {
-                    self.models
-                        .load(&mut self.textures, &self.root, entry.path())
-                        .unwrap();
+                if entry.metadata().is_ok_and(|metadata| metadata.is_file()) && !entry.file_name().to_string_lossy().starts_with("cuboid") {
+                    self.models.load(&mut self.textures, &self.root, entry.path()).unwrap();
                 }
             }
         }
@@ -98,5 +93,9 @@ impl ResourceManager {
 
     pub fn get_texture<I: AsRef<str>>(&self, name: I) -> Option<(Vec2, Vec2, u8)> {
         self.textures.get_texture(name.as_ref())
+    }
+
+    pub fn get_block(&self, id: usize) -> Option<&str> {
+        self.blocks.get(id)
     }
 }

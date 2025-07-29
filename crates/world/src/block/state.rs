@@ -34,10 +34,7 @@ pub enum ConditionValue {
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 pub enum BlockCondition {
-    Equals {
-        target: String,
-        value: ConditionValue,
-    },
+    Equals { target: String, value: ConditionValue },
 }
 
 impl BlockCondition {
@@ -47,9 +44,7 @@ impl BlockCondition {
                 target == other.name
                     && match (value, other.value) {
                         (ConditionValue::Number(a), PropertyValue::Number(b)) => a == &b,
-                        (ConditionValue::Float(a), PropertyValue::Float(b)) => {
-                            (a - b).abs() < f32::EPSILON
-                        }
+                        (ConditionValue::Float(a), PropertyValue::Float(b)) => (a - b).abs() < f32::EPSILON,
                         (ConditionValue::String(a), PropertyValue::String(b)) => a == b,
                         (ConditionValue::Boolean(a), PropertyValue::Boolean(b)) => a == &b,
                         _ => false,

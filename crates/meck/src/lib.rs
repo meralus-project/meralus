@@ -67,8 +67,7 @@ impl<K: Hash + Eq> TextureAtlas<K> {
     pub fn with_mipmaps(mut self, mipmaps: u32) -> Self {
         let (width, height) = self.main_texture().dimensions();
 
-        self.mipmaps
-            .extend((1..=mipmaps).map(|level| RgbaImage::new(width >> level, height >> level)));
+        self.mipmaps.extend((1..=mipmaps).map(|level| RgbaImage::new(width >> level, height >> level)));
 
         self
     }
@@ -108,13 +107,7 @@ impl<K: Hash + Eq> TextureAtlas<K> {
         K: Borrow<Q>,
     {
         self.get_texture_rect(key)
-            .map(|(Rect { origin, size }, alpha)| {
-                (
-                    origin.to_raw().as_vec2() / self.size(),
-                    size.to_raw().as_vec2() / self.size(),
-                    alpha,
-                )
-            })
+            .map(|(Rect { origin, size }, alpha)| (origin.to_raw().as_vec2() / self.size(), size.to_raw().as_vec2() / self.size(), alpha))
     }
 
     pub fn textures(&self) -> usize {
@@ -181,10 +174,7 @@ impl<K: Hash + Eq> TextureAtlas<K> {
             .copy_from(image, 0, 0)?;
 
         self.texture_map.insert(key, (offset, alpha));
-        self.next_texture_offset = UVec2::new(
-            offset.origin.x + offset.size.width + self.spacing,
-            offset.origin.y,
-        );
+        self.next_texture_offset = UVec2::new(offset.origin.x + offset.size.width + self.spacing, offset.origin.y);
 
         Ok((
             offset.origin.to_raw().as_vec2() / self.size(),

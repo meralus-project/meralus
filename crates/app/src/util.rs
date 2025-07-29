@@ -1,5 +1,6 @@
-use glam::{DVec3, Vec2, Vec3, ivec3, vec2, vec3};
+use glam::{DVec3, Mat4, Vec2, Vec3, ivec3, vec2, vec3};
 use meralus_engine::KeyCode;
+use meralus_graphics::Line;
 use meralus_shared::{Color, Cube3D};
 use meralus_world::{ChunkManager, Face};
 
@@ -7,7 +8,6 @@ use crate::{
     Aabb, BakedBlockModelLoader, Camera, KeyboardController,
     loaders::BakedBlockModel,
     raycast::{HitType, RayCastResult},
-    renderers::Line,
     world::Colliders,
 };
 
@@ -18,19 +18,19 @@ pub fn get_movement_direction(keyboard: &KeyboardController) -> Vec3 {
     let mut direction = Vec3::ZERO;
 
     if keyboard.is_key_pressed(KeyCode::KeyW) {
-        direction.z += 1.;
+        direction.z += 1.0;
     }
 
     if keyboard.is_key_pressed(KeyCode::KeyS) {
-        direction.z -= 1.;
+        direction.z -= 1.0;
     }
 
     if keyboard.is_key_pressed(KeyCode::KeyA) {
-        direction.x -= 1.;
+        direction.x -= 1.0;
     }
 
     if keyboard.is_key_pressed(KeyCode::KeyD) {
-        direction.x += 1.;
+        direction.x += 1.0;
     }
 
     direction
@@ -38,12 +38,7 @@ pub fn get_movement_direction(keyboard: &KeyboardController) -> Vec3 {
 
 #[must_use]
 pub fn get_rotation_directions(yaw: f32, pitch: f32) -> (Vec3, Vec3, Vec3) {
-    let front: Vec3 = vec3(
-        yaw.cos() * pitch.cos(),
-        pitch.sin(),
-        yaw.sin() * pitch.cos(),
-    )
-    .normalize();
+    let front: Vec3 = vec3(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
 
     let right = front.cross(Vec3::Y).normalize();
 
@@ -89,27 +84,6 @@ impl AsColor for Vec3 {
     }
 }
 
-pub trait CameraExt {
-    fn unproject_position(&self, width: f32, height: f32, position: Vec3) -> Option<(Vec2, f32)>;
-}
-
-impl CameraExt for Camera {
-    fn unproject_position(&self, width: f32, height: f32, position: Vec3) -> Option<(Vec2, f32)> {
-        let clip_space = self.matrix() * position.extend(1.0);
-
-        if clip_space.w <= 0.0 {
-            return None;
-        }
-
-        let ndc = clip_space.truncate() / clip_space.w;
-
-        let x = (ndc.x + 1.0) * 0.5 * width;
-        let y = (1.0 - ndc.y) * 0.5 * height;
-
-        Some((vec2(x, y), clip_space.w))
-    }
-}
-
 pub trait VecExt<T>: Sized {
     fn get_intermediate_with_x_value(&self, vec: Self, x: T) -> Option<Self>;
     fn get_intermediate_with_y_value(&self, vec: Self, y: T) -> Option<Self>;
@@ -128,11 +102,7 @@ impl VecExt<f64> for DVec3 {
             let d3 = (x - self.x) / d0;
 
             if (0.0..=1.0).contains(&d3) {
-                Some(Self::new(
-                    d0.mul_add(d3, self.x),
-                    d1.mul_add(d3, self.y),
-                    d2.mul_add(d3, self.z),
-                ))
+                Some(Self::new(d0.mul_add(d3, self.x), d1.mul_add(d3, self.y), d2.mul_add(d3, self.z)))
             } else {
                 None
             }
@@ -150,11 +120,7 @@ impl VecExt<f64> for DVec3 {
             let d3 = (y - self.y) / d1;
 
             if (0.0..=1.0).contains(&d3) {
-                Some(Self::new(
-                    d0.mul_add(d3, self.x),
-                    d1.mul_add(d3, self.y),
-                    d2.mul_add(d3, self.z),
-                ))
+                Some(Self::new(d0.mul_add(d3, self.x), d1.mul_add(d3, self.y), d2.mul_add(d3, self.z)))
             } else {
                 None
             }
@@ -172,11 +138,7 @@ impl VecExt<f64> for DVec3 {
             let d3 = (z - self.x) / d2;
 
             if (0.0..=1.0).contains(&d3) {
-                Some(Self::new(
-                    d0.mul_add(d3, self.x),
-                    d1.mul_add(d3, self.y),
-                    d2.mul_add(d3, self.z),
-                ))
+                Some(Self::new(d0.mul_add(d3, self.x), d1.mul_add(d3, self.y), d2.mul_add(d3, self.z)))
             } else {
                 None
             }
@@ -205,64 +167,30 @@ pub fn cube_outline(Cube3D { origin, size }: Cube3D) -> [Line; 12] {
         [[0.0, 0.0, 0.0], [0.0, size.height, 0.0]],
         [[size.width, 0.0, 0.0], [size.width, size.height, 0.0]],
         [[0.0, 0.0, size.depth], [0.0, size.height, size.depth]],
-        [[size.width, 0.0, size.depth], [
-            size.width,
-            size.height,
-            size.depth,
-        ]],
+        [[size.width, 0.0, size.depth], [size.width, size.height, size.depth]],
         [[0.0, 0.0, 0.0], [size.width, 0.0, 0.0]],
         [[0.0, 0.0, 0.0], [0.0, 0.0, size.depth]],
         [[size.width, 0.0, 0.0], [size.width, 0.0, size.depth]],
         [[0.0, 0.0, size.depth], [size.width, 0.0, size.depth]],
         [[0.0, size.height, 0.0], [size.width, size.height, 0.0]],
         [[0.0, size.height, 0.0], [0.0, size.height, size.depth]],
-        [[size.width, size.height, 0.0], [
-            size.width,
-            size.height,
-            size.depth,
-        ]],
-        [[0.0, size.height, size.depth], [
-            size.width,
-            size.height,
-            size.depth,
-        ]],
+        [[size.width, size.height, 0.0], [size.width, size.height, size.depth]],
+        [[0.0, size.height, size.depth], [size.width, size.height, size.depth]],
     ]
-    .map(|[start, end]| {
-        Line::new(
-            origin.to_raw() + Vec3::from_array(start),
-            origin.to_raw() + Vec3::from_array(end),
-            Color::BLUE,
-        )
-    })
+    .map(|[start, end]| Line::new(origin.to_raw() + Vec3::from_array(start), origin.to_raw() + Vec3::from_array(end), Color::BLUE))
 }
 
 pub trait ChunkManagerPhysics {
     fn collides(&self, aabb: Aabb) -> bool;
     fn get_colliders(&self, collider_position: DVec3, aabb: Aabb) -> Colliders;
-    fn raycast(
-        &self,
-        models: &BakedBlockModelLoader,
-        origin: DVec3,
-        target: DVec3,
-        last_uncollidable_block: bool,
-    ) -> Option<RayCastResult>;
+    fn raycast(&self, models: &BakedBlockModelLoader, origin: DVec3, target: DVec3, last_uncollidable_block: bool) -> Option<RayCastResult>;
 
-    fn get_model_for<'a>(
-        &self,
-        models: &'a BakedBlockModelLoader,
-        position: Vec3,
-    ) -> Option<&'a BakedBlockModel>;
+    fn get_model_for<'a>(&self, models: &'a BakedBlockModelLoader, position: Vec3) -> Option<&'a BakedBlockModel>;
 }
 
 fn raycast_into(position: Vec3, start: DVec3, end: DVec3, aabb: Aabb) -> Option<RayCastResult> {
     aabb.calculate_intercept(start - position.as_dvec3(), end - position.as_dvec3())
-        .map(|raytraceresult| {
-            RayCastResult::new3(
-                raytraceresult.hit_vec + position.as_dvec3(),
-                raytraceresult.hit_side,
-                position,
-            )
-        })
+        .map(|raytraceresult| RayCastResult::new3(raytraceresult.hit_vec + position.as_dvec3(), raytraceresult.hit_side, position))
 }
 
 impl ChunkManagerPhysics for ChunkManager {
@@ -278,10 +206,7 @@ impl ChunkManagerPhysics for ChunkManager {
                     if self.contains_block(position.as_vec3()) {
                         let block = Aabb::new(position, position + DVec3::ONE);
 
-                        if aabb.intersects_with_x(block)
-                            && aabb.intersects_with_y(block)
-                            && aabb.intersects_with_z(block)
-                        {
+                        if aabb.intersects_with_x(block) && aabb.intersects_with_y(block) && aabb.intersects_with_z(block) {
                             return true;
                         }
                     }
@@ -306,10 +231,7 @@ impl ChunkManagerPhysics for ChunkManager {
                     if self.contains_block(position.as_vec3()) {
                         let block = Aabb::new(position, position + DVec3::ONE);
 
-                        if aabb.intersects_with_x(block)
-                            && aabb.intersects_with_y(block)
-                            && aabb.intersects_with_z(block)
-                        {
+                        if aabb.intersects_with_x(block) && aabb.intersects_with_y(block) && aabb.intersects_with_z(block) {
                             let colliding_position = position - collider_position.floor();
 
                             if colliding_position.x < 0.0 {
@@ -334,181 +256,169 @@ impl ChunkManagerPhysics for ChunkManager {
         colliders
     }
 
-    fn raycast(
-        &self,
-        models: &BakedBlockModelLoader,
-        mut origin: DVec3,
-        target: DVec3,
-        last_uncollidable_block: bool,
-    ) -> Option<RayCastResult> {
+    fn raycast(&self, models: &BakedBlockModelLoader, mut origin: DVec3, target: DVec3, last_uncollidable_block: bool) -> Option<RayCastResult> {
         if origin.is_nan() || target.is_nan() {
-            None
-        } else {
-            let mut start = origin.floor();
-            let end = target.floor();
+            return None;
+        }
 
-            let mut position = start.as_vec3();
-            let block = self.get_model_for(models, position);
+        let mut start = origin.floor();
+        let end = target.floor();
 
-            if let Some(block) = block {
-                let result = raycast_into(position, origin, target, Aabb::from(block.bounding_box));
+        let mut position = start.as_vec3();
+        let block = self.get_model_for(models, position);
 
-                if result.is_some() {
-                    return result;
-                }
-            }
+        if let Some(block) = block {
+            let result = raycast_into(position, origin, target, Aabb::from(block.bounding_box));
 
-            let mut result: Option<RayCastResult> = None;
-
-            for _ in 0..200 {
-                if origin.is_nan() {
-                    return None;
-                }
-
-                if (start.x - end.x).abs() < 0.0001
-                    && (start.y - end.y).abs() < 0.0001
-                    && (start.z - end.z).abs() < 0.0001
-                {
-                    return if last_uncollidable_block {
-                        result
-                    } else {
-                        None
-                    };
-                }
-
-                let mut modify_d3 = true;
-                let mut modify_d4 = true;
-                let mut modify_d5 = true;
-
-                let mut d0 = 999.0f64;
-                let mut d1 = 999.0f64;
-                let mut d2 = 999.0f64;
-
-                if end.x > start.x {
-                    d0 = start.x + 1.0;
-                } else if end.x < start.x {
-                    d0 = start.x + 0.0;
-                } else {
-                    modify_d3 = false;
-                }
-
-                if end.y > start.y {
-                    d1 = start.y + 1.0;
-                } else if end.y < start.y {
-                    d1 = start.y + 0.0;
-                } else {
-                    modify_d4 = false;
-                }
-
-                if end.z > start.z {
-                    d2 = start.z + 1.0;
-                } else if end.z < start.z {
-                    d2 = start.z + 0.0;
-                } else {
-                    modify_d5 = false;
-                }
-
-                let mut d3 = 999.0f64;
-                let mut d4 = 999.0f64;
-                let mut d5 = 999.0f64;
-
-                let d6 = target.x - origin.x;
-                let d7 = target.y - origin.y;
-                let d8 = target.z - origin.z;
-
-                if modify_d3 {
-                    d3 = (d0 - origin.x) / d6;
-                }
-
-                if modify_d4 {
-                    d4 = (d1 - origin.y) / d7;
-                }
-
-                if modify_d5 {
-                    d5 = (d2 - origin.z) / d8;
-                }
-
-                if d3 == -0.0 {
-                    d3 = -0.0001;
-                }
-
-                if d4 == -0.0 {
-                    d4 = -0.0001;
-                }
-
-                if d5 == -0.0 {
-                    d5 = -0.0001;
-                }
-
-                let facing_at = if d3 < d4 && d3 < d5 {
-                    origin = DVec3::new(d0, d7.mul_add(d3, origin.y), d8.mul_add(d3, origin.z));
-
-                    if end.x > start.x {
-                        Face::Left
-                    } else {
-                        Face::Right
-                    }
-                } else if d4 < d5 {
-                    origin = DVec3::new(d6.mul_add(d4, origin.x), d1, d8.mul_add(d4, origin.z));
-
-                    if end.y > start.y {
-                        Face::Bottom
-                    } else {
-                        Face::Top
-                    }
-                } else {
-                    origin = DVec3::new(d6.mul_add(d5, origin.x), d7.mul_add(d5, origin.y), d2);
-
-                    if end.z > start.z {
-                        Face::Front
-                    } else {
-                        Face::Back
-                    }
-                };
-
-                start = origin.floor()
-                    - match facing_at {
-                        Face::Right => DVec3::X,
-                        Face::Top => DVec3::Y,
-                        Face::Back => DVec3::Z,
-                        Face::Bottom | Face::Left | Face::Front => DVec3::ZERO,
-                    };
-
-                position = start.as_vec3();
-
-                let block = self.get_model_for(models, position);
-
-                if let Some(block) = block {
-                    let result =
-                        raycast_into(position, origin, target, Aabb::from(block.bounding_box));
-
-                    if result.is_some() {
-                        return result;
-                    }
-                } else {
-                    result.replace(RayCastResult::new(
-                        HitType::None,
-                        origin,
-                        facing_at,
-                        position,
-                    ));
-                }
-            }
-
-            if last_uncollidable_block {
-                result
-            } else {
-                None
+            if result.is_some() {
+                return result;
             }
         }
+
+        let mut result: Option<RayCastResult> = None;
+
+        for _ in 0..200 {
+            if origin.is_nan() {
+                return None;
+            }
+
+            if (start.x - end.x).abs() < 0.0001 && (start.y - end.y).abs() < 0.0001 && (start.z - end.z).abs() < 0.0001 {
+                return if last_uncollidable_block { result } else { None };
+            }
+
+            let mut modify_d3 = true;
+            let mut modify_d4 = true;
+            let mut modify_d5 = true;
+
+            let mut d0 = 999f64;
+            let mut d1 = 999f64;
+            let mut d2 = 999f64;
+
+            if end.x > start.x {
+                d0 = start.x + 1.0;
+            } else if end.x < start.x {
+                d0 = start.x + 0.0;
+            } else {
+                modify_d3 = false;
+            }
+
+            if end.y > start.y {
+                d1 = start.y + 1.0;
+            } else if end.y < start.y {
+                d1 = start.y + 0.0;
+            } else {
+                modify_d4 = false;
+            }
+
+            if end.z > start.z {
+                d2 = start.z + 1.0;
+            } else if end.z < start.z {
+                d2 = start.z + 0.0;
+            } else {
+                modify_d5 = false;
+            }
+
+            let mut d3 = 999f64;
+            let mut d4 = 999f64;
+            let mut d5 = 999f64;
+
+            let d6 = target.x - origin.x;
+            let d7 = target.y - origin.y;
+            let d8 = target.z - origin.z;
+
+            if modify_d3 {
+                d3 = (d0 - origin.x) / d6;
+            }
+
+            if modify_d4 {
+                d4 = (d1 - origin.y) / d7;
+            }
+
+            if modify_d5 {
+                d5 = (d2 - origin.z) / d8;
+            }
+
+            if d3 == -0.0 {
+                d3 = -0.0001;
+            }
+
+            if d4 == -0.0 {
+                d4 = -0.0001;
+            }
+
+            if d5 == -0.0 {
+                d5 = -0.0001;
+            }
+
+            let facing_at = if d3 < d4 && d3 < d5 {
+                origin = DVec3::new(d0, d7.mul_add(d3, origin.y), d8.mul_add(d3, origin.z));
+
+                if end.x > start.x { Face::Left } else { Face::Right }
+            } else if d4 < d5 {
+                origin = DVec3::new(d6.mul_add(d4, origin.x), d1, d8.mul_add(d4, origin.z));
+
+                if end.y > start.y { Face::Bottom } else { Face::Top }
+            } else {
+                origin = DVec3::new(d6.mul_add(d5, origin.x), d7.mul_add(d5, origin.y), d2);
+
+                if end.z > start.z { Face::Front } else { Face::Back }
+            };
+
+            start = origin.floor()
+                - match facing_at {
+                    Face::Right => DVec3::X,
+                    Face::Top => DVec3::Y,
+                    Face::Back => DVec3::Z,
+                    Face::Bottom | Face::Left | Face::Front => DVec3::ZERO,
+                };
+
+            position = start.as_vec3();
+
+            let block = self.get_model_for(models, position);
+
+            if let Some(block) = block
+                && let Some(result) = raycast_into(position, origin, target, Aabb::from(block.bounding_box))
+            {
+                return Some(result);
+            }
+
+            result.replace(RayCastResult::new(HitType::None, origin, facing_at, position));
+        }
+
+        if last_uncollidable_block { result } else { None }
     }
 
-    fn get_model_for<'a>(
-        &self,
-        models: &'a BakedBlockModelLoader,
-        position: Vec3,
-    ) -> Option<&'a BakedBlockModel> {
-        self.get_block(position)
-            .and_then(|block| models.get(block.into()))
+    fn get_model_for<'a>(&self, models: &'a BakedBlockModelLoader, position: Vec3) -> Option<&'a BakedBlockModel> {
+        self.get_block(position).and_then(|block| models.get(block.into()))
+    }
+}
+
+pub trait MatrixExt<T> {
+    fn translate(self, position: T) -> Self;
+    fn scale(self, value: T) -> Self;
+    fn rotate_x(self, angle: f32) -> Self;
+    fn rotate_y(self, angle: f32) -> Self;
+    fn rotate_z(self, angle: f32) -> Self;
+}
+
+impl MatrixExt<Vec3> for Mat4 {
+    fn translate(self, position: Vec3) -> Self {
+        self * Self::from_translation(position)
+    }
+
+    fn scale(self, value: Vec3) -> Self {
+        self * Self::from_scale(value)
+    }
+
+    fn rotate_x(self, angle: f32) -> Self {
+        self * Self::from_rotation_x(angle)
+    }
+
+    fn rotate_y(self, angle: f32) -> Self {
+        self * Self::from_rotation_y(angle)
+    }
+
+    fn rotate_z(self, angle: f32) -> Self {
+        self * Self::from_rotation_z(angle)
     }
 }

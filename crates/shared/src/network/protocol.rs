@@ -25,9 +25,7 @@ pub struct Bson<Item, SinkItem> {
 
 impl<Item, SinkItem> Default for Bson<Item, SinkItem> {
     fn default() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self { phantom: PhantomData }
     }
 }
 
@@ -38,12 +36,7 @@ where
     type Error = io::Error;
 
     fn deserialize(self: Pin<&mut Self>, src: &BytesMut) -> Result<Item, Self::Error> {
-        bson::from_reader(Cursor::new(src).reader()).map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to deserialize BSON: {err}"),
-            )
-        })
+        bson::from_reader(Cursor::new(src).reader()).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to deserialize BSON: {err}")))
     }
 }
 
@@ -51,12 +44,9 @@ impl<Item, SinkItem: Serialize> Serializer<SinkItem> for Bson<Item, SinkItem> {
     type Error = io::Error;
 
     fn serialize(self: Pin<&mut Self>, item: &SinkItem) -> Result<Bytes, Self::Error> {
-        bson::to_vec(item).map(Bytes::from).map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to serialize BSON: {err}"),
-            )
-        })
+        bson::to_vec(item)
+            .map(Bytes::from)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("Failed to serialize BSON: {err}")))
     }
 }
 
@@ -68,8 +58,5 @@ pub fn wrap_stream<I, O>(stream: TcpStream) -> (InStream<I>, OutSink<O>) {
     let stream = WrappedStream::new(read, LengthDelimitedCodec::new());
     let sink = WrappedSink::new(write, LengthDelimitedCodec::new());
 
-    (
-        InStream::new(stream, Bson::default()),
-        OutSink::new(sink, Bson::default()),
-    )
+    (InStream::new(stream, Bson::default()), OutSink::new(sink, Bson::default()))
 }

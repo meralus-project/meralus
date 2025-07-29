@@ -13,9 +13,14 @@ tokio-util = { workspace = true, optional = true }
 tokio-serde = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
+lyon_tessellation = { version = "1.0.15", optional = true }
+
+[dev-dependencies]
+lyon_tessellation = "1.0.15"
 
 [features]
 default = []
+lyon-path-api = ["dep:lyon_tessellation"]
 network = [
     "dep:uuid",
     "dep:serde",

@@ -1,0 +1,22 @@
+[package]
+name = "meralus-graphics"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+meralus-engine = { workspace = true }
+meralus-shared = { workspace = true }
+meralus-world = { workspace = true }
+glium = { workspace = true }
+glam = { workspace = true }
+meck = { workspace = true }
+image = { workspace = true }
+ahash = { workspace = true }
+fontdue = { git = "https://github.com/Aiving/fontdue.git", features = ["std"] }
+lyon_tessellation = "1.0.15"
+bytemuck = "1.23.1"
+euclid = { version = "0.22.4", features = ["bytemuck"] }
+
+
+[lints]
+workspace = true

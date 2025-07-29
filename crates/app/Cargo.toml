@@ -7,9 +7,11 @@ edition = "2024"
 meralus-animation = { workspace = true }
 meralus-world = { workspace = true }
 meralus-engine = { workspace = true }
-meralus-shared = { workspace = true, features = ["network"] }
+meralus-shared = { workspace = true, features = ["lyon-path-api", "network"] }
+meralus-graphics = { workspace = true }
 meck = { workspace = true }
-lessor = { workspace = true }
+# lessor = { workspace = true }
+mollie-compiler = { path = "../../mollie/crates/compiler" }
 glium = { workspace = true }
 glam = { workspace = true }
 glamour = { workspace = true }
@@ -23,6 +25,12 @@ fontdue = { git = "https://github.com/Aiving/fontdue.git", features = ["std"] }
 owo-colors = "4.2.0"
 ahash = { workspace = true }
 lyon_tessellation = "1.0.15"
+bytemuck = "1.23.1"
+euclid = { version = "0.22.4", features = ["bytemuck"] }
+num-traits = "0.2.19"
+parking_lot = "0.12.4"
+polymorpher = { path = "../../../polymorph", features = ["lyon"] }
+mollie-vm = { path = "../../mollie/crates/vm" }
 
 [lints]
 workspace = true

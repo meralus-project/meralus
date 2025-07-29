@@ -246,10 +246,7 @@ impl Chunk {
     }
 
     pub const fn new(origin: IVec2) -> Self {
-        Self {
-            origin,
-            ..Self::EMPTY
-        }
+        Self { origin, ..Self::EMPTY }
     }
 
     pub fn generate_surface(&mut self, seed: u32) {
@@ -278,10 +275,7 @@ impl Chunk {
                         max = max.max(y);
 
                         if y == CHUNK_HEIGHT - 1 {
-                            self.set_block_unchecked(
-                                self.to_local(vec3(x as f32, y as f32, z as f32)),
-                                2,
-                            );
+                            self.set_block_unchecked(self.to_local(vec3(x as f32, y as f32, z as f32)), 2);
                         } else {
                             let value = generator.get([
                                 (f64::from(position.x) + x as f64) / CHUNK_SIZE_F64,
@@ -290,15 +284,9 @@ impl Chunk {
                             ]);
 
                             if value <= 0.0 {
-                                self.set_block_unchecked(
-                                    self.to_local(vec3(x as f32, y as f32, z as f32)),
-                                    2,
-                                );
+                                self.set_block_unchecked(self.to_local(vec3(x as f32, y as f32, z as f32)), 2);
                             } else {
-                                self.set_block_unchecked(
-                                    self.to_local(vec3(x as f32, y as f32, z as f32)),
-                                    1,
-                                );
+                                self.set_block_unchecked(self.to_local(vec3(x as f32, y as f32, z as f32)), 1);
                             }
                         }
                     }

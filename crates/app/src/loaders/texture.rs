@@ -61,9 +61,7 @@ impl TextureLoader {
             path.display().bright_blue().bold()
         );
 
-        let name = path
-            .file_stem()
-            .ok_or(LoadingError::Texture(TextureLoadingError::InvalidPath))?;
+        let name = path.file_stem().ok_or(LoadingError::Texture(TextureLoadingError::InvalidPath))?;
         let name = name.to_string_lossy();
         let name = name.to_string();
 
@@ -76,9 +74,9 @@ impl TextureLoader {
                 if let Ok(value) = value.decode() {
                     let image = value.to_rgba8();
 
-                    self.atlas.append(name, &image).map_err(|_| {
-                        LoadingError::Texture(TextureLoadingError::DimensionMismatch)
-                    })?;
+                    self.atlas
+                        .append(name, &image)
+                        .map_err(|_| LoadingError::Texture(TextureLoadingError::DimensionMismatch))?;
                 }
             }
             Err(err) => return Err(LoadingError::Texture(TextureLoadingError::Io(err))),

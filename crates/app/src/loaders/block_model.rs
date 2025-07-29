@@ -3,9 +3,7 @@ use std::path::Path;
 use ahash::HashMap;
 use glam::{Vec2, Vec3};
 use meralus_shared::Cube3D;
-use meralus_world::{
-    ChunkManager, ElementRotation, Face, Faces, JsonError, TexturePath, TextureRef,
-};
+use meralus_world::{ChunkManager, ElementRotation, Face, Faces, JsonError, TexturePath, TextureRef};
 use owo_colors::OwoColorize;
 
 use super::{LoadingResult, block::BlockManager, texture::TextureLoader};
@@ -29,9 +27,8 @@ pub struct BlockModelFace {
 
 impl BlockModelFace {
     pub fn culled(&self, chunk_manager: &ChunkManager, position: Vec3) -> bool {
-        self.cull_face.is_some_and(|cull_face| {
-            chunk_manager.contains_block(position + cull_face.as_normal().as_vec3())
-        })
+        self.cull_face
+            .is_some_and(|cull_face| chunk_manager.contains_block(position + cull_face.as_normal().as_vec3()))
     }
 }
 
@@ -54,9 +51,9 @@ const ERROR: [f32; 3] = [0.00001; 3];
 
 impl BakedBlockModel {
     pub fn is_opaque(&self) -> bool {
-        self.elements.iter().any(|BlockModelElement { cube, .. }| {
-            (cube.size.to_raw() - Vec3::ONE).abs().to_array() < ERROR
-        })
+        self.elements
+            .iter()
+            .any(|BlockModelElement { cube, .. }| (cube.size.to_raw() - Vec3::ONE).abs().to_array() < ERROR)
     }
 }
 
@@ -65,16 +62,11 @@ pub struct BakedBlockModelLoader {
     models: Vec<BakedBlockModel>,
 }
 
-fn get_texture<T: AsRef<str>>(
-    textures: &HashMap<String, TextureRef>,
-    name: T,
-) -> Option<&TexturePath> {
-    textures
-        .get(name.as_ref())
-        .and_then(|texture_ref| match texture_ref {
-            TextureRef::Id(id) => get_texture(textures, &id.0),
-            TextureRef::Path(path) => Some(path),
-        })
+fn get_texture<T: AsRef<str>>(textures: &HashMap<String, TextureRef>, name: T) -> Option<&TexturePath> {
+    textures.get(name.as_ref()).and_then(|texture_ref| match texture_ref {
+        TextureRef::Id(id) => get_texture(textures, &id.0),
+        TextureRef::Path(path) => Some(path),
+    })
 }
 
 #[derive(Debug)]
@@ -99,12 +91,7 @@ impl BakedBlockModelLoader {
     /// An error will be returned if the passed path does not contain a filename
     /// or an error occurred while loading the block model (see
     /// [`BlockManager::load`]).
-    pub fn load<P: AsRef<Path>, R: AsRef<Path>>(
-        &mut self,
-        textures: &mut TextureLoader,
-        root: R,
-        path: P,
-    ) -> LoadingResult<&BakedBlockModel> {
+    pub fn load<P: AsRef<Path>, R: AsRef<Path>>(&mut self, textures: &mut TextureLoader, root: R, path: P) -> LoadingResult<&BakedBlockModel> {
         let path = path.as_ref();
 
         println!(
@@ -113,10 +100,7 @@ impl BakedBlockModelLoader {
             path.display().bright_blue().bold()
         );
 
-        let name = path
-            .file_stem()
-            .ok_or(LoadingError::Model(ModelLoadingError::InvalidPath))?
-            .to_string_lossy();
+        let name = path.file_stem().ok_or(LoadingError::Model(ModelLoadingError::InvalidPath))?.to_string_lossy();
 
         let block = BlockManager::load(textures, root.as_ref(), path)?;
 
@@ -143,9 +127,7 @@ impl BakedBlockModelLoader {
                     faces: match element.faces {
                         Faces::All(data) => Face::ALL.map(|face| {
                             let texture = get_texture(&block.textures, &data.texture).unwrap();
-                            let (offset, scale, alpha) = textures
-                                .get_texture(texture.1.file_stem().unwrap().to_string_lossy())
-                                .unwrap();
+                            let (offset, scale, alpha) = textures.get_texture(texture.1.file_stem().unwrap().to_string_lossy()).unwrap();
 
                             let uv = if let Some([start, end]) = data.uv {
                                 FaceUV {
@@ -170,9 +152,7 @@ impl BakedBlockModelLoader {
 
                             for (face, data) in face_map {
                                 let texture = get_texture(&block.textures, &data.texture).unwrap();
-                                let (offset, scale, alpha) = textures
-                                    .get_texture(texture.1.file_stem().unwrap().to_string_lossy())
-                                    .unwrap();
+                                let (offset, scale, alpha) = textures.get_texture(texture.1.file_stem().unwrap().to_string_lossy()).unwrap();
 
                                 let uv = if let Some([start, end]) = data.uv {
                                     FaceUV {

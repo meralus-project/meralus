@@ -70,7 +70,7 @@ pub trait State {
     fn handle_window_resize(&mut self, size: UVec2, scale_factor: f64) {}
     fn handle_keyboard_modifiers(&mut self, modifiers: KeyboardModifiers) {}
     fn handle_keyboard_input(&mut self, key: KeyCode, is_pressed: bool, repeat: bool) {}
-    fn handle_mouse_motion(&mut self, position: Vec2) {}
+    fn handle_mouse_motion(&mut self, delta: Option<Vec2>, position: Option<Vec2>) {}
     fn handle_mouse_wheel(&mut self, delta: Vec2) {}
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
@@ -80,7 +80,7 @@ pub trait State {
     // fn fixed_update(&mut self, event_loop: &ActiveEventLoop, display:
     // &WindowDisplay, delta: f32) {}
     fn update(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration) {}
-    fn render(&mut self, display: &WindowDisplay, delta: Duration);
+    fn render(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration);
 }
 
 pub struct ApplicationWindow<T: State> {
@@ -139,15 +139,12 @@ impl<T: State> ApplicationWindow<T> {
             .build(Some(window_handle.into()));
 
         let gl_context = unsafe {
-            gl_config
-                .display()
-                .create_context(&gl_config, &context_attrs)
-                .unwrap_or_else(|_| {
-                    gl_config
-                        .display()
-                        .create_context(&gl_config, &fallback_context_attrs)
-                        .expect("failed to create context")
-                })
+            gl_config.display().create_context(&gl_config, &context_attrs).unwrap_or_else(|_| {
+                gl_config
+                    .display()
+                    .create_context(&gl_config, &fallback_context_attrs)
+                    .expect("failed to create context")
+            })
         };
 
         let (width, height): (u32, u32) = window.inner_size().into();
@@ -157,19 +154,11 @@ impl<T: State> ApplicationWindow<T> {
             NonZeroU32::new(height).expect("failed to create window height"),
         );
 
-        let surface = unsafe {
-            gl_config
-                .display()
-                .create_window_surface(&gl_config, &attrs)
-                .expect("failed to create surface")
-        };
+        let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).expect("failed to create surface") };
 
-        let current_context = gl_context
-            .make_current(&surface)
-            .expect("failed to obtain opengl context");
+        let current_context = gl_context.make_current(&surface).expect("failed to obtain opengl context");
 
-        let display = Display::from_context_surface(current_context, surface)
-            .expect("failed to create display from context and surface");
+        let display = Display::from_context_surface(current_context, surface).expect("failed to create display from context and surface");
 
         Self {
             state: T::new(WindowContext::new(event_loop, &window), &display),
@@ -197,10 +186,9 @@ impl<T: State> ApplicationHandler for Application<T> {
             WindowEvent::Resized(physical_size) => self.window.inspect_mut(move |window| {
                 window.display.resize(physical_size.into());
 
-                window.state.handle_window_resize(
-                    uvec2(physical_size.width, physical_size.height),
-                    window.window.scale_factor(),
-                );
+                window
+                    .state
+                    .handle_window_resize(uvec2(physical_size.width, physical_size.height), window.window.scale_factor());
             }),
             WindowEvent::ModifiersChanged(modifiers) => {
                 let state = modifiers.state();
@@ -217,11 +205,7 @@ impl<T: State> ApplicationHandler for Application<T> {
             WindowEvent::KeyboardInput { event, .. } => {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     self.window.inspect_mut(|window| {
-                        window.state.handle_keyboard_input(
-                            code,
-                            event.state.is_pressed(),
-                            event.repeat,
-                        );
+                        window.state.handle_keyboard_input(code, event.state.is_pressed(), event.repeat);
                     });
                 }
             }
@@ -233,6 +217,11 @@ impl<T: State> ApplicationHandler for Application<T> {
 
                 self.window.inspect_mut(|window| {
                     window.state.handle_mouse_wheel(delta);
+                });
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.window.inspect_mut(|window| {
+                    window.state.handle_mouse_motion(None, Some(vec2(position.x as f32, position.y as f32)));
                 });
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -247,9 +236,7 @@ impl<T: State> ApplicationHandler for Application<T> {
     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
             self.window.inspect_mut(|window| {
-                window
-                    .state
-                    .handle_mouse_motion(vec2(delta.0 as f32, delta.1 as f32));
+                window.state.handle_mouse_motion(Some(vec2(delta.0 as f32, delta.1 as f32)), None);
             });
         }
     }
@@ -258,23 +245,21 @@ impl<T: State> ApplicationHandler for Application<T> {
         self.window.inspect_mut(|window| {
             // let update = Instant::now();
 
-            window.state.update(
-                WindowContext::new(event_loop, &window.window),
-                &window.display,
-                window.delta,
-            );
+            window
+                .state
+                .update(WindowContext::new(event_loop, &window.window), &window.display, window.delta);
 
             // println!("update took {:?}", update.elapsed());
 
             // let render = Instant::now();
 
-            window.state.render(&window.display, window.delta);
+            window
+                .state
+                .render(WindowContext::new(event_loop, &window.window), &window.display, window.delta);
 
             // println!("render took {:?}", render.elapsed());
 
-            window.delta = window
-                .last_time
-                .map_or_else(|| Duration::ZERO, |last_time| last_time.elapsed());
+            window.delta = window.last_time.map_or_else(|| Duration::ZERO, |last_time| last_time.elapsed());
 
             window.last_time.replace(Instant::now());
         });

@@ -9,7 +9,7 @@ impl Block for AirBlock {
         "air"
     }
 
-    fn get_properties(&self) -> Vec<Property> {
+    fn get_properties(&self) -> Vec<Property<'_>> {
         Vec::new()
     }
 }
@@ -21,7 +21,7 @@ impl Block for DirtBlock {
         "dirt"
     }
 
-    fn get_properties(&self) -> Vec<Property> {
+    fn get_properties(&self) -> Vec<Property<'_>> {
         Vec::new()
     }
 }
@@ -33,7 +33,7 @@ impl Block for GrassBlock {
         "grass_block"
     }
 
-    fn get_properties(&self) -> Vec<Property> {
+    fn get_properties(&self) -> Vec<Property<'_>> {
         Vec::new()
     }
 }

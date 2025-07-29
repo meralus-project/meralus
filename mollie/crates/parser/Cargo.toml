@@ -1,0 +1,12 @@
+[package]
+name = "mollie-parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mollie-shared = { workspace = true }
+mollie-lexer = { workspace = true }
+peekmore = { workspace = true }
+
+[lints]
+workspace = true
