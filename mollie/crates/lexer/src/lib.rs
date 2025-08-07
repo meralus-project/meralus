@@ -23,19 +23,22 @@ impl Lexer {
             "as" => Token::As,
             "from" => Token::From,
             "struct" => Token::Struct,
+            "enum" => Token::Enum,
             // "match" => Token::Match,
             "fn" => Token::Fn,
             "trait" => Token::Trait,
             "impl" => Token::Impl,
-            // "const" => Token::Const,
-            // "let" => Token::Let,
-            // "while" => Token::While,
+            "const" => Token::Const,
+            "let" => Token::Let,
+            "while" => Token::While,
             "for" => Token::For,
             // "infix" => Token::Infix,
-            // "in" => Token::In,
-            // "if" => Token::If,
-            // "is" => Token::Is,
-            // "else" => Token::Else,
+            "in" => Token::In,
+            "loop" => Token::Loop,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "null" => Token::Null,
+            "is" => Token::Is,
             _ => Token::Ident(ident),
         }
     }
@@ -59,9 +62,39 @@ impl Lexer {
                 }
             }
             ';' => Token::Semi,
-            // '+' => Token::Plus,
-            // '*' => Token::Star,
-            // '/' => Token::Slash,
+            '+' => Token::Plus,
+            '*' => Token::Star,
+            '/' => Token::Slash,
+            '=' => {
+                if chars.next_if_eq(&'=').is_some() {
+                    span.end += 1;
+                    span.column += 1;
+
+                    Token::EqEq
+                } else {
+                    Token::Eq
+                }
+            }
+            '&' => {
+                if chars.next_if_eq(&'&').is_some() {
+                    span.end += 1;
+                    span.column += 1;
+
+                    Token::AndAnd
+                } else {
+                    Token::And
+                }
+            }
+            '|' => {
+                if chars.next_if_eq(&'|').is_some() {
+                    span.end += 1;
+                    span.column += 1;
+
+                    Token::OrOr
+                } else {
+                    Token::Or
+                }
+            }
             '%' => Token::Percent,
             '.' => {
                 if chars.next_if_eq(&'.').is_some() {
@@ -74,6 +107,16 @@ impl Lexer {
                 }
             }
             ',' => Token::Comma,
+            '!' => {
+                if chars.next_if_eq(&'=').is_some() {
+                    span.end += 1;
+                    span.column += 1;
+
+                    Token::NotEq
+                } else {
+                    Token::Not
+                }
+            }
             // '#' => Token::Pound,
             '?' => Token::Question,
             '>' => Token::Greater,

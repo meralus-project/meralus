@@ -1,7 +1,7 @@
 use mollie_lexer::Token;
 use mollie_shared::Positioned;
 
-use crate::{Block, Ident, Parse, ParseResult, Parser, ty::Type};
+use crate::{Block, CustomType, Ident, Parse, ParseResult, Parser, ty::Type};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Argument {
@@ -83,7 +83,8 @@ impl Parse for ImplFunction {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Impl {
-    pub trait_name: Option<Positioned<Ident>>,
+    pub generics: Vec<Positioned<Ident>>,
+    pub trait_name: Option<Positioned<CustomType>>,
     pub target: Positioned<Type>,
     pub functions: Positioned<Vec<Positioned<ImplFunction>>>,
 }
@@ -92,8 +93,18 @@ impl Parse for Impl {
     fn parse(parser: &mut Parser) -> ParseResult<Positioned<Self>> {
         let start = parser.consume(&Token::Impl)?;
 
+        let generics = if parser.try_consume(&Token::Less) {
+            let generics = parser.consume_separated_until(&Token::Comma, &Token::Greater)?;
+
+            parser.consume(&Token::Greater)?;
+
+            generics
+        } else {
+            Vec::new()
+        };
+
         let trait_name = if parser.try_consume(&Token::Trait) {
-            let name = Ident::parse(parser)?;
+            let name = CustomType::parse(parser)?;
 
             parser.consume(&Token::For)?;
 
@@ -106,6 +117,11 @@ impl Parse for Impl {
 
         let functions = parser.consume_in(&Token::BraceOpen, &Token::BraceClose)?;
 
-        Ok(start.between(&functions).wrap(Self { trait_name, target, functions }))
+        Ok(start.between(&functions).wrap(Self {
+            generics,
+            trait_name,
+            target,
+            functions,
+        }))
     }
 }

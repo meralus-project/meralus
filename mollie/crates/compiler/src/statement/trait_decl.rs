@@ -1,11 +1,15 @@
 use mollie_parser::TraitDecl;
 use mollie_shared::{Positioned, Span};
-use mollie_vm::{Chunk, Trait, TraitFunc, void};
+use mollie_vm::{void, Chunk, Trait, TraitFunc, TypeVariant};
 
 use crate::{Compile, CompileResult, Compiler, GetPositionedType, GetType, TypeResult};
 
 impl Compile for Positioned<TraitDecl> {
     fn compile(self, _: &mut Chunk, compiler: &mut Compiler) -> CompileResult {
+        for (index, name) in self.value.name.value.generics.iter().enumerate() {
+            compiler.add_type(&name.value.0, TypeVariant::Generic(index));
+        }
+
         let functions = self
             .value
             .functions
@@ -30,12 +34,17 @@ impl Compile for Positioned<TraitDecl> {
             })
             .collect::<CompileResult<_>>()?;
 
-        compiler.traits.insert(self.value.name.value.0, Trait {
+        for name in &self.value.name.value.generics {
+            compiler.remove_type(&name.value.0);
+        }
+
+        compiler.traits.insert(self.value.name.value.name.value.0, Trait {
+            generics: self.value.name.value.generics.into_iter().map(|v| v.value.0).collect(),
             functions,
             declared_at: Some(self.span),
         });
 
-        Ok(())
+        Ok(false)
     }
 }
 

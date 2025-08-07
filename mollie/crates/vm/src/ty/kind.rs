@@ -10,10 +10,13 @@ pub enum TypeKind {
     String,
     Trait,
     Struct,
+    Enum,
     Function,
     Component,
     Array(Box<Self>, Option<usize>),
     OneOf(Vec<Self>),
+    Null,
+    Generic,
 }
 
 impl fmt::Display for TypeKind {
@@ -21,12 +24,15 @@ impl fmt::Display for TypeKind {
         match self {
             Self::Void => f.write_str("void"),
             Self::Any => f.write_str("<any>"),
+            Self::Generic => f.write_str("<generic>"),
             Self::Integer => f.write_str("integer"),
             Self::Float => f.write_str("float"),
             Self::Boolean => f.write_str("boolean"),
+            Self::Null => f.write_str("null"),
             Self::String => f.write_str("string"),
             Self::Trait => f.write_str("trait"),
             Self::Struct => f.write_str("structure"),
+            Self::Enum => f.write_str("enumeration"),
             Self::Function => f.write_str("function"),
             Self::Component => f.write_str("component"),
             Self::Array(element, size) => write!(f, "{element}[{}]", size.as_ref().map_or_else(String::new, ToString::to_string)),
@@ -39,7 +45,7 @@ impl fmt::Display for TypeKind {
 
                         write!(f, "{kind}")?;
                     } else {
-                        write!(f, "| {kind}")?;
+                        write!(f, " | {kind}")?;
                     }
                 }
 

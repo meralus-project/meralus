@@ -1,10 +1,11 @@
 use std::fmt::{self, Write};
 
 use mollie_shared::pretty_fmt::{PrettyFmt, indent_down, indent_up};
+use serde::{Deserialize, Serialize};
 
 use crate::Type;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComponentChildren {
     None,
     Single,
@@ -42,7 +43,7 @@ impl From<usize> for ComponentChildren {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ComponentType {
     pub properties: Vec<(String, bool, Type)>,
     pub children: ComponentChildren,

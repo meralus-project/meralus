@@ -1,8 +1,10 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 use crate::Type;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ArrayType {
     pub element: Type,
     pub size: Option<usize>,

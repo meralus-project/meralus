@@ -1,7 +1,7 @@
 use mollie_lexer::Token;
 use mollie_shared::Positioned;
 
-use crate::{Ident, Parse, ParseResult, Parser, Type};
+use crate::{Ident, NameWithGenerics, Parse, ParseResult, Parser, Type};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Property {
@@ -28,7 +28,7 @@ impl Parse for Property {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct StructDecl {
-    pub name: Positioned<Ident>,
+    pub name: Positioned<NameWithGenerics>,
     pub properties: Positioned<Vec<Positioned<Property>>>,
 }
 
@@ -36,7 +36,7 @@ impl Parse for StructDecl {
     fn parse(parser: &mut Parser) -> ParseResult<Positioned<Self>> {
         parser.consume(&Token::Struct)?;
 
-        let name = Ident::parse(parser)?;
+        let name = NameWithGenerics::parse(parser)?;
 
         let properties = parser.consume_separated_in(&Token::Comma, &Token::BraceOpen, &Token::BraceClose)?;
 

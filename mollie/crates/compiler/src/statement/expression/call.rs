@@ -10,8 +10,6 @@ impl Compile for Positioned<FunctionCall> {
 
         if let Some(function) = ty.variant.as_function() {
             if function.have_self {
-                println!("{function:#?}");
-                
                 if self.value.args.value.len() != function.args.len() - 1 {
                     return Err(TypeError::InvalidArguments {
                         got: self.value.args.value.len(),
@@ -20,16 +18,17 @@ impl Compile for Positioned<FunctionCall> {
                     .into());
                 }
 
-
                 compiler.compile(chunk, *self.value.function)?;
+
+                compiler.generics = ty.applied_generics;
 
                 for (arg, expected) in self.value.args.value.into_iter().zip(function.args.iter().skip(1)) {
                     let got = arg.get_type(compiler)?;
 
-                    if !got.variant.same_as(&expected.variant) {
+                    if !got.variant.same_as(&expected.variant, &compiler.generics) {
                         return Err(TypeError::Unexpected {
-                            got: got.kind(),
-                            expected: expected.kind(),
+                            got: Box::new(got.kind()),
+                            expected: Box::new(expected.kind()),
                         }
                         .into());
                     }
@@ -46,14 +45,15 @@ impl Compile for Positioned<FunctionCall> {
                 }
 
                 compiler.compile(chunk, *self.value.function)?;
+                compiler.generics = ty.applied_generics;
 
                 for (arg, expected) in self.value.args.value.into_iter().zip(function.args.iter()) {
                     let got = arg.get_type(compiler)?;
 
-                    if !got.variant.same_as(&expected.variant) {
+                    if !got.variant.same_as(&expected.variant, &compiler.generics) {
                         return Err(TypeError::Unexpected {
-                            got: got.kind(),
-                            expected: expected.kind(),
+                            got: Box::new(got.kind()),
+                            expected: Box::new(expected.kind()),
                         }
                         .into());
                     }
@@ -62,13 +62,15 @@ impl Compile for Positioned<FunctionCall> {
                 }
             }
 
+            compiler.generics = Vec::new();
+
             chunk.call(function.args.len());
 
-            Ok(())
+            Ok(false)
         } else {
             Err(TypeError::Unexpected {
-                got: ty.kind(),
-                expected: TypeKind::Function.into(),
+                got: Box::new(ty.kind()),
+                expected: Box::new(TypeKind::Function.into()),
             }
             .into())
         }
@@ -79,14 +81,13 @@ impl GetType for FunctionCall {
     fn get_type(&self, compiler: &Compiler, _: Span) -> TypeResult {
         let ty = self.function.get_type(compiler)?;
 
-        ty.variant.as_function().map_or_else(
-            || {
-                Err(TypeError::Unexpected {
-                    got: ty.kind(),
-                    expected: TypeKind::Function.into(),
-                })
-            },
-            |function| Ok(*(function.returns.clone())),
-        )
+        if let Some(function) = ty.variant.as_function() {
+            Ok(function.returns.clone().resolve_type(&ty.applied_generics))
+        } else {
+            Err(TypeError::Unexpected {
+                got: Box::new(ty.kind()),
+                expected: Box::new(TypeKind::Function.into()),
+            })
+        }
     }
 }

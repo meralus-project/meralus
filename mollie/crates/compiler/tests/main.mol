@@ -1,0 +1,61 @@
+declare Rectangle {
+    width: float,
+    height: float,
+}
+
+declare Circle {
+    radius: float,
+}
+
+declare Container {
+    value: string,
+    children: component[]
+}
+
+const container = Container {
+    value: "Hello, World!",
+
+    Rectangle {
+        width: 100.0,
+        height: 50.0
+    }
+
+    Circle {
+        radius: 75.0
+    }
+};
+
+trait Drawable {
+    fn draw(self);
+}
+
+impl trait Drawable for Rectangle {
+    fn draw(self) {
+        println("rectangle");
+        println(self.width);
+        println(self.height);
+    }
+}
+
+impl trait Drawable for Circle {
+    fn draw(self) {
+        println("circle");
+        println(self.radius);
+    }
+}
+
+impl trait Drawable for Container {
+    fn draw(self) {
+        println("container");
+
+        const iterator = self.children.iter();
+
+        while iterator.next() is Option::Some { value } {
+            if value is Rectangle drawable {
+                drawable.draw();
+            }
+        }
+    }
+}
+
+container.draw();

@@ -1,11 +1,13 @@
 use std::fmt;
 
 use mollie_shared::pretty_fmt::PrettyFmt;
+use serde::{Deserialize, Serialize};
 
 use crate::Type;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FunctionType {
+    pub is_native: bool,
     pub have_self: bool,
     pub args: Vec<Type>,
     pub returns: Box<Type>,

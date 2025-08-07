@@ -1,6 +1,9 @@
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(rename_all = "kebab-case")]
 pub enum PrimitiveType {
     Any,
     Integer,
@@ -9,6 +12,7 @@ pub enum PrimitiveType {
     String,
     Component,
     Void,
+    Null,
 }
 
 impl fmt::Display for PrimitiveType {
@@ -21,6 +25,7 @@ impl fmt::Display for PrimitiveType {
             Self::String => f.write_str("string"),
             Self::Component => f.write_str("component"),
             Self::Void => f.write_str("void"),
+            Self::Null => f.write_str("null"),
         }
     }
 }

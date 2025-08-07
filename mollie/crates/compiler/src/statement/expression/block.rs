@@ -4,30 +4,29 @@ use mollie_vm::{Chunk, void};
 
 use crate::{Compile, CompileResult, Compiler, GetPositionedType, GetType, TypeResult};
 
-impl Compile<Chunk> for Positioned<Block> {
-    fn compile(self, _: &mut Chunk, compiler: &mut Compiler) -> CompileResult<Chunk> {
-        let mut chunk = Chunk::default();
-
+impl Compile for Positioned<Block> {
+    fn compile(self, chunk: &mut Chunk, compiler: &mut Compiler) -> CompileResult {
         for statement in self.value.statements {
-            compiler.compile(&mut chunk, statement)?;
+            if compiler.compile(chunk, statement)? {
+                chunk.pop();
+            }
         }
+
+        let mut returns = false;
 
         if let Some(final_statement) = self.value.final_statement {
-            compiler.compile(&mut chunk, *final_statement)?;
+            compiler.compile(chunk, *final_statement)?;
 
-            chunk.ret();
+            returns = true;
         }
 
-        chunk.halt();
-
-        Ok(chunk)
+        Ok(returns)
     }
 }
 
-impl GetType for Positioned<Block> {
+impl GetType for Block {
     fn get_type(&self, compiler: &Compiler, _: Span) -> TypeResult {
-        self.value
-            .final_statement
+        self.final_statement
             .as_ref()
             .map_or_else(|| Ok(void().into()), |final_statement| final_statement.get_type(compiler))
     }

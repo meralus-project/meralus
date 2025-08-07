@@ -9,6 +9,8 @@ mollie-shared = { workspace = true }
 # mollie-parser = { workspace = true }
 derive_more = { workspace = true }
 indexmap = { workspace = true }
+smallvec = { git = "https://github.com/servo/rust-smallvec.git" }
+serde = { version = "1.0.219", features = ["derive", "rc"] }
 
 [lints]
 workspace = true

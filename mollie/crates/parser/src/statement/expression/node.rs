@@ -1,15 +1,15 @@
 use mollie_lexer::Token;
 use mollie_shared::Positioned;
 
-use crate::{Expression, Ident, Parse, ParseResult, Parser};
+use crate::{CustomType, Expression, Ident, Parse, ParseResult, Parser};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct NodeProperty {
+pub struct NameValue {
     pub name: Positioned<Ident>,
     pub value: Positioned<Expression>,
 }
 
-impl Parse for NodeProperty {
+impl Parse for NameValue {
     fn parse(parser: &mut Parser) -> ParseResult<Positioned<Self>> {
         parser.verify_if(Token::is_ident)?;
         parser.verify2(&Token::Colon)?;
@@ -26,18 +26,18 @@ impl Parse for NodeProperty {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Node {
-    pub name: Positioned<Ident>,
+    pub name: Positioned<CustomType>,
     pub from: Option<(Positioned<Box<Expression>>, Positioned<Ident>)>,
-    pub properties: Vec<Positioned<NodeProperty>>,
+    pub properties: Vec<Positioned<NameValue>>,
     pub children: Positioned<Vec<Positioned<Self>>>,
 }
 
 impl Parse for Node {
     fn parse(parser: &mut Parser) -> ParseResult<Positioned<Self>> {
         parser.verify_if(Token::is_ident)?;
-        parser.verify2_if(|t| matches!(t, Token::BraceOpen | Token::From))?;
+        parser.verify2_if(|t| matches!(t, Token::BraceOpen | Token::From | Token::Less))?;
 
-        let name = Ident::parse(parser)?;
+        let name = CustomType::parse(parser)?;
 
         let from = if parser.try_consume(&Token::From) {
             parser.consume(&Token::Less)?;
@@ -64,7 +64,7 @@ impl Parse for Node {
                 parser.consume(&Token::Comma)?;
             }
 
-            match NodeProperty::parse(parser) {
+            match NameValue::parse(parser) {
                 Ok(property) => properties.push(property),
                 Err(_) => break,
             }

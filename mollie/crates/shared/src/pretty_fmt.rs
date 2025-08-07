@@ -14,7 +14,9 @@ pub fn indent_down() {
 }
 
 pub trait PrettyFmt {
+    #[allow(clippy::missing_errors_doc)]
     fn write_indent(&mut self) -> fmt::Result;
+    #[allow(clippy::missing_errors_doc)]
     fn write_array_like<V: fmt::Display, T: IntoIterator<Item = V>>(&mut self, items: T, linebreak: bool) -> fmt::Result;
 }
 

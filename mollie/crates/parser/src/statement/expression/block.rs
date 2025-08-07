@@ -1,8 +1,11 @@
 use mollie_lexer::Token;
 use mollie_shared::Positioned;
 
-use crate::{Parse, ParseError, ParseResult, Parser, Statement};
+use crate::{Expression, IfElseExpression, Parse, ParseError, ParseResult, Parser, Statement};
 
+/// # Errors
+///
+/// Returns error if parsing failed
 pub fn parse_statements_until(parser: &mut Parser, token: &Token) -> ParseResult<(Vec<Positioned<Statement>>, Option<Positioned<Statement>>)> {
     let mut statements = Vec::new();
     let mut return_statement: Option<Positioned<Statement>> = None;
@@ -10,7 +13,21 @@ pub fn parse_statements_until(parser: &mut Parser, token: &Token) -> ParseResult
     while !parser.check(token) {
         let statement = Statement::parse(parser)?;
 
-        if matches!(statement.value, Statement::Expression(_)) {
+        if matches!(statement.value, Statement::Expression(_))
+            && !matches!(
+                statement.value,
+                Statement::Expression(
+                    Expression::IfElse(IfElseExpression {
+                        block: Positioned {
+                            value: Block { final_statement: None, .. },
+                            ..
+                        },
+                        ..
+                    }) | Expression::Block(_)
+                        | Expression::While(_)
+                )
+            )
+        {
             if parser.try_consume(&Token::Semi) {
                 statements.push(statement);
             } else if let Some(statement) = &return_statement {

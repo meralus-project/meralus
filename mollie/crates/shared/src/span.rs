@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::Positioned;
 
-#[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Span {
     pub start: usize,
     pub end: usize,

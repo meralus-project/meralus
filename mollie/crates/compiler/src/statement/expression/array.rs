@@ -14,7 +14,7 @@ impl Compile for Positioned<ArrayExpr> {
 
         chunk.create_array(size);
 
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -24,6 +24,7 @@ impl GetType for ArrayExpr {
         let size = self.elements.len();
 
         Ok(Type {
+            applied_generics: vec![element.clone()],
             variant: TypeVariant::complex(ComplexType::Array(ArrayType { element, size: Some(size) })),
             declared_at: Some(span),
         })

@@ -169,6 +169,21 @@ impl Parser {
     }
 
     /// # Errors
+    /// 
+    /// Returns error if parsing failed
+    pub fn consume_separated_until<T: Parse>(&mut self, separator: &Token, until: &Token) -> ParseResult<Vec<Positioned<T>>> {
+        let mut values = vec![T::parse(self)?];
+
+        while !self.check(until) {
+            self.consume(separator)?;
+
+            values.push(T::parse(self)?);
+        }
+
+        Ok(values)
+    }
+
+    /// # Errors
     ///
     /// Returns error if parsing failed
     pub fn consume_separated_in<T: Parse>(&mut self, separator: &Token, from: &Token, to: &Token) -> ParseResult<Positioned<Vec<Positioned<T>>>> {

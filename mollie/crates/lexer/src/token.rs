@@ -33,28 +33,34 @@ pub enum Token {
     Inherits,
     #[display("as")]
     As,
+    #[display("is")]
+    Is,
     #[display("from")]
     From,
     #[display("..")]
     DotDot,
-    // #[display("record")]
-    // Record,
+    #[display("enum")]
+    Enum,
     #[display("struct")]
     Struct,
-    // #[display("const")]
-    // Const,
-    // #[display("let")]
-    // Let,
-    // #[display("while")]
-    // While,
+    #[display("const")]
+    Const,
+    #[display("let")]
+    Let,
+    #[display("while")]
+    While,
     #[display("for")]
     For,
-    // #[display("in")]
-    // In,
-    // #[display("if")]
-    // If,
-    // #[display("else")]
-    // Else,
+    #[display("in")]
+    In,
+    #[display("if")]
+    If,
+    #[display("else")]
+    Else,
+    #[display("loop")]
+    Loop,
+    #[display("null")]
+    Null,
     // #[display("infix")]
     // Infix,
     #[display("fn")]
@@ -83,32 +89,32 @@ pub enum Token {
     Semi,
     #[display("-")]
     Minus,
-    // #[display("+")]
-    // Plus,
-    // #[display("/")]
-    // Slash,
-    // #[display("*")]
-    // Star,
+    #[display("+")]
+    Plus,
+    #[display("/")]
+    Slash,
+    #[display("*")]
+    Star,
     // #[display("=>")]
     // FatArrow,
     #[display("->")]
     Arrow,
-    // #[display("=")]
-    // Eq,
-    // #[display("==")]
-    // EqEq,
-    // #[display("!=")]
-    // NotEq,
-    // #[display("!")]
-    // Not,
-    // #[display("|")]
-    // Or,
-    // #[display("||")]
-    // OrOr,
-    // #[display("&")]
-    // And,
-    // #[display("&&")]
-    // AndAnd,
+    #[display("=")]
+    Eq,
+    #[display("==")]
+    EqEq,
+    #[display("!=")]
+    NotEq,
+    #[display("!")]
+    Not,
+    #[display("|")]
+    Or,
+    #[display("||")]
+    OrOr,
+    #[display("&")]
+    And,
+    #[display("&&")]
+    AndAnd,
     // #[display("#")]
     // Pound,
     #[display("?")]

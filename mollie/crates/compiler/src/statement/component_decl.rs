@@ -37,8 +37,8 @@ impl Compile for Positioned<ComponentDecl> {
                     };
                 } else {
                     return Err(TypeError::Unexpected {
-                        got: ty.kind(),
-                        expected: TypeKind::Component.into(),
+                        got: Box::new(ty.kind()),
+                        expected: Box::new(TypeKind::Component.into()),
                     }
                     .into());
                 }
@@ -48,6 +48,7 @@ impl Compile for Positioned<ComponentDecl> {
         }
 
         let ty = Type {
+            applied_generics: Vec::new(),
             variant: TypeVariant::complex(ComplexType::Component(ComponentType { properties, children })),
             declared_at: Some(self.span),
         };
@@ -56,7 +57,7 @@ impl Compile for Positioned<ComponentDecl> {
 
         // compiler.var(self.value.name.value.0, ty.variant);
 
-        Ok(())
+        Ok(false)
     }
 }
 

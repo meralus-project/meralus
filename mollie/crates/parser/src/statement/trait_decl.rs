@@ -1,7 +1,7 @@
 use mollie_lexer::Token;
 use mollie_shared::Positioned;
 
-use crate::{Ident, Parse, ParseResult, Parser, ty::Type};
+use crate::{Ident, NameWithGenerics, Parse, ParseResult, Parser, ty::Type};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct TraitFuncArgument {
@@ -76,7 +76,7 @@ impl Parse for TraitFunction {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct TraitDecl {
-    pub name: Positioned<Ident>,
+    pub name: Positioned<NameWithGenerics>,
     pub functions: Positioned<Vec<Positioned<TraitFunction>>>,
 }
 
@@ -84,7 +84,7 @@ impl Parse for TraitDecl {
     fn parse(parser: &mut Parser) -> ParseResult<Positioned<Self>> {
         let start = parser.consume(&Token::Trait)?;
 
-        let name = Ident::parse(parser)?;
+        let name = NameWithGenerics::parse(parser)?;
 
         let functions = parser.consume_in(&Token::BraceOpen, &Token::BraceClose)?;
 

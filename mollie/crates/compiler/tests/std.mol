@@ -1,0 +1,42 @@
+enum Option<T> {
+    Some { value: T },
+    None
+}
+
+trait Iterable<T> {
+    fn iter(self) -> T;
+}
+
+trait Iterator<T> {
+    fn next(self) -> Option<T>;
+}
+
+struct ArrayIter<T> {
+    value: T[],
+    index: integer
+}
+
+impl<T> trait Iterator<T> for ArrayIter<T> {
+    fn next(self) -> Option<T> {
+        if self.index == self.value.size() {
+            Option::None<T>
+        } else {
+            const returned = self.value[self.index];
+
+            self.index = self.index + 1;
+
+            Option::Some<T> {
+                value: returned
+            }
+        }
+    }
+}
+
+impl<T> trait Iterable<ArrayIter<T>> for T[] {
+    fn iter(self) -> ArrayIter<T> {
+        ArrayIter {
+            value: self,
+            index: 0
+        }
+    }
+}

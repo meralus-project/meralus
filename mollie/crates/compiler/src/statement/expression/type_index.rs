@@ -6,16 +6,13 @@ use crate::{Compile, CompileResult, Compiler, GetPositionedType, GetType, TypeRe
 
 impl Compile for Positioned<TypeIndexExpr> {
     fn compile(self, chunk: &mut Chunk, compiler: &mut Compiler) -> CompileResult {
-        println!("ALOW");
-        
         let ty = self.value.target.get_type(compiler)?;
 
-        let vtable = compiler.vtables.get_index_of(&ty.variant).unwrap();
-        let function = compiler.vtables[vtable].functions.get_index_of(&self.value.index.value.0).unwrap();
+        let (vtable, trait_index, function) = compiler.find_vtable_function_index(&ty.variant, &self.value.index.value.0).unwrap();
 
-        chunk.get_type_function(vtable, function);
+        chunk.get_type_function(vtable, trait_index, function);
 
-        Ok(())
+        Ok(false)
     }
 }
 
@@ -23,8 +20,8 @@ impl GetType for TypeIndexExpr {
     fn get_type(&self, compiler: &Compiler, _: Span) -> TypeResult {
         let ty = self.target.get_type(compiler)?;
 
-        let vtable = compiler.vtables.get(&ty.variant).unwrap();
+        let (vtable, trait_index, function) = compiler.find_vtable_function_index(&ty.variant, &self.index.value.0).unwrap();
 
-        Ok(vtable.functions.get(&self.index.value.0).unwrap().0.clone())
+        Ok(compiler.vtables[vtable][&trait_index][function].0.clone())
     }
 }

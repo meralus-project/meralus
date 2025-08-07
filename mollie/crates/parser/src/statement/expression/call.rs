@@ -10,6 +10,9 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
+    /// # Errors
+    ///
+    /// Returns error if parsing failed
     pub fn parse(parser: &mut Parser, target: Positioned<Expression>) -> ParseResult<Positioned<Self>> {
         let args = parser.consume_separated_in::<Expression>(&Token::Comma, &Token::ParenOpen, &Token::ParenClose)?;
 

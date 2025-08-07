@@ -1,24 +1,35 @@
 mod array;
+mod as_expr;
+mod binary;
 mod block;
 mod call;
+mod enum_path;
 mod ident;
+mod if_else;
 mod index;
 mod literal;
+mod loop_expr;
 mod node;
 mod type_index;
+mod while_expr;
 
 use mollie_lexer::Token;
-use mollie_shared::Positioned;
+use mollie_shared::{Operator, Positioned};
 
 pub use self::{
     array::ArrayExpr,
+    as_expr::{AsExpr, AsPattern, NameValuePattern},
+    binary::BinaryExpression,
     block::{Block, parse_statements_until},
     call::FunctionCall,
+    enum_path::EnumPathExpr,
     ident::Ident,
-    index::IndexExpr,
+    if_else::IfElseExpression,
+    index::{IndexExpr, IndexTarget},
     literal::{Literal, Number, SizeType},
-    node::{Node, NodeProperty},
+    node::{NameValue, Node},
     type_index::TypeIndexExpr,
+    while_expr::WhileExpression,
 };
 use crate::{Parse, ParseResult, Parser};
 
@@ -37,22 +48,22 @@ pub enum Precedence {
 }
 
 impl Precedence {
-    const fn from_ref(token: &Token) -> (Self, Option<()>) {
+    const fn from_ref(token: &Token) -> (Self, Option<Operator>) {
         match &token {
-            // Token::AndAnd => (Self::PAnd, Some(Operator::And)),
-            // Token::OrOr => (Self::POr, Some(Operator::Or)),
-            // Token::Eq => (Self::PEquals, Some(Operator::Assign)),
-            // Token::EqEq => (Self::PEquals, Some(Operator::Equal)),
-            // Token::NotEq => (Self::PEquals, Some(Operator::NotEqual)),
-            // Token::Less => (Self::PLessGreater, Some(Operator::LessThan)),
-            // Token::Greater => (Self::PLessGreater, Some(Operator::GreaterThan)),
-            // Token::Plus => (Self::PSum, Some(Operator::Add)),
-            // Token::Minus => (Self::PSum, Some(Operator::Sub)),
-            // Token::Star => (Self::PProduct, Some(Operator::Mul)),
-            // Token::Slash => (Self::PProduct, Some(Operator::Div)),
+            Token::AndAnd => (Self::PAnd, Some(Operator::And)),
+            Token::OrOr => (Self::POr, Some(Operator::Or)),
+            Token::Eq => (Self::PEquals, Some(Operator::Assign)),
+            Token::EqEq => (Self::PEquals, Some(Operator::Equal)),
+            Token::NotEq => (Self::PEquals, Some(Operator::NotEqual)),
+            Token::Less => (Self::PLessGreater, Some(Operator::LessThan)),
+            Token::Greater => (Self::PLessGreater, Some(Operator::GreaterThan)),
+            Token::Plus => (Self::PSum, Some(Operator::Add)),
+            Token::Minus => (Self::PSum, Some(Operator::Sub)),
+            Token::Star => (Self::PProduct, Some(Operator::Mul)),
+            Token::Slash => (Self::PProduct, Some(Operator::Div)),
             Token::ParenOpen => (Self::PCall, None),
             Token::BracketOpen | Token::Dot => (Self::PIndex, None),
-            // Token::Is => (Self::PCheck, None),
+            Token::Is => (Self::PCheck, None),
             _ => (Self::PLowest, None),
         }
     }
@@ -63,11 +74,18 @@ fn go_parse_pratt_expr(parser: &mut Parser, precedence: Precedence, left: Positi
         let (p, _) = Precedence::from_ref(&value.value);
 
         match p {
-            // Precedence::PCheck if precedence < Precedence::PCheck => {
-            //     let left = CheckExpression::parse(parser, left)?.map(Expression::Check);
+            Precedence::PCheck if precedence < Precedence::PCheck => {
+                parser.consume(&Token::Is)?;
 
-            //     go_parse_pratt_expr(parser, precedence, left)
-            // }
+                let pattern = AsPattern::parse(parser)?;
+
+                let left = left.between(&pattern).wrap(Expression::AsExpr(AsExpr {
+                    target: Box::new(left),
+                    pattern,
+                }));
+
+                go_parse_pratt_expr(parser, precedence, left)
+            }
             Precedence::PCall if precedence < Precedence::PCall => {
                 let left = FunctionCall::parse(parser, left)?.map(Expression::FunctionCall);
 
@@ -78,11 +96,11 @@ fn go_parse_pratt_expr(parser: &mut Parser, precedence: Precedence, left: Positi
 
                 go_parse_pratt_expr(parser, precedence, left)
             }
-            // ref peek_precedence if precedence < *peek_precedence => {
-            //     let left = BinaryExpression::parse(parser, left)?.map(Box::new).map(Expression::Binary);
+            ref peek_precedence if precedence < *peek_precedence => {
+                let left = BinaryExpression::parse(parser, left)?.map(Expression::Binary);
 
-            //     go_parse_pratt_expr(parser, precedence, left)
-            // }
+                go_parse_pratt_expr(parser, precedence, left)
+            }
             _ => Ok(left),
         }
     } else {
@@ -96,8 +114,14 @@ pub enum Expression {
     FunctionCall(FunctionCall),
     Node(Node),
     Index(IndexExpr),
+    Binary(BinaryExpression),
     TypeIndex(TypeIndexExpr),
     Array(ArrayExpr),
+    IfElse(IfElseExpression),
+    While(WhileExpression),
+    Block(Block),
+    EnumPath(EnumPathExpr),
+    AsExpr(AsExpr),
     Ident(Ident),
     This,
 }
@@ -112,8 +136,12 @@ impl Expression {
             Literal::parse(parser)
                 .map(|v| v.map(Self::Literal))
                 .or_else(|_| Node::parse(parser).map(|v| v.map(Self::Node)))
+                .or_else(|_| Block::parse(parser).map(|v| v.map(Self::Block)))
+                .or_else(|_| IfElseExpression::parse(parser).map(|v| v.map(Self::IfElse)))
+                .or_else(|_| WhileExpression::parse(parser).map(|v| v.map(Self::While)))
                 .or_else(|_| ArrayExpr::parse(parser).map(|v| v.map(Self::Array)))
                 .or_else(|_| TypeIndexExpr::parse(parser).map(|v| v.map(Self::TypeIndex)))
+                .or_else(|_| EnumPathExpr::parse(parser).map(|v| v.map(Self::EnumPath)))
                 .or_else(|_| Ident::parse(parser).map(|v| v.map(Self::Ident)))
                 .or_else(|_| parser.consume(&Token::This).map(|v| v.wrap(Self::This)))
         }

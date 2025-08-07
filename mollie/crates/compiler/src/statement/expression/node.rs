@@ -1,12 +1,13 @@
+use indexmap::IndexMap;
 use mollie_parser::Node;
 use mollie_shared::{Positioned, Span};
-use mollie_vm::{Chunk, ComponentChildren, TypeKind, Value};
+use mollie_vm::{Chunk, ComponentChildren, Type, TypeKind, TypeVariant, Value};
 
 use crate::{Compile, CompileError, CompileResult, Compiler, GetPositionedType, GetType, TypeError, TypeResult};
 
 impl Compile for Positioned<Node> {
     fn compile(mut self, chunk: &mut Chunk, compiler: &mut Compiler) -> CompileResult {
-        let ty = compiler.try_get_type(&self.value.name.value.0)?;
+        let ty = self.get_type(compiler)?;
 
         if let Some(component) = ty.variant.as_component() {
             for prop in &self.value.properties {
@@ -17,15 +18,15 @@ impl Compile for Positioned<Node> {
                         .iter()
                         .find(|(name, ..)| name == &prop.value.name.value.0)
                         .ok_or_else(|| TypeError::PropertyNotFound {
-                            ty: TypeKind::Component,
-                            ty_name: Some(self.value.name.value.0.clone()),
+                            ty: Box::new(TypeKind::Component),
+                            ty_name: Some(self.value.name.value.name.value.0.clone()),
                             property: prop.value.name.value.0.clone(),
                         })?;
 
-                if !got.variant.same_as(&expected.variant) {
+                if !got.variant.same_as(&expected.variant, &compiler.generics) {
                     return Err(TypeError::Unexpected {
-                        got: got.kind(),
-                        expected: expected.kind(),
+                        got: Box::new(got.kind()),
+                        expected: Box::new(expected.kind()),
                     }
                     .into());
                 }
@@ -37,7 +38,7 @@ impl Compile for Positioned<Node> {
                 return Err(TypeError::InvalidChildren {
                     got: children,
                     expected: component.children,
-                    ty_name: self.value.name.value.0,
+                    ty_name: self.value.name.value.name.value.0,
                 }
                 .into());
             }
@@ -75,36 +76,15 @@ impl Compile for Positioned<Node> {
                 size != 0
             };
 
-
             let ty = compiler
                 .types
-                .get_index_of(&self.value.name.value.0)
-                .ok_or(CompileError::VariableNotFound { name: self.value.name.value.0 })?;
+                .get_index_of(&self.value.name.value.name.value.0)
+                .ok_or(CompileError::VariableNotFound {
+                    name: self.value.name.value.name.value.0,
+                })?;
 
             chunk.instantiate(ty, have_children);
         } else if let Some(structure) = ty.variant.as_struct() {
-            for prop in &self.value.properties {
-                let got = prop.value.value.get_type(compiler)?;
-                let (.., expected) =
-                    structure
-                        .properties
-                        .iter()
-                        .find(|(name, ..)| name == &prop.value.name.value.0)
-                        .ok_or_else(|| TypeError::PropertyNotFound {
-                            ty: TypeKind::Struct,
-                            ty_name: Some(self.value.name.value.0.clone()),
-                            property: prop.value.name.value.0.clone(),
-                        })?;
-
-                if !got.variant.same_as(&expected.variant) {
-                    return Err(TypeError::Unexpected {
-                        got: got.kind(),
-                        expected: expected.kind(),
-                    }
-                    .into());
-                }
-            }
-
             for (name, _) in &structure.properties {
                 let property = self
                     .value
@@ -115,42 +95,104 @@ impl Compile for Positioned<Node> {
 
                 if let Some(property) = property {
                     compiler.compile(chunk, property.value.value)?;
-                }/*  else if *nullable {
-                    let constant = chunk.constant(Value::Null);
-
-                    chunk.load_const(constant);
-                } */
+                }
             }
 
             for node in self.value.children.value {
                 compiler.compile(chunk, node)?;
             }
 
+            compiler.generics = Vec::new();
+
             let ty = compiler
                 .types
-                .get_index_of(&self.value.name.value.0)
-                .ok_or(CompileError::VariableNotFound { name: self.value.name.value.0 })?;
+                .get_index_of(&self.value.name.value.name.value.0)
+                .ok_or(CompileError::VariableNotFound {
+                    name: self.value.name.value.name.value.0,
+                })?;
 
             chunk.instantiate(ty, false);
         }
 
-        Ok(())
+        Ok(true)
     }
 }
 
 impl GetType for Node {
     fn get_type(&self, compiler: &Compiler, _: Span) -> TypeResult {
-        let ty = compiler.types.get(&self.name.value.0).ok_or_else(|| TypeError::NotFound {
-            ty: Some(TypeKind::OneOf(vec![TypeKind::Component, TypeKind::Struct])),
-            name: self.name.value.0.clone(),
+        let ty = compiler.types.get(&self.name.value.name.value.0).ok_or_else(|| TypeError::NotFound {
+            ty: Some(Box::new(TypeKind::OneOf(vec![TypeKind::Component, TypeKind::Struct]))),
+            name: self.name.value.name.value.0.clone(),
         })?;
 
-        if ty.variant.is_component() || ty.variant.is_struct() {
-            Ok(ty.clone())
+        if let Some(structure) = ty.variant.as_struct() {
+            let applied_generics = self
+                .name
+                .value
+                .generics
+                .iter()
+                .map(|ty| ty.get_type(compiler))
+                .collect::<TypeResult<Vec<_>>>()?;
+
+            let mut resolved_generics = IndexMap::new();
+
+            for prop in &self.properties {
+                let got = prop.value.value.get_type(compiler)?;
+                let (.., expected) =
+                    structure
+                        .properties
+                        .iter()
+                        .find(|(name, ..)| name == &prop.value.name.value.0)
+                        .ok_or_else(|| TypeError::PropertyNotFound {
+                            ty: Box::new(TypeKind::Struct),
+                            ty_name: Some(self.name.value.name.value.0.clone()),
+                            property: prop.value.name.value.0.clone(),
+                        })?;
+
+                if let TypeVariant::Generic(position) = expected.variant
+                    && position >= applied_generics.len()
+                {
+                    resolved_generics.insert(position, got);
+                } else if !got.variant.same_as(&expected.variant, &applied_generics) {
+                    return Err(TypeError::Unexpected {
+                        got: Box::new(got.kind()),
+                        expected: Box::new(expected.kind()),
+                    }
+                    .into());
+                }
+            }
+
+            if !resolved_generics.is_empty() {
+                resolved_generics.sort_unstable_keys();
+
+                Ok(Type {
+                    variant: ty.variant.clone(),
+                    applied_generics: resolved_generics.into_values().collect(),
+                    declared_at: ty.declared_at,
+                })
+            } else {
+                Ok(Type {
+                    variant: ty.variant.clone(),
+                    applied_generics,
+                    declared_at: ty.declared_at,
+                })
+            }
+        } else if ty.variant.is_component() {
+            Ok(Type {
+                variant: ty.variant.clone(),
+                applied_generics: self
+                    .name
+                    .value
+                    .generics
+                    .iter()
+                    .map(|ty| ty.get_type(compiler))
+                    .collect::<TypeResult<Vec<_>>>()?,
+                declared_at: ty.declared_at,
+            })
         } else {
             Err(TypeError::Unexpected {
-                got: ty.kind(),
-                expected: TypeKind::Struct.into(),
+                got: Box::new(ty.kind()),
+                expected: Box::new(TypeKind::Struct.into()),
             })
         }
     }

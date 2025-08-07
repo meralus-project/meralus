@@ -1,8 +1,8 @@
 use indexmap::{IndexMap, map::Entry};
 use mollie_lexer::{Lexer, Token};
-use mollie_parser::{Parser, Statement, parse_statements_until};
+use mollie_parser::{Expression, Parser, Statement, parse_statements_until};
 use mollie_shared::{Positioned, Span};
-use mollie_vm::{ArrayType, Chunk, ComplexType, PrimitiveType, Trait, TraitFunc, Type, TypeVariant, VTable, Value, Vm, any};
+use mollie_vm::{ArrayType, Chunk, ComplexType, PrimitiveType, SmallVec, StackFrame, Trait, TraitFunc, Type, TypeVariant, Value, Vm, any};
 
 pub use self::error::{CompileError, CompileResult, TypeError, TypeResult};
 
@@ -13,16 +13,38 @@ mod ty;
 #[derive(Debug)]
 pub struct Variable {
     pub id: usize,
-    pub ty: TypeVariant,
+    pub ty: Type,
     pub value: Option<Value>,
 }
 
-#[derive(Debug, Default)]
+type VTable = IndexMap<Option<usize>, IndexMap<String, (Type, Value)>>;
+
+#[derive(Debug)]
 pub struct Compiler {
-    traits: IndexMap<String, Trait>,
-    types: IndexMap<String, Type>,
-    vtables: IndexMap<TypeVariant, VTable>,
-    locals: IndexMap<String, Variable>,
+    pub traits: IndexMap<String, Trait>,
+    pub types: IndexMap<String, Type>,
+    pub impls: IndexMap<TypeVariant, Vec<usize>>,
+    pub vtables: IndexMap<TypeVariant, VTable>,
+    pub frames: Vec<IndexMap<String, Variable>>,
+
+    pub generics: Vec<Type>,
+    pub assign: Option<Positioned<Expression>>,
+    pub infer: Option<Type>,
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self {
+            traits: IndexMap::new(),
+            types: IndexMap::new(),
+            impls: IndexMap::new(),
+            vtables: IndexMap::new(),
+            frames: vec![IndexMap::new()],
+            generics: Vec::new(),
+            assign: None,
+            infer: None,
+        }
+    }
 }
 
 pub struct TraitBuilder<'a> {
@@ -64,11 +86,16 @@ impl<'a> TraitBuilder<'a> {
         self
     }
 
-    pub fn build(self) {
+    pub fn build(self) -> usize {
+        let index = self.compiler.traits.len();
+
         self.compiler.traits.insert(self.name, Trait {
+            generics: Vec::new(),
             functions: self.functions,
             declared_at: None,
         });
+
+        index
     }
 }
 
@@ -78,10 +105,7 @@ impl Compiler {
     }
 
     pub fn add_type<T: Into<String>>(&mut self, name: T, ty: TypeVariant) {
-        self.types.insert(name.into(), Type {
-            variant: ty,
-            declared_at: None,
-        });
+        self.types.insert(name.into(), ty.into());
     }
 
     pub fn add_declared_type<T: Into<String>>(&mut self, name: T, ty: Type) {
@@ -92,60 +116,122 @@ impl Compiler {
         self.types.shift_remove(name.as_ref());
     }
 
+    pub fn push_frame(&mut self) {
+        self.frames.push(IndexMap::new());
+    }
+
+    pub fn pop_frame(&mut self) {
+        self.frames.pop();
+    }
+
+    pub const fn current_frame_id(&self) -> usize {
+        self.frames.len() - 1
+    }
+
+    pub fn current_frame(&self) -> &IndexMap<String, Variable> {
+        self.frames.last().unwrap()
+    }
+
+    pub fn current_frame_mut(&mut self) -> &mut IndexMap<String, Variable> {
+        self.frames.last_mut().unwrap()
+    }
+
+    pub fn get_var<T: AsRef<str>>(&self, name: T) -> Option<&Variable> {
+        let name = name.as_ref();
+
+        for frame in self.frames.iter().rev() {
+            if let Some(var) = frame.get(name) {
+                return Some(var);
+            }
+        }
+
+        None
+    }
+
+    pub fn get_var_index<T: AsRef<str>>(&self, name: T) -> Option<(usize, usize)> {
+        let name = name.as_ref();
+
+        for (frame_id, frame) in self.frames.iter().enumerate().rev() {
+            if let Some(var) = frame.get(name) {
+                return Some((self.current_frame_id() - frame_id, var.id));
+            }
+        }
+
+        None
+    }
+
     pub fn vtable_func<T: Into<String>>(&mut self, ty: TypeVariant, name: T, function_ty: Type, value: Value) {
         let name = name.into();
 
         match self.vtables.entry(ty) {
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().functions.insert(name, (function_ty, None, value));
-            }
+            Entry::Occupied(mut entry) => match entry.get_mut().entry(None) {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().insert(name, (function_ty, value));
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(IndexMap::from_iter([(name, (function_ty, value))]));
+                }
+            },
             Entry::Vacant(entry) => {
-                entry.insert(VTable {
-                    functions: IndexMap::from_iter([(name, (function_ty, None, value))]),
-                });
+                entry.insert(IndexMap::from_iter([(None, IndexMap::from_iter([(name, (function_ty, value))]))]));
             }
         }
     }
 
-    pub fn var<T: Into<String>>(&mut self, name: T, ty: TypeVariant) {
-        let id = self.locals.len();
+    pub fn var<T: Into<String>, V: Into<Type>>(&mut self, name: T, ty: V) -> usize {
+        let id = self.current_frame().len();
         let name = name.into();
 
-        self.add_type(name.clone(), ty.clone());
-        self.locals.insert(name, Variable { id, ty, value: None });
+        self.current_frame_mut().insert(name, Variable {
+            id,
+            ty: ty.into(),
+            value: None,
+        });
+
+        id
     }
 
     pub fn remove_var<T: AsRef<str>>(&mut self, name: T) {
         let name = name.as_ref();
 
-        self.remove_type(name);
-        self.locals.shift_remove(name);
+        self.current_frame_mut().shift_remove(name);
     }
 
     pub fn var_value<T: Into<String>>(&mut self, name: T, ty: TypeVariant, value: Value) {
-        let id = self.locals.len();
+        let id = self.current_frame().len();
         let name = name.into();
 
-        self.add_type(name.clone(), ty.clone());
-        self.locals.insert(name, Variable { id, ty, value: Some(value) });
+        self.current_frame_mut().insert(name, Variable {
+            id,
+            ty: ty.into(),
+            value: Some(value),
+        });
     }
 
+    /// # Errors
+    ///
+    /// Returns `CompileError` if program parsing or compilation fails.
     pub fn compile_program_text<T: AsRef<str>>(&mut self, text: T) -> CompileResult<Chunk> {
         let mut parser = Parser::new(Lexer::lex(text.as_ref()));
 
         let program = match parse_statements_until(&mut parser, &Token::EOF) {
             Ok(statements) => statements,
-            Err(error) => panic!("{error}"),
+            Err(error) => return Err(CompileError::Parse(error)),
         };
 
         self.compile_program(program)
     }
 
+    /// # Errors
+    ///
+    /// Returns `CompileError` if program compilation fails.
     pub fn compile_program(&mut self, (statements, returned): (Vec<Positioned<Statement>>, Option<Positioned<Statement>>)) -> CompileResult<Chunk> {
         let mut chunk = Chunk::default();
 
         for statement in statements {
-            self.compile(&mut chunk, statement)?;
+            if self.compile(&mut chunk, statement)? {
+                chunk.pop();
+            }
         }
 
         if let Some(statement) = returned {
@@ -159,53 +245,118 @@ impl Compiler {
         Ok(chunk)
     }
 
+    /// # Errors
+    ///
+    /// Returns `CompileError` if compilation fails. This can happen in two
+    /// cases: if the referenced variable is not found or if type inference
+    /// fails.
     pub fn compile<O, T: Compile<O>>(&mut self, chunk: &mut Chunk, value: T) -> CompileResult<O> {
         value.compile(chunk, self)
     }
 
+    /// # Errors
+    ///
+    /// Returns `TypeError` if type inference fails. This can happen if, for
+    /// example, the required type is not declared.
     pub fn get_positioned_type<T: GetType>(&mut self, value: &Positioned<T>) -> TypeResult {
         value.get_type(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns `TypeError` if type inference fails. This can happen if, for
+    /// example, the required type is not declared.
     pub fn get_value_type<T: GetType>(&mut self, value: &T, span: Span) -> TypeResult {
         value.get_type(self, span)
     }
 
+    /// # Errors
+    ///
+    /// Will throw `CompileError` if there's no type with that `name`.
     pub fn try_get_type<T: AsRef<str>>(&self, name: T) -> CompileResult<Type> {
         self.types.get(name.as_ref()).cloned().ok_or_else(|| CompileError::VariableNotFound {
             name: name.as_ref().to_string(),
         })
     }
 
+    /// # Errors
+    ///
+    /// Will throw `TypeError` if there's no local with that `name`.
+    pub fn get_local_type<T: AsRef<str>>(&self, name: T) -> TypeResult<Type> {
+        for frame in self.frames.iter().rev() {
+            if let Some(v) = frame.get(name.as_ref()) {
+                return Ok(v.ty.clone());
+            }
+        }
+
+        Err(TypeError::NotFound {
+            ty: None,
+            name: name.as_ref().to_string(),
+        })
+    }
+
+    /// # Panics
+    ///
+    /// Will panic if there's no type with that `name`.
     pub fn get_type<T: AsRef<str>>(&self, name: T) -> Type {
         self.types
             .get(name.as_ref())
             .map_or_else(|| panic!("{} not found", name.as_ref()), Clone::clone)
     }
 
-    pub fn get_vtable(&self, ty: &TypeVariant) -> Option<&VTable> {
-        self.vtables.get(ty).map_or_else(
+    fn _find_vtable_function_index<T: AsRef<str>>(&self, vtable_index: usize, function_name: T) -> Option<(usize, Option<usize>, usize)> {
+        let index = self.vtables[vtable_index]
+            .iter()
+            .find_map(|(i, vtable)| vtable.get_index_of(function_name.as_ref()).map(|index| (*i, index)));
+
+        index.map(|index| (vtable_index, index.0, index.1))
+    }
+
+    pub fn find_vtable_function<T: AsRef<str>>(&self, ty: &TypeVariant, contains: T) -> Option<&(Type, Value)> {
+        self.find_vtable_function_index(ty, contains).map(|v| &self.vtables[v.0][&v.1][v.2])
+    }
+
+    pub fn find_vtable_function_index<T: AsRef<str>>(&self, ty: &TypeVariant, function_name: T) -> Option<(usize, Option<usize>, usize)> {
+        self.vtables.get_index_of(ty).map_or_else(
             || {
                 ty.as_array().map_or_else(
                     || {
-                        ty.as_component().map_or_else(
-                            || self.vtables.get(&any()),
-                            |_| self.vtables.get(&TypeVariant::Primitive(PrimitiveType::Component)),
-                        )
+                        ty.as_component()
+                            .map_or_else(
+                                || self.vtables.get_index_of(&any()),
+                                |_| self.vtables.get_index_of(&TypeVariant::Primitive(PrimitiveType::Component)),
+                            )
+                            .and_then(|v| self._find_vtable_function_index(v, function_name.as_ref()))
                     },
                     |ty| {
-                        self.vtables.get(&TypeVariant::complex(ComplexType::Array(ArrayType {
-                            element: ty.element.clone(),
-                            size: None,
-                        })))
+                        self.vtables
+                            .get_index_of(&TypeVariant::complex(ComplexType::Array(ArrayType {
+                                element: ty.element.clone(),
+                                size: None,
+                            })))
+                            .and_then(|v| self._find_vtable_function_index(v, function_name.as_ref()))
+                            .or_else(|| {
+                                self.vtables
+                                    .get_index_of(&TypeVariant::complex(ComplexType::Array(ArrayType {
+                                        element: TypeVariant::Generic(0).into(),
+                                        size: None,
+                                    })))
+                                    .and_then(|v| self._find_vtable_function_index(v, function_name.as_ref()))
+                            })
+                            .or_else(|| {
+                                self.vtables
+                                    .iter()
+                                    .position(|t| t.0.as_array().is_some_and(|arr| matches!(arr.element.variant, TypeVariant::Generic(_))))
+                                    .and_then(|v| self._find_vtable_function_index(v, function_name.as_ref()))
+                            })
                     },
                 )
             },
-            Some,
+            |v| self._find_vtable_function_index(v, function_name.as_ref()),
         )
     }
 
-    pub fn get_vtable_index(&self, ty: &TypeVariant) -> Option<usize> {
+    pub fn get_vtable_index<T: AsRef<str>>(&self, ty: &TypeVariant) -> Option<usize> {
         self.vtables.get_index_of(ty).map_or_else(
             || {
                 ty.as_array().map_or_else(
@@ -216,10 +367,22 @@ impl Compiler {
                         )
                     },
                     |ty| {
-                        self.vtables.get_index_of(&TypeVariant::complex(ComplexType::Array(ArrayType {
-                            element: ty.element.clone(),
-                            size: None,
-                        })))
+                        self.vtables
+                            .get_index_of(&TypeVariant::complex(ComplexType::Array(ArrayType {
+                                element: ty.element.clone(),
+                                size: None,
+                            })))
+                            .or_else(|| {
+                                self.vtables.get_index_of(&TypeVariant::complex(ComplexType::Array(ArrayType {
+                                    element: TypeVariant::Generic(0).into(),
+                                    size: None,
+                                })))
+                            })
+                            .or_else(|| {
+                                self.vtables
+                                    .iter()
+                                    .position(|t| t.0.as_array().is_some_and(|arr| matches!(arr.element.variant, TypeVariant::Generic(_))))
+                            })
                     },
                 )
             },
@@ -227,50 +390,103 @@ impl Compiler {
         )
     }
 
-    pub fn get_vtable_method_index<T: AsRef<str>>(&self, ty: &TypeVariant, name: T) -> Option<(usize, usize)> {
-        self.get_vtable_index(ty)
-            .and_then(|vtable| self.vtables[vtable].functions.get_index_of(name.as_ref()).map(|function| (vtable, function)))
+    pub fn implements_trait(&self, ty: &TypeVariant, trait_index: usize) -> bool {
+        self.vtables.get(ty).is_some_and(|vtables| vtables.contains_key(&Some(trait_index)))
+    }
+
+    pub fn get_vtable_method_index<T: AsRef<str>>(&self, ty: &TypeVariant, name: T) -> Option<(usize, Option<usize>, usize)> {
+        self.find_vtable_function_index(ty, name.as_ref())
     }
 
     pub fn get_local_index<T: AsRef<str>>(&self, name: T) -> Option<usize> {
-        self.locals.get_index_of(name.as_ref())
+        for frame in self.frames.iter().rev() {
+            if let Some(index) = frame.get_index_of(name.as_ref()) {
+                return Some(index);
+            }
+        }
+
+        None
     }
 
     pub fn extend_vm(&self, vm: &mut Vm) {
         vm.types = self.types.values().cloned().collect();
         vm.vtables = self
             .vtables
-            .values()
-            .map(|vtable| vtable.functions.values().map(|value| value.2.clone()).collect())
+            .iter()
+            .map(|vtable| {
+                (
+                    vtable.0.clone(),
+                    vtable
+                        .1
+                        .iter()
+                        .map(|(index, functions)| (*index, functions.values().map(|v| v.1.clone()).collect()))
+                        .collect(),
+                )
+            })
             .collect();
 
-        vm.locals = self.locals.values().map(|variable| variable.value.clone().unwrap_or(Value::Null)).collect();
+        vm.frames = self
+            .frames
+            .iter()
+            .map(|variable| StackFrame {
+                locals: variable.values().filter_map(|variable| variable.value.clone()).collect(),
+            })
+            .collect();
     }
 
     pub fn as_vm(&self) -> Vm {
         Vm {
             state: Box::new(()),
             types: self.types.values().cloned().collect(),
+            impls: self.impls.clone(),
             vtables: self
                 .vtables
-                .values()
-                .map(|vtable| vtable.functions.values().map(|value| value.2.clone()).collect())
+                .iter()
+                .map(|vtable| {
+                    (
+                        vtable.0.clone(),
+                        vtable
+                            .1
+                            .iter()
+                            .map(|(index, functions)| (*index, functions.values().map(|v| v.1.clone()).collect()))
+                            .collect(),
+                    )
+                })
                 .collect(),
-            locals: self.locals.values().map(|variable| variable.value.clone().unwrap_or(Value::Null)).collect(),
-            stack: Vec::new(),
+            frames: self
+                .frames
+                .iter()
+                .map(|variable| StackFrame {
+                    locals: variable.values().filter_map(|variable| variable.value.clone()).collect(),
+                })
+                .collect(),
+            stack: SmallVec::new(),
         }
     }
 }
 
-pub trait Compile<T = ()> {
+pub trait Compile<T = bool> {
+    /// # Errors
+    ///
+    /// Returns `CompileError` if compilation fails. This can happen in two
+    /// cases: if the referenced variable is not found or if type inference
+    /// fails.
     fn compile(self, chunk: &mut Chunk, compiler: &mut Compiler) -> CompileResult<T>;
 }
 
 pub trait GetType {
+    /// # Errors
+    ///
+    /// Returns `TypeError` if type inference fails. This can happen if, for
+    /// example, the required type is not declared.
     fn get_type(&self, compiler: &Compiler, span: Span) -> TypeResult;
 }
 
 pub trait GetPositionedType {
+    /// # Errors
+    ///
+    /// Returns `TypeError` if type inference fails. This can happen if, for
+    /// example, the required type is not declared.
     fn get_type(&self, compiler: &Compiler) -> TypeResult;
 }
 
@@ -282,136 +498,51 @@ impl<T: GetType> GetPositionedType for Positioned<T> {
 
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
-    use mollie_lexer::{Lexer, Token};
-    use mollie_parser::{Parser, parse_statements_until};
     use mollie_vm::{
-        ComponentChildren, FromValue, ObjectValue, Struct, StructType, TypeVariant, Value, Vm, any, array_of, boolean, component, float, function, integer,
-        string, structure, void,
+        ComponentChildren, FromValue, ObjectValue, Struct, TypeVariant, Value, Vm, any, array_of, boolean, component, float, function, integer, string,
+        structure, void,
     };
 
     use crate::Compiler;
 
-    const BASIC_UI2: &str = "declare Button inherits Container {
-    title: string,
-    waat_size_prop: integer,
-    children: component,
-    
-    Rectangle from <self as Element> {
+    //     const BASIC_UI2: &str = "declare Button inherits Container {
+    //     title: string,
+    //     waat_size_prop: integer,
+    //     children: component,
 
-    }
-}
+    //     Rectangle from <self as Element> {
 
-Rectangle {
-    width: 100px,
-    height: 20%,
-    corner_radius: all(12px),
-    background: 0x00FF00,
-    foreground: rgb(255, 0, 0),
-    some_flag: true,
-    string_value: \"okak!\",
-
-    Button {
-        title: \"xz\",
-        waat_size_prop: 2,
-
-        Rectangle {
-            width: 100px,
-            height: 20%,
-            corner_radius: all(12px),
-            background: 0x00FF00,
-            foreground: rgb(255, 0, 0),
-            some_flag: true,
-            string_value: \"okak!\",
-        }
-    }
-}";
-
-    // trait Iterable<T> {
-    //  fn next(self) -> T;
-    // }
-    //
-    // struct ArrayIter<T> {
-    //  array: T[],
-    //  index: integer,
-    // }
-    //
-    // impl<T> trait Iterable<T> for ArrayIter<T> {
-    //  fn next(self) -> T {
-    //   self.index += 1;
-    //
-    //   self.array[self.index]
-    //  }
+    //     }
     // }
 
-    const BASIC_UI: &str = "println(\"эвоно как\");
-println([\"эвоно как\", \"эвоно как\", \"эвоно как\"]);
+    // Rectangle {
+    //     width: 100px,
+    //     height: 20%,
+    //     corner_radius: all(12px),
+    //     background: 0x00FF00,
+    //     foreground: rgb(255, 0, 0),
+    //     some_flag: true,
+    //     string_value: \"okak!\",
 
-struct Daun {
-    tochno: boolean
-}
+    //     Button {
+    //         title: \"xz\",
+    //         waat_size_prop: 2,
 
-declare Rect {
-    width: float,
-    height: float,
-    color: Color,
-}
+    //         Rectangle {
+    //             width: 100px,
+    //             height: 20%,
+    //             corner_radius: all(12px),
+    //             background: 0x00FF00,
+    //             foreground: rgb(255, 0, 0),
+    //             some_flag: true,
+    //             string_value: \"okak!\",
+    //         }
+    //     }
+    // }";
 
-impl trait Drawable for Rect {
-    fn draw(self, context: DrawContext) {
-        context.draw_rect(0.0, 0.0, self.width, self.height, self.color);
-        context.draw_rect(40.0, 40.0, self.width, self.height, self.color);
-    }
-}
+    // const BASIC_UI: &str = include_str!("../tests/main.mol");
 
-impl string {
-    fn get_prikol() -> string {
-        \"HELLO\"
-    }
-
-    fn log_len(self) {
-        println(self.length());
-    }
-}
-
-impl string[] {
-    fn lmao(self) -> boolean {
-        true
-    }
-}
-
-println(<string>::get_prikol().length());
-println(Daun { tochno: true }.tochno);
-
-\"dubai\".log_len();
-
-println([\"эвоно как\", \"эвоно как\", \"эвоно как\", \"эвоно как\"].lmao());
-println([\"эвоно как\", \"эвоно как\", \"эвоно как\"].lmao());
-
-Rectangle {
-    width: 100px,
-    height: 20%,
-    corner_radius: all(12px),
-    background: hex(0x00FF00),
-    foreground: rgb(255, 0, 0),
-    some_flag: true,
-    string_value: \"okak!\",
-    test_array: [true, false, true],
-
-    Rectangle {
-        width: 100px,
-        height: 20%,
-        corner_radius: all(12px),
-        background: hex(0x00FF00),
-        foreground: rgb(255, 0, 0),
-        some_flag: true,
-        string_value: \"йобань\",
-        test_array: [true, false, true],
-    }
-};
-    
-Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
-
+    #[allow(dead_code)]
     #[derive(Debug)]
     struct Color {
         red: u8,
@@ -433,40 +564,25 @@ Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
         }
     }
 
-    fn get_value_method<T: AsRef<str>>(value: &Value, name: T, compiler: &Compiler, vm: &Vm) -> Option<Value> {
+    #[allow(dead_code)]
+    fn get_value_method<T: AsRef<str>>(value: &Value, trait_index: usize, name: T, compiler: &Compiler, vm: &Vm) -> Option<Value> {
         let ty = value.get_type()?;
 
-        compiler
-            .get_vtable_method_index(&ty, name)
-            .map(|(vtable, method)| vm.vtables[vtable][method].clone())
+        if compiler.implements_trait(&ty.variant, trait_index) {
+            compiler
+                .get_vtable_method_index(&ty.variant, name)
+                .map(|(vtable, vtable2, method)| vm.vtables[vtable][&vtable2][method].clone())
+        } else {
+            None
+        }
     }
 
-    #[test]
-    fn chaotic_test() {
-        let mut parser = Parser::new(Lexer::lex(BASIC_UI));
-
-        let program = match parse_statements_until(&mut parser, &Token::EOF) {
-            Ok(statements) => statements,
-            Err(error) => {
-                return println!(
-                    "{error} [{:?}]",
-                    error.location().map_or("", |location| &BASIC_UI2[location.start..location.end])
-                );
-            }
-        };
-
-        let mut compiler = Compiler {
-            traits: IndexMap::new(),
-            types: IndexMap::new(),
-            locals: IndexMap::new(),
-            vtables: IndexMap::new(),
-        };
-
+    fn add_builtins(compiler: &mut Compiler) {
         compiler.vtable_func(
             string(),
             "length",
             function(true, [string()], integer()).into(),
-            Value::object(ObjectValue::NativeFunc(|_, args| {
+            Value::object(ObjectValue::native_func(|_, args| {
                 let Value::Object(object) = &args[0] else { unreachable!() };
                 let ObjectValue::String(string) = &*object.borrow() else { unreachable!() };
 
@@ -474,6 +590,33 @@ Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
             })),
         );
 
+        compiler.vtable_func(
+            array_of(TypeVariant::Generic(0), None),
+            "size",
+            function(true, [array_of(TypeVariant::Generic(0), None)], integer()).into(),
+            Value::object(ObjectValue::native_func(|_, args| {
+                let Value::Object(object) = &args[0] else { unreachable!("{}", args[0]) };
+                let ObjectValue::Array(array) = &*object.borrow() else { unreachable!() };
+
+                Some(Value::Integer(array.len() as i64))
+            })),
+        );
+
+        compiler.var_value(
+            "println",
+            function(false, [any()], void()),
+            Value::object(ObjectValue::native_func(|_, args| println(args))),
+        );
+
+        compiler.var_value(
+            "println_type",
+            function(false, [any()], void()),
+            Value::object(ObjectValue::native_func(|_, args| println_type(args))),
+        );
+    }
+
+    #[allow(dead_code)]
+    fn add_customs(compiler: &mut Compiler) -> usize {
         let color_ty = structure([("red", integer()), ("green", integer()), ("blue", integer())]);
 
         compiler.add_type("Color", color_ty.clone());
@@ -499,14 +642,14 @@ Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
             ),
         );
 
-        let context_ty = TypeVariant::complex(mollie_vm::ComplexType::Struct(StructType { properties: Vec::new() }));
+        let context_ty = structure::<String, TypeVariant, _>([]);
 
         compiler.add_type("DrawContext", context_ty.clone());
         compiler.vtable_func(
             context_ty.clone(),
             "draw_rect",
             function(true, [context_ty.clone(), float(), float(), float(), float(), color_ty], void()).into(),
-            Value::object(ObjectValue::NativeFunc(|vm, args| {
+            Value::object(ObjectValue::native_func(|_, args| {
                 let x = args[1].as_float()?;
                 let y = args[2].as_float()?;
                 let w = args[3].as_float()?;
@@ -519,35 +662,39 @@ Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
             })),
         );
 
-        compiler.add_trait("Drawable").method("draw", [context_ty.clone()], void()).build();
+        let drawable = compiler.add_trait("Drawable").method("draw", [context_ty.clone()], void()).build();
 
         compiler.var_value(
             "all",
             function(false, [integer()], compiler.get_type("Thickness")),
-            Value::object(ObjectValue::NativeFunc(|vm, args| Some(all(vm, args)))),
+            Value::object(ObjectValue::native_func(|vm, args| Some(all(vm, args)))),
         );
 
         compiler.var_value(
             "rgb",
             function(false, [integer(), integer(), integer()], compiler.get_type("Color")),
-            Value::object(ObjectValue::NativeFunc(|vm, args| Some(rgb(vm, args)))),
-        );
-
-        compiler.var_value(
-            "println",
-            function(false, [any()], void()),
-            Value::object(ObjectValue::NativeFunc(|_, args| println(args))),
+            Value::object(ObjectValue::native_func(|vm, args| Some(rgb(vm, args)))),
         );
 
         compiler.var_value(
             "hex",
             function(false, [integer()], compiler.get_type("Color")),
-            Value::object(ObjectValue::NativeFunc(|vm, args| Some(hex(vm, args)))),
+            Value::object(ObjectValue::native_func(|vm, args| Some(hex(vm, args)))),
         );
 
-        std::fs::write("./parse", format!("{program:#?}")).unwrap();
+        drawable
+    }
 
-        match compiler.compile_program(program) {
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn chaotic_test() {
+        let mut compiler = Compiler::default();
+
+        add_builtins(&mut compiler);
+
+        compiler.compile_program_text(include_str!("../tests/std.mol")).unwrap();
+
+        match compiler.compile_program_text(include_str!("../tests/main.mol")) {
             Ok(chunk) => {
                 println!("{chunk}");
 
@@ -555,36 +702,39 @@ Rect { width: 100.0, height: 100.0, color: rgb(0xFF, 0xFF, 0x00) }";
 
                 let value = vm.execute(&chunk);
 
-                println!("/*** LOCALS ***/");
+                println!("/*** LOCALS START ***/");
 
-                for value in &vm.locals {
-                    println!("{value}");
+                for frame in &vm.frames {
+                    for value in &frame.locals {
+                        println!("{value}");
+                    }
                 }
 
-                println!("/*** STACK ***/");
+                println!("/*** LOCALS END ***/");
+
+                println!("/*** STACK START ***/");
 
                 for value in &vm.stack {
                     println!("{value}");
                 }
 
-                if let Some(value) = value {
-                    vm.execute_function(
-                        vec![
-                            value.clone(),
-                            Value::object(ObjectValue::Struct(Struct {
-                                ty: context_ty.into(),
-                                values: Vec::new(),
-                            })),
-                        ],
-                        get_value_method(&value, "draw", &compiler, &vm).unwrap(),
-                    );
+                println!("/*** STACK END ***/");
 
-                    println!("/*** RETURNED ***/");
+                if let Some(value) = value {
+                    println!("/*** RETURNED VALUE ***/");
                     println!("{value}");
                 }
             }
             Err(error) => println!("{error}"),
         }
+    }
+
+    fn println_type(mut args: Vec<Value>) -> Option<Value> {
+        let value = args.remove(0);
+
+        println!("{}", value.get_type()?);
+
+        None
     }
 
     fn println(mut args: Vec<Value>) -> Option<Value> {

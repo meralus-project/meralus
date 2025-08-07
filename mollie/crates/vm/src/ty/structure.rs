@@ -1,11 +1,13 @@
 use std::fmt::{self, Write};
 
 use mollie_shared::pretty_fmt::{PrettyFmt, indent_down, indent_up};
+use serde::{Deserialize, Serialize};
 
 use crate::Type;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructType {
+    pub generics: Vec<String>,
     pub properties: Vec<(String, Type)>,
 }
 
