@@ -1,3 +1,4 @@
+use glam::Mat4;
 use meralus_shared::{Color, Point2D, RRect2D, Rect2D, Size2D};
 
 use super::{Element, ElementChildren, RenderContext, Style};
@@ -60,12 +61,12 @@ impl Element for Text {
         ElementChildren::None
     }
 
-    fn measure(&mut self, text: &mut TextRenderer, context: &RenderContext, parent: Rect2D) {
+    fn measure(&mut self, context: &RenderContext, parent: Rect2D) {
         let padding = self.style.padding;
 
         self.set_origin(parent.origin);
         self.set_size(
-            text.measure("default", &self.data, self.size, None).unwrap() + Size2D::new(padding.left() + padding.right(), padding.bottom() + padding.top()),
+            context.text_renderer.measure("default", &self.data, self.size, None).unwrap() + Size2D::new(padding.left() + padding.right(), padding.bottom() + padding.top()),
         );
     }
 
@@ -78,6 +79,6 @@ impl Element for Text {
             self.bounding_box.origin
         };
 
-        context.draw_text(origin, "default", &self.data, self.size, self.color, None);
+        context.draw_text(origin, "default", &self.data, self.size, self.color, None, Mat4::default());
     }
 }

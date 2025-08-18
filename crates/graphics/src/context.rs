@@ -1,7 +1,7 @@
-use std::mem::replace;
+use std::mem::{replace, take};
 
 use glam::{Mat2, Mat4};
-use glium::{Frame, IndexBuffer, Rect, VertexBuffer};
+use glium::{framebuffer::SimpleFrameBuffer, uniform, uniforms::MagnifySamplerFilter, BlitMask, BlitTarget, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface, Texture2d, VertexBuffer};
 use lyon_tessellation::{
     FillBuilder, TessellationError,
     math::{Transform, Vector},
@@ -12,8 +12,9 @@ use lyon_tessellation::{
 };
 use meralus_engine::WindowDisplay;
 use meralus_shared::{Color, Point2D, RRect2D, Rect2D, Size2D};
+use ouroboros::self_referencing;
 
-use crate::{ShapeRenderer, ShapeTessellator, ShapeVertex, TextRenderer};
+use crate::{BLENDING, Shader, ShapeRenderer, ShapeTessellator, ShapeVertex, TextRenderer, shape};
 
 pub struct RenderInfo {
     pub draw_calls: usize,
@@ -50,18 +51,42 @@ struct Text {
     max_width: Option<f32>,
 }
 
-pub struct RenderContext {
+#[self_referencing]
+pub struct Layer {
+    texture: Texture2d,
+    #[borrows(texture)]
+    #[not_covariant]
+    buffer: SimpleFrameBuffer<'this>,
+}
+
+pub struct RenderContext<'a> {
     window_size: Size2D,
     bounds: Rect2D,
     texts: Vec<Text>,
     clip: Option<Rect2D>,
     matrix: Option<Mat4>,
     tessellator: ShapeTessellator,
+    layer: Layer,
+    shape_shader: Program,
+    pub text_renderer: &'a mut TextRenderer,
+    display: WindowDisplay,
 }
 
-impl RenderContext {
-    pub fn new(display: &WindowDisplay) -> Self {
+impl<'a> RenderContext<'a> {
+    pub fn new(display: &WindowDisplay, text_renderer: &'a mut TextRenderer) -> Self {
         let (width, height) = display.get_framebuffer_dimensions();
+        let layer_texture = glium::texture::Texture2d::empty_with_format(
+            display,
+            glium::texture::UncompressedFloatFormat::F32F32F32F32,
+            glium::texture::MipmapsOption::NoMipmap,
+            width,
+            height,
+        )
+        .unwrap();
+
+        let mut layer = Layer::new(layer_texture, |texture| SimpleFrameBuffer::new(display, texture).unwrap());
+
+        layer.with_buffer_mut(|b| b.clear_color(0.0, 0.0, 0.0, 0.0));
 
         Self {
             window_size: Size2D::new(width as f32, height as f32),
@@ -70,16 +95,42 @@ impl RenderContext {
             clip: None,
             matrix: None,
             tessellator: ShapeTessellator::new(),
+            shape_shader: shape::ShapeShader::program(display),
+            layer,
+            display: display.clone(),
+            text_renderer,
         }
     }
 
     pub fn tessellate_with_color<F: FnOnce(NoAttributes<FillBuilder>) -> Result<(), TessellationError>>(&mut self, color: Color, tessellate: F) {
         self.tessellator.tessellate_with_color(color, tessellate).unwrap();
+
+        self.layer.with_buffer_mut(|b| {
+            let (v, i) = take(&mut self.tessellator).build(&self.display);
+
+            if v.len() > 0 {
+                let (width, height) = self.display.get_framebuffer_dimensions();
+
+                let matrix = self
+                    .matrix
+                    .unwrap_or_else(|| Mat4::orthographic_rh_gl(0.0, width as f32, height as f32, 0.0, -1.0, 1.0));
+
+                let uniforms = uniform! {
+                    matrix: matrix.to_cols_array_2d(),
+                };
+
+                b.draw(&v, &i, &self.shape_shader, &uniforms, &DrawParameters {
+                    blend: BLENDING,
+                    ..DrawParameters::default()
+                })
+                .expect("failed to draw!");
+            }
+        });
     }
 
-    // pub fn draw_shape(&mut self, vertex_buffer: &VertexBuffer<ShapeVertex>, index_buffer: &IndexBuffer<u32>) {
-    //     self.shape_renderer.draw(self.frame, self.display, vertex_buffer, index_buffer);
-    // }
+    // pub fn draw_shape(&mut self, vertex_buffer: &VertexBuffer<ShapeVertex>,
+    // index_buffer: &IndexBuffer<u32>) {     self.shape_renderer.draw(self.
+    // frame, self.display, vertex_buffer, index_buffer); }
 
     // pub const fn text_renderer(&self) -> &TextRenderer {
     //     self.text_renderer
@@ -89,21 +140,49 @@ impl RenderContext {
         self.bounds
     }
 
-    // pub fn measure_text<F: AsRef<str>, T: AsRef<str>>(&self, font: F, text: T, size: f32) -> Option<Size2D> {
-    //     self.text_renderer.measure(font, text, size, None)
-    // }
+    // pub fn measure_text<F: AsRef<str>, T: AsRef<str>>(&self, font: F, text: T,
+    // size: f32) -> Option<Size2D> {     self.text_renderer.measure(font, text,
+    // size, None) }
 
-    pub fn draw_text<F: Into<String>, T: Into<String>>(&mut self, position: Point2D, font: F, text: T, size: f32, color: Color, max_width: Option<f32>) {
-        self.texts.push(Text {
-            position,
-            font: font.into(),
-            data: text.into(),
-            size,
-            color,
-            clip: self.clip,
-            matrix: self.matrix,
-            max_width,
+    pub fn draw_text<F: Into<String>, T: Into<String>>(
+        &mut self,
+        position: Point2D,
+        font: F,
+        text: T,
+        size: f32,
+        color: Color,
+        max_width: Option<f32>,
+        window_matrix: Mat4,
+    ) {
+        self.layer.with_buffer_mut(|b| {
+            self.text_renderer.render(
+                b,
+                &(window_matrix * self.matrix.unwrap_or_default()),
+                position,
+                font.into(),
+                text.into(),
+                size,
+                max_width,
+                color,
+                self.clip.map(|area| Rect {
+                    left: area.origin.x.floor() as u32,
+                    bottom: (self.window_size.height - area.origin.y - area.size.height).floor() as u32,
+                    width: area.size.width.floor() as u32,
+                    height: area.size.height.floor() as u32,
+                }),
+            );
         });
+
+        //             self.texts.push(Text {
+        //     position,
+        //     font: font.into(),
+        //     data: text.into(),
+        //     size,
+        //     color,
+        //     clip: self.clip,
+        //     matrix: self.matrix,
+        //     max_width,
+        // });
     }
 
     pub const fn add_transform(&mut self, transform: Mat4) {
@@ -180,16 +259,8 @@ impl RenderContext {
         }
     }
 
-    pub fn finish(
-        self,
-        shape_renderer: &mut ShapeRenderer,
-        text_renderer: &mut TextRenderer,
-        display: &WindowDisplay,
-        frame: &mut Frame,
-        window_matrix: Mat4,
-    ) -> RenderInfo {
+    pub fn finish(self, shape_renderer: &mut ShapeRenderer, display: &WindowDisplay, frame: &mut Frame, window_matrix: Mat4) -> RenderInfo {
         let mut render_info = RenderInfo::default();
-
         let (v, i) = self.tessellator.build(display);
 
         if v.len() > 0 {
@@ -200,7 +271,7 @@ impl RenderContext {
         }
 
         for text in self.texts {
-            render_info.extend(&text_renderer.render(
+            render_info.extend(&self.text_renderer.render(
                 frame,
                 &(window_matrix * text.matrix.unwrap_or_default()),
                 text.position,
@@ -217,6 +288,12 @@ impl RenderContext {
                 }),
             ));
         }
+
+        self.layer.with_buffer(|b| {
+            let (width, height) = display.get_framebuffer_dimensions();
+
+            b.fill(frame, MagnifySamplerFilter::Nearest);
+        });
 
         render_info
     }

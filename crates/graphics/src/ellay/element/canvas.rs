@@ -74,7 +74,7 @@ impl Element for Canvas {
         ElementChildrenMut::multiple(self.children.iter_mut().map(|(.., element)| element))
     }
 
-    fn measure(&mut self, text: &mut TextRenderer, context: &RenderContext, parent: Rect2D) {
+    fn measure(&mut self, context: &RenderContext, parent: Rect2D) {
         self.set_origin(parent.origin);
         self.set_size(parent.size);
 
@@ -83,7 +83,7 @@ impl Element for Canvas {
 
             bounds.origin = *origin;
 
-            child.measure(text, context, bounds);
+            child.measure(context, bounds);
 
             let bounds = child.bounding_box();
 

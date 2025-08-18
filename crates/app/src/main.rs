@@ -50,8 +50,8 @@ use meralus_graphics::{
 };
 use meralus_shared::{Color, Lerp, Point2D, Point3D, RRect2D, Rect2D, Size2D, Thickness};
 use meralus_world::{CHUNK_SIZE_U16, ChunkManager};
-use mollie_compiler::Compiler;
-use mollie_vm::{Chunk, ObjectValue, StructType, TypeVariant, Value, Vm, float, function, integer, void};
+// use mollie_compiler::Compiler;
+// use mollie_vm::{Chunk, ObjectValue, StructType, TypeVariant, Value, Vm, float, function, integer, void};
 use owo_colors::OwoColorize;
 use parking_lot::RwLock;
 use polymorpher::{Morph, geometry::Vector};
@@ -130,8 +130,8 @@ struct GameLoop {
     world: Option<World>,
     root: ellay::Canvas,
     m: Morph,
-    vm: Vm,
-    program: Chunk,
+    // vm: Vm,
+    // program: Chunk,
 
     progress: Progress,
 }
@@ -354,60 +354,60 @@ impl State for GameLoop {
             elements[0].remove(0);
         }
 
-        let mut compiler = Compiler::default();
+        // let mut compiler = Compiler::default();
 
-        // draw_round_rect(24.0, 80.0, 128.0, 48.0, 12.0, 0x00FFFF);
-        // draw_round_rect(24.0, 136.0, 128.0, 48.0, 12.0, 0xFFFF00);
+        // // draw_round_rect(24.0, 80.0, 128.0, 48.0, 12.0, 0x00FFFF);
+        // // draw_round_rect(24.0, 136.0, 128.0, 48.0, 12.0, 0xFFFF00);
 
-        compiler.var_value(
-            "draw_round_rect",
-            function(false, [float(), float(), float(), float(), float(), integer()], void()),
-            Value::object(ObjectValue::NativeFunc(|vm, args| {
-                let x = args[0].as_float()?;
-                let y = args[1].as_float()?;
-                let w = args[2].as_float()?;
-                let h = args[3].as_float()?;
-                let roundness = args[4].as_float()?;
-                let color = args[5].as_integer()? as u32;
+        // compiler.var_value(
+        //     "draw_round_rect",
+        //     function(false, [float(), float(), float(), float(), float(), integer()], void()),
+        //     Value::object(ObjectValue::NativeFunc(|vm, args| {
+        //         let x = args[0].as_float()?;
+        //         let y = args[1].as_float()?;
+        //         let w = args[2].as_float()?;
+        //         let h = args[3].as_float()?;
+        //         let roundness = args[4].as_float()?;
+        //         let color = args[5].as_integer()? as u32;
 
-                let context = vm.state.downcast_mut::<RenderContext>()?;
+        //         let context = vm.state.downcast_mut::<RenderContext>()?;
 
-                context.draw_rounded_rect(
-                    RRect2D::new(Point2D::new(x, y), Size2D::new(w, h), Thickness::all(roundness)),
-                    Color::from_u32_rgb(color),
-                );
+        //         context.draw_rounded_rect(
+        //             RRect2D::new(Point2D::new(x, y), Size2D::new(w, h), Thickness::all(roundness)),
+        //             Color::from_u32_rgb(color),
+        //         );
 
-                None
-            })),
-        );
+        //         None
+        //     })),
+        // );
 
-        let context_ty = TypeVariant::complex(mollie_vm::ComplexType::Struct(StructType { properties: Vec::new() }));
+        // // let context_ty = TypeVariant::complex(mollie_vm::ComplexType::Struct(StructType { properties: Vec::new() }));
 
-        compiler.add_type("DrawContext", context_ty.clone());
-        compiler.vtable_func(
-            context_ty.clone(),
-            "draw_rect",
-            function(true, [float(), float(), float(), float(), integer()], void()).into(),
-            Value::object(ObjectValue::NativeFunc(|vm, args| {
-                let x = args[1].as_float()?;
-                let y = args[2].as_float()?;
-                let w = args[3].as_float()?;
-                let h = args[4].as_float()?;
-                let color = args[5].as_integer()? as u32;
+        // compiler.add_type("DrawContext", context_ty.clone());
+        // compiler.vtable_func(
+        //     context_ty.clone(),
+        //     "draw_rect",
+        //     function(true, [float(), float(), float(), float(), integer()], void()).into(),
+        //     Value::object(ObjectValue::NativeFunc(|vm, args| {
+        //         let x = args[1].as_float()?;
+        //         let y = args[2].as_float()?;
+        //         let w = args[3].as_float()?;
+        //         let h = args[4].as_float()?;
+        //         let color = args[5].as_integer()? as u32;
 
-                let context = vm.state.downcast_mut::<RenderContext>()?;
+        //         let context = vm.state.downcast_mut::<RenderContext>()?;
 
-                context.draw_rect(Rect2D::new(Point2D::new(x, y), Size2D::new(w, h)), Color::from_u32_rgb(color));
+        //         context.draw_rect(Rect2D::new(Point2D::new(x, y), Size2D::new(w, h)), Color::from_u32_rgb(color));
 
-                None
-            })),
-        );
+        //         None
+        //     })),
+        // );
 
-        compiler.add_trait("Drawable").method("draw", [context_ty], void());
+        // compiler.add_trait("Drawable").method("draw", [context_ty], void());
 
-        let chunk = compiler.compile_program_text(fs::read_to_string("/home/aiving/meralus.mol").unwrap()).unwrap();
+        // let chunk = compiler.compile_program_text(fs::read_to_string("/home/aiving/meralus.mol").unwrap()).unwrap();
 
-        let vm = compiler.as_vm();
+        // let vm = compiler.as_vm();
 
         Self {
             keyboard: KeyboardController::default(),
@@ -455,8 +455,8 @@ impl State for GameLoop {
                     .transformed(|point| point * 128.0)
                     .transformed(|point| point + Vector::splat(128.0)),
             ),
-            vm,
-            program: chunk,
+            // vm,
+            // program: chunk,
         }
     }
 
@@ -763,7 +763,7 @@ impl State for GameLoop {
             //     self.shape_renderer.set_default_matrix();
             // }
 
-            let mut context = RenderContext::new(display);
+            let mut context = RenderContext::new(display, &mut self.text_renderer);
 
             context.ui(|context, bounds| {
                 let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS) * SLOT_SIZE;
@@ -810,9 +810,9 @@ impl State for GameLoop {
 
                     context.padding(2.0, |context, bounds| {
                         context.clipped(bounds, |context, bounds| {
-                            let measured = self.text_renderer.measure("default_bold", "Inventory", 18.0, None).unwrap();
+                            let measured = context.text_renderer.measure("default_bold", "Inventory", 18.0, None).unwrap();
 
-                            context.draw_text(bounds.origin, "default_bold", "Inventory", 18.0, Color::WHITE.with_alpha(opacity), None);
+                            context.draw_text(bounds.origin, "default_bold", "Inventory", 18.0, Color::WHITE.with_alpha(opacity), None, self.window_matrix);
 
                             let size = bounds.size - Size2D::new(0.0, measured.height + 4.0);
                             let origin = bounds.origin + Point2D::new(0.0, measured.height + 2.0);
@@ -897,7 +897,7 @@ impl State for GameLoop {
                         .unwrap_or_else(|| String::from("nothing")),
                 );
 
-                let text_size = self.text_renderer.measure("default", &text, 18.0, None).unwrap();
+                let text_size = context.text_renderer.measure("default", &text, 18.0, None).unwrap();
                 let overlay_width = self.animation_player.get_value::<_, f32>("overlay-width").unwrap();
 
                 let text_bounds = Rect2D::new(Point2D::new(12.0, 12.0), Size2D::new((522.0 + 4.0) * overlay_width, text_size.height + 4.0));
@@ -907,7 +907,7 @@ impl State for GameLoop {
 
                     context.padding(2.0, |context, bounds| {
                         context.clipped(bounds, |context, bounds| {
-                            context.draw_text(bounds.origin, "default", text, 18.0, Color::WHITE, None);
+                            context.draw_text(bounds.origin, "default", text, 18.0, Color::WHITE, None, self.window_matrix);
                         });
                     });
                 });
@@ -934,7 +934,7 @@ impl State for GameLoop {
                         )
                     };
 
-                    let text_size = self.text_renderer.measure("default", &text, 18.0, None).unwrap();
+                    let text_size = context.text_renderer.measure("default", &text, 18.0, None).unwrap();
 
                     context.bounds(
                         Rect2D::new(
@@ -946,7 +946,7 @@ impl State for GameLoop {
 
                             context.padding(2.0, |context, bounds| {
                                 context.clipped(bounds, |context, bounds| {
-                                    context.draw_text(bounds.origin, "default", text, 18.0, Color::WHITE, None);
+                                    context.draw_text(bounds.origin, "default", text, 18.0, Color::WHITE, None, self.window_matrix);
 
                                     context.draw_rect(
                                         Rect2D::new(
@@ -971,7 +971,7 @@ impl State for GameLoop {
             context.ui(|context, bounds| {
                 context.fill(BG_COLOR.with_alpha(animation_progress));
 
-                let measured = self.text_renderer.measure("default_bold", "Meralus", 64.0, None).unwrap();
+                let measured = context.text_renderer.measure("default_bold", "Meralus", 64.0, None).unwrap();
                 let text_pos = Point2D::from_tuple(((bounds.size - measured) / 2.0).to_tuple());
 
                 let progress_width = bounds.size.width * 0.5;
@@ -993,29 +993,29 @@ impl State for GameLoop {
                     });
                 });
 
-                context.draw_text(text_pos, "default_bold", "Meralus", 64.0, TEXT_COLOR.with_alpha(animation_progress), None);
+                context.draw_text(text_pos, "default_bold", "Meralus", 64.0, TEXT_COLOR.with_alpha(animation_progress), None, self.window_matrix);
             });
 
             self.debugging
                 .render_info
-                .extend(&context.finish(&mut self.shape_renderer, &mut self.text_renderer, display, &mut frame, self.window_matrix));
+                .extend(&context.finish(&mut self.shape_renderer, display, &mut frame, self.window_matrix));
         } else {
             let [r, g, b] = Color::from_u32_rgb(0x1D211B).to_linear();
 
             frame.clear_color_and_depth((r, g, b, 1.0), 1.0);
 
-            let context = RenderContext::new(display);
+            let mut context = RenderContext::new(display, &mut self.text_renderer);
 
-            self.vm.set_state(context);
-            self.vm.execute(&self.program);
+            // self.vm.set_state(context);
+            // self.vm.execute(&self.program);
 
-            let mut context = replace(&mut self.vm.state, Box::new(())).downcast::<RenderContext>().unwrap();
+            // let mut context = replace(&mut self.vm.state, Box::new(())).downcast::<RenderContext>().unwrap();
 
             context.ui(|context, bounds| {
                 let text_scaling: f32 = self.animation_player.get_value("text-scaling").unwrap();
                 let text_opacity = 1.0 - self.animation_player.get_value::<_, f32>("progress-opacity").unwrap_or(0.0);
 
-                let size = self.text_renderer.measure("default", "Meralus", 64.0, None).unwrap();
+                let size = context.text_renderer.measure("default", "Meralus", 64.0, None).unwrap();
                 let offset = Point2D::new(bounds.size.width / 2.0 - size.width / 2.0, 24.0);
 
                 context.draw_text(
@@ -1024,12 +1024,12 @@ impl State for GameLoop {
                     "Meralus",
                     64.0,
                     Color::from_hsl(110.0, 0.4, 0.7).with_alpha(text_opacity),
-                    None,
+                    None, self.window_matrix,
                 );
 
                 let mut origin = bounds.origin + offset + Point2D::new(size.width, 0.0);
 
-                let size = self.text_renderer.measure("default", "hiii wrld!!", 36.0, None).unwrap().to_raw();
+                let size = context.text_renderer.measure("default", "hiii wrld!!", 36.0, None).unwrap().to_raw();
 
                 origin += Vector2::from_raw(size * Vec2::new(-0.4, 0.45));
 
@@ -1047,7 +1047,7 @@ impl State for GameLoop {
                             "hiii wrld!!",
                             36.0,
                             Color::from_hsl(200.0, 0.6, 0.6).with_alpha(text_opacity),
-                            None,
+                            None, self.window_matrix,
                         );
                     },
                 );
@@ -1058,7 +1058,7 @@ impl State for GameLoop {
                     format!("developer build for {OS} (arch: {ARCH}), v{}", env!("CARGO_PKG_VERSION")),
                     16.0,
                     Color::from_hsl(110.0, 0.6, 0.6).with_alpha(text_opacity),
-                    None,
+                    None, self.window_matrix,
                 );
 
                 let button_width = (bounds.size.width * 0.4).max(192.0);
@@ -1106,7 +1106,7 @@ impl State for GameLoop {
 
                     context.draw_rounded_rect(box_bounds, self.animation_player.get_value(&animation).unwrap());
 
-                    let size = self.text_renderer.measure("default", button.as_str(), 32.0, None).unwrap();
+                    let size = context.text_renderer.measure("default", button.as_str(), 32.0, None).unwrap();
 
                     context.draw_text(
                         start + Point2D::new((bounds.size.width * 0.4) / 2.0 - size.width / 2.0, 0.0),
@@ -1114,7 +1114,7 @@ impl State for GameLoop {
                         button.as_str(),
                         32.0,
                         Color::from_u32_rgb(0xD6E8CE),
-                        None,
+                        None, self.window_matrix,
                     );
 
                     start.y += 48.0;
@@ -1150,7 +1150,7 @@ impl State for GameLoop {
                                 ),
                             ),
                             |context, bounds| {
-                                let measured = self
+                                let measured = context
                                     .text_renderer
                                     .measure("default", "легендар чешек трахал...\nчленовеку секс дороже друзей...", 32.0, None)
                                     .unwrap();
@@ -1164,7 +1164,7 @@ impl State for GameLoop {
                                     "легендар чешек трахал...\nчленовеку секс дороже друзей...",
                                     32.0,
                                     Color::RED,
-                                    None,
+                                    None, self.window_matrix,
                                 );
                             },
                         );
@@ -1179,7 +1179,7 @@ impl State for GameLoop {
                 builder.build()
             });
 
-            self.root.measure(&mut self.text_renderer, &context, context.get_bounds());
+            self.root.measure(&context, context.get_bounds());
 
             if let ElementChildren::Multiple(child) = self.root.children() {
                 context.draw_rect(child[0].bounding_box().as_rect(), Color::RED);
@@ -1188,12 +1188,12 @@ impl State for GameLoop {
             self.root.draw(&mut context);
 
             if self.animation_player.get_value::<_, f32>("progress-opacity") > Some(0.0) {
-                show_loading_screen(&self.animation_player, &mut context, &self.progress);
+                show_loading_screen(&self.animation_player, &mut context, &self.progress, self.window_matrix);
             }
 
             self.debugging
                 .render_info
-                .extend(&context.finish(&mut self.shape_renderer, &mut self.text_renderer, display, &mut frame, self.window_matrix));
+                .extend(&context.finish(&mut self.shape_renderer, display, &mut frame, self.window_matrix));
         }
 
         frame.finish().expect("failed to finish draw frame");
@@ -1237,7 +1237,7 @@ impl fmt::Display for MenuButton {
 // context.add_transform(normal);
 // }
 
-fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderContext, progress: &Progress) {
+fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderContext, progress: &Progress, window_matrix: Mat4) {
     let opacity = animation_player.get_value("progress-opacity").unwrap();
 
     context.ui(|context, bounds| {
@@ -1253,7 +1253,7 @@ fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderC
                 name,
                 32.0,
                 Color::from_u32_rgb(0xA2D398).with_alpha(opacity),
-                None,
+                None, window_matrix,
             );
         }
 

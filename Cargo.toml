@@ -14,11 +14,11 @@ meralus-graphics = { path = "./crates/graphics" }
 meralus-world = { path = "./crates/world" }
 meralus-engine = { path = "./crates/engine" }
 meralus-shared = { path = "./crates/shared" }
-mollie-shared = { path = "./mollie/crates/shared" }
-mollie-lexer = { path = "./mollie/crates/lexer" }
-mollie-parser = { path = "./mollie/crates/parser" }
-mollie-compiler = { path = "./mollie/crates/compiler" }
-mollie-vm = { path = "./mollie/crates/vm" }
+# mollie-shared = { path = "./mollie/crates/shared" }
+# mollie-lexer = { path = "./mollie/crates/lexer" }
+# mollie-parser = { path = "./mollie/crates/parser" }
+# mollie-compiler = { path = "./mollie/crates/compiler" }
+# mollie-vm = { path = "./mollie/crates/vm" }
 meck = { path = "./crates/meck" }
 # lessor = { path = "./crates/lessor" }
 

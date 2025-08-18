@@ -75,7 +75,7 @@ impl Element for Column {
         ElementChildrenMut::multiple(&mut self.children)
     }
 
-    fn measure(&mut self, text: &mut TextRenderer, context: &RenderContext, parent: Rect2D) {
+    fn measure(&mut self, context: &RenderContext, parent: Rect2D) {
         self.set_origin(parent.origin);
 
         let origin = parent.origin + Point2D::new(self.style.padding.left(), self.style.padding.top());
@@ -90,7 +90,7 @@ impl Element for Column {
             bounds.origin.y += parent.size.height - available_height;
             bounds.size.height = available_height;
 
-            child.measure(text, context, bounds);
+            child.measure(context, bounds);
 
             let bounds = child.bounding_box();
 

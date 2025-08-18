@@ -16,6 +16,7 @@ fontdue = { git = "https://github.com/Aiving/fontdue.git", features = ["std"] }
 lyon_tessellation = "1.0.15"
 bytemuck = "1.23.1"
 euclid = { version = "0.22.4", features = ["bytemuck"] }
+ouroboros = "0.18.5"
 
 
 [lints]

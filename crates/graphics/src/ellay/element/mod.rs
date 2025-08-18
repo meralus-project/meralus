@@ -135,7 +135,7 @@ pub trait Element: Any + Debug {
     }
 
     /// Calculates the size and position of an element.
-    fn measure(&mut self, text: &mut TextRenderer, context: &RenderContext, parent: Rect2D);
+    fn measure(&mut self, context: &RenderContext, parent: Rect2D);
     /// Draws an element on the screen.
     fn draw(&self, context: &mut RenderContext);
 

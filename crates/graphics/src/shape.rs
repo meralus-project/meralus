@@ -16,7 +16,7 @@ use meralus_shared::Color;
 use super::Shader;
 use crate::{BLENDING, RenderInfo, impl_vertex};
 
-struct ShapeShader;
+pub(crate) struct ShapeShader;
 
 impl Shader for ShapeShader {
     const FRAGMENT: &str = include_str!("../../app/resources/shaders/shape.fs");
@@ -162,6 +162,12 @@ pub struct ShapeTessellator {
     builder: ShapeGeometryBuilder,
     tessellator: FillTessellator,
     options: FillOptions,
+}
+
+impl Default for ShapeTessellator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ShapeTessellator {

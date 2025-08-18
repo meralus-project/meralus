@@ -163,9 +163,9 @@ impl TextRenderer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn render<F: AsRef<str>, T: AsRef<str>>(
+    pub fn render<S: Surface, F: AsRef<str>, T: AsRef<str>>(
         &mut self,
-        frame: &mut Frame,
+        frame: &mut S,
         matrix: &Mat4,
         position: Point2D,
         font: F,
