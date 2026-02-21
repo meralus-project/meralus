@@ -24,13 +24,12 @@ Note: animation player is disabled by default, so you need to press `R` to enabl
 - \[Debugging\] Save texture atlas (with mipmaps): `L`
 - ~~\[Debugging\] Select a block under the player for debugging: `Ctrl + F`~~
 
-## Screenshots
-
-![image](https://github.com/user-attachments/assets/d5956478-24bc-4edc-af8c-42b82a651531)
-![image](https://github.com/user-attachments/assets/33f30247-54a5-4f4c-acf5-4c6c9425af4a)
-![image](https://github.com/user-attachments/assets/b4c7117b-d41b-45aa-9e09-7323fa61fd0c)
-![image](https://github.com/user-attachments/assets/8abd0575-4c40-4fe3-b0ed-2350f157da78)
-![image](https://github.com/user-attachments/assets/6486251b-1ed7-44bf-9378-53159eac2243)
+## Screenshots (they may not reflect the current state of the game)
+![image](https://github.com/user-attachments/assets/e75e8014-192e-482b-a9ed-74a86d2336c9)
+![image](https://github.com/user-attachments/assets/ac261b69-b57a-49b4-87f0-98de1474d0ba)
+![image](https://github.com/user-attachments/assets/ac9b4616-638c-4909-a613-cae3a55007c8)
+![image](https://github.com/user-attachments/assets/c61d3605-bee2-4b1b-a7d7-f46853f458f4)
+![image](https://github.com/user-attachments/assets/04bcfbde-37bc-4a98-bdaf-8d0e27b5933e)
 
 ## MSRV
 
