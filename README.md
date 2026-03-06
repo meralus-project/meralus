@@ -1,4 +1,4 @@
-# Meralus
+![Meralus](https://github.com/user-attachments/assets/2d2543b4-bedd-4899-9d9a-f191a371a009)
 
 [![License: MIT or Apache 2.0](https://img.shields.io/badge/License-MIT_or_Apache_2.0-634f7d.svg?style=for-the-badge)](LICENSE-APACHE)
 
@@ -22,9 +22,12 @@ Note: animation player is disabled by default, so you need to press `R` to enabl
 - \[Debugging\] Toggle chunk borders: `B`
 - \[Debugging\] Save texture atlas (with mipmaps): `L`
 
-## Screenshots
-
-Soon.
+## Screenshots (they may not reflect the current state of the game)
+![image](https://github.com/user-attachments/assets/e75e8014-192e-482b-a9ed-74a86d2336c9)
+![image](https://github.com/user-attachments/assets/ac261b69-b57a-49b4-87f0-98de1474d0ba)
+![image](https://github.com/user-attachments/assets/ac9b4616-638c-4909-a613-cae3a55007c8)
+![image](https://github.com/user-attachments/assets/c61d3605-bee2-4b1b-a7d7-f46853f458f4)
+![image](https://github.com/user-attachments/assets/04bcfbde-37bc-4a98-bdaf-8d0e27b5933e)
 
 ## MSRV
 
