@@ -1,0 +1,92 @@
+{
+  "texture": {
+    "path": "game:default_skin",
+    "size": [256, 256]
+  },
+  "elements": [
+    {
+      "name": "head",
+      "type": "cube",
+      "start": [0, 48, 0],
+      "end": [16, 64, 16],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    },
+    {
+      "name": "body",
+      "type": "cube",
+      "start": [0, 24, 4],
+      "end": [16, 48, 12],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    },
+    {
+      "name": "l-arm",
+      "type": "cube",
+      "start": [-8, 24, 4],
+      "end": [0, 48, 12],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    },
+    {
+      "name": "r-arm",
+      "type": "cube",
+      "start": [16, 24, 4],
+      "end": [24, 48, 12],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    },
+    {
+      "name": "l-leg",
+      "type": "cube",
+      "start": [0, 0, 4],
+      "end": [8, 24, 12],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    },
+    {
+      "name": "r-leg",
+      "type": "cube",
+      "start": [8, 0, 4],
+      "end": [16, 24, 12],
+      "faces": {
+        "bottom": { "from": [80, 0], "to": [96, 16] },
+        "top": { "from": [64, 0], "to": [80, 16] },
+        "front": { "from": [0, 0], "to": [16, 16] },
+        "back": { "from": [48, 0], "to": [64, 16] },
+        "left": { "from": [16, 0], "to": [32, 16] },
+        "right": { "from": [32, 0], "to": [48, 16] }
+      }
+    }
+  ]
+}

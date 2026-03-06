@@ -1,0 +1,1 @@
+data.register_block(Block { id: "tech_test" });

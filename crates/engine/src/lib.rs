@@ -5,17 +5,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use glam::{UVec2, Vec2, uvec2, vec2};
 use glium::Display;
 use glutin::{
     config::ConfigTemplateBuilder,
     context::{ContextApi, ContextAttributesBuilder},
     display::GetGlDisplay,
-    prelude::{GlDisplay, NotCurrentGlContext},
+    prelude::{GlDisplay, GlSurface, NotCurrentGlContext},
     surface::{SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
-use meralus_shared::InspectMut;
+use meralus_shared::{InspectMut, Point2D, USize2D, Vector2D};
 use winit::{
     application::ApplicationHandler,
     error::EventLoopError,
@@ -49,6 +48,16 @@ impl<'a> WindowContext<'a> {
         self.window.set_cursor_visible(visible);
     }
 
+    pub fn window_size(&self) -> USize2D {
+        let size = self.window.inner_size();
+
+        USize2D::new(size.width, size.height)
+    }
+
+    pub fn window_scale_factor(&self) -> f64 {
+        self.window.scale_factor()
+    }
+
     pub fn close_window(&self) {
         self.event_loop.exit();
     }
@@ -65,13 +74,15 @@ pub struct KeyboardModifiers {
 
 #[allow(unused)]
 pub trait State {
-    fn new(context: WindowContext, display: &WindowDisplay) -> Self;
+    type Args;
 
-    fn handle_window_resize(&mut self, size: UVec2, scale_factor: f64) {}
+    fn new(context: WindowContext, display: &WindowDisplay, args: Self::Args) -> Self;
+
+    fn handle_window_resize(&mut self, display: &WindowDisplay, size: USize2D, scale_factor: f64) {}
     fn handle_keyboard_modifiers(&mut self, modifiers: KeyboardModifiers) {}
     fn handle_keyboard_input(&mut self, key: KeyCode, is_pressed: bool, repeat: bool) {}
-    fn handle_mouse_motion(&mut self, delta: Option<Vec2>, position: Option<Vec2>) {}
-    fn handle_mouse_wheel(&mut self, delta: Vec2) {}
+    fn handle_mouse_motion(&mut self, delta: Option<Vector2D>, position: Option<Point2D>) {}
+    fn handle_mouse_wheel(&mut self, delta: Vector2D) {}
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
     // /// Runs every 50ms
@@ -93,6 +104,7 @@ pub struct ApplicationWindow<T: State> {
 
 pub struct Application<T: State> {
     window: Option<ApplicationWindow<T>>,
+    args: Option<T::Args>,
 }
 
 impl<T: State> Application<T> {
@@ -109,16 +121,25 @@ impl<T: State> Application<T> {
     }
 }
 
-impl<T: State> Default for Application<T> {
+impl<T: State<Args = ()>> Default for Application<T> {
     fn default() -> Self {
-        Self { window: None }
+        Self { window: None, args: Some(()) }
+    }
+}
+
+impl<T: State> Application<T> {
+    pub const fn new(args: T::Args) -> Self {
+        Self {
+            window: None,
+            args: Some(args),
+        }
     }
 }
 
 impl<T: State> ApplicationWindow<T> {
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
-    pub fn new(event_loop: &ActiveEventLoop) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, args: T::Args) -> Self {
         let window_attrs = Window::default_attributes().with_transparent(false);
 
         let template_builder = ConfigTemplateBuilder::new().with_transparency(true);
@@ -155,13 +176,14 @@ impl<T: State> ApplicationWindow<T> {
         );
 
         let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).expect("failed to create surface") };
-
         let current_context = gl_context.make_current(&surface).expect("failed to obtain opengl context");
+
+        surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
 
         let display = Display::from_context_surface(current_context, surface).expect("failed to create display from context and surface");
 
         Self {
-            state: T::new(WindowContext::new(event_loop, &window), &display),
+            state: T::new(WindowContext::new(event_loop, &window), &display, args),
             window,
             display,
             last_time: None,
@@ -174,21 +196,25 @@ impl<T: State> ApplicationWindow<T> {
 
 impl<T: State> ApplicationHandler for Application<T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window.replace(ApplicationWindow::new(event_loop));
+        if let Some(args) = self.args.take() {
+            self.window.replace(ApplicationWindow::new(event_loop, args));
+        }
     }
 
     fn suspended(&mut self, _: &ActiveEventLoop) {
         self.window.take();
     }
 
-    fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::Resized(physical_size) => self.window.inspect_mut(move |window| {
                 window.display.resize(physical_size.into());
 
-                window
-                    .state
-                    .handle_window_resize(uvec2(physical_size.width, physical_size.height), window.window.scale_factor());
+                window.state.handle_window_resize(
+                    &window.display,
+                    USize2D::new(physical_size.width, physical_size.height),
+                    window.window.scale_factor(),
+                );
             }),
             WindowEvent::ModifiersChanged(modifiers) => {
                 let state = modifiers.state();
@@ -211,8 +237,8 @@ impl<T: State> ApplicationHandler for Application<T> {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let delta = match delta {
-                    MouseScrollDelta::LineDelta(x, y) => vec2(x, y),
-                    MouseScrollDelta::PixelDelta(delta) => vec2(delta.x as f32, delta.y as f32),
+                    MouseScrollDelta::LineDelta(x, y) => Vector2D::new(x, y),
+                    MouseScrollDelta::PixelDelta(delta) => Vector2D::new(delta.x as f32, delta.y as f32),
                 };
 
                 self.window.inspect_mut(|window| {
@@ -221,7 +247,7 @@ impl<T: State> ApplicationHandler for Application<T> {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.window.inspect_mut(|window| {
-                    window.state.handle_mouse_motion(None, Some(vec2(position.x as f32, position.y as f32)));
+                    window.state.handle_mouse_motion(None, Some(Point2D::new(position.x as f32, position.y as f32)));
                 });
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -229,6 +255,7 @@ impl<T: State> ApplicationHandler for Application<T> {
                     window.state.handle_mouse_button(button, state.is_pressed());
                 });
             }
+            WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
         }
     }
@@ -236,7 +263,7 @@ impl<T: State> ApplicationHandler for Application<T> {
     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
             self.window.inspect_mut(|window| {
-                window.state.handle_mouse_motion(Some(vec2(delta.0 as f32, delta.1 as f32)), None);
+                window.state.handle_mouse_motion(Some(Vector2D::new(delta.0 as f32, delta.1 as f32)), None);
             });
         }
     }

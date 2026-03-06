@@ -1,4 +1,4 @@
-use glam::{IVec2, Vec3};
+use glam::{IVec2, USizeVec3, Vec3};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -23,9 +23,10 @@ impl Player {
 #[serde(tag = "type", content = "data")]
 pub enum IncomingPacket {
     GetPlayers,
-    PlayerConnected { name: String },
+    RemoveBlock(IVec2, USizeVec3),
+    PlayerConnected(String),
     PlayerMoved { uuid: Uuid, position: Vec3 },
-    RequestChunk { origin: IVec2 },
+    RequestChunk(IVec2),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,4 +38,5 @@ pub enum OutgoingPacket {
     PlayerMoved { uuid: Uuid, position: Vec3 },
     PlayersList { players: Vec<Player> },
     ChunkData { data: Vec<u8> },
+    RemoveBlock(IVec2, USizeVec3),
 }

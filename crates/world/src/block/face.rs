@@ -1,8 +1,9 @@
 use std::fmt;
 
-use glam::{IVec3, U16Vec3, Vec2, Vec3, vec2, vec3};
+use meralus_shared::{IPoint3D, Point2D, Point3D};
 use serde::{Deserialize, Serialize};
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum Face {
@@ -64,7 +65,7 @@ impl Corner {
         }
     }
 
-    pub const fn from_vec(face: Face, vec: Vec3) -> Self {
+    pub const fn from_vec(face: Face, vec: Point3D) -> Self {
         Self::from_array(match face.as_axis() {
             Axis::X => [vec.y, vec.z], // only yz
             Axis::Y => [vec.x, vec.z], // only xz
@@ -83,7 +84,7 @@ impl Corner {
     //     [1, 1],   // RIGHT TOP
     // ];
 
-    pub fn get_neighbours(self, face: Face) -> [IVec3; 3] {
+    pub const fn get_neighbours(self, face: Face) -> [IPoint3D; 3] {
         let neighbours = face.get_neighbours();
 
         match self {
@@ -107,25 +108,26 @@ impl Face {
         [false, true, false],  // 6 LEFT  TOP    BACK
         [true, true, false],   // 7 RIGHT TOP    BACK
     ];
-    const NEIGHBOURS: [[i32; 2]; 8] = [
-        [-1, -1], // LEFT BOTTOM
-        [-1, 0],  // LEFT
-        [-1, 1],  // LEFT TOP
-        [0, -1],  // BOTTOM
-        [0, 1],   // TOP
-        [1, -1],  // RIGHT BOTTOM
-        [1, 0],   // RIGHT
-        [1, 1],   // RIGHT TOP
-    ];
-    pub const VERTICES: [Vec3; 8] = [
-        vec3(0.0, 0.0, 1.0), // 0 LEFT  BOTTOM FRONT
-        vec3(1.0, 0.0, 1.0), // 1 RIGHT BOTTOM FRONT
-        vec3(0.0, 1.0, 1.0), // 2 LEFT  TOP    FRONT
-        vec3(1.0, 1.0, 1.0), // 3 RIGHT TOP    FRONT
-        vec3(0.0, 0.0, 0.0), // 4 LEFT  BOTTOM BACK
-        vec3(1.0, 0.0, 0.0), // 5 RIGHT BOTTOM BACK
-        vec3(0.0, 1.0, 0.0), // 6 LEFT  TOP    BACK
-        vec3(1.0, 1.0, 0.0), // 7 RIGHT TOP    BACK
+    pub const NORMALS: [IPoint3D; 6] = [IPoint3D::NEG_Y, IPoint3D::Y, IPoint3D::NEG_X, IPoint3D::X, IPoint3D::Z, IPoint3D::NEG_Z];
+    // const NEIGHBOURS: [[i32; 2]; 8] = [
+    //     [-1, -1], // LEFT BOTTOM
+    //     [-1, 0],  // LEFT
+    //     [-1, 1],  // LEFT TOP
+    //     [0, -1],  // BOTTOM
+    //     [0, 1],   // TOP
+    //     [1, -1],  // RIGHT BOTTOM
+    //     [1, 0],   // RIGHT
+    //     [1, 1],   // RIGHT TOP
+    // ];
+    pub const VERTICES: [Point3D; 8] = [
+        Point3D::new(0.0, 0.0, 1.0), // 0 LEFT  BOTTOM FRONT
+        Point3D::new(1.0, 0.0, 1.0), // 1 RIGHT BOTTOM FRONT
+        Point3D::new(0.0, 1.0, 1.0), // 2 LEFT  TOP    FRONT
+        Point3D::new(1.0, 1.0, 1.0), // 3 RIGHT TOP    FRONT
+        Point3D::new(0.0, 0.0, 0.0), // 4 LEFT  BOTTOM BACK
+        Point3D::new(1.0, 0.0, 0.0), // 5 RIGHT BOTTOM BACK
+        Point3D::new(0.0, 1.0, 0.0), // 6 LEFT  TOP    BACK
+        Point3D::new(1.0, 1.0, 0.0), // 7 RIGHT TOP    BACK
     ];
 
     pub const fn get_light_level(self) -> f32 {
@@ -134,6 +136,18 @@ impl Face {
             Self::Bottom => 0.5,
             Self::Left | Self::Right => 0.6,
             Self::Front | Self::Back => 0.8,
+        }
+    }
+
+    #[must_use]
+    pub const fn opposite_normal_index(self) -> usize {
+        match self {
+            Self::Bottom => 1,
+            Self::Top => 0,
+            Self::Left => 3,
+            Self::Right => 2,
+            Self::Front => 5,
+            Self::Back => 4,
         }
     }
 
@@ -150,29 +164,22 @@ impl Face {
     }
 
     #[must_use]
-    pub fn get_neighbours(self) -> [IVec3; 8] {
-        let mut normal = self.as_normal();
+    pub const fn get_neighbours(self) -> [IPoint3D; 8] {
+        let normal = self.as_normal();
         let axis = self.as_axis();
+        let v = match axis {
+            Axis::X => normal.x,
+            Axis::Y => normal.y,
+            Axis::Z => normal.z,
+        };
 
-        match axis {
-            Axis::X => Self::NEIGHBOURS.map(|neighbour| {
-                normal.y = neighbour[0];
-                normal.z = neighbour[1];
-
-                normal
-            }),
-            Axis::Y => Self::NEIGHBOURS.map(|neighbour| {
-                normal.x = neighbour[0];
-                normal.z = neighbour[1];
-
-                normal
-            }),
-            Axis::Z => Self::NEIGHBOURS.map(|neighbour| {
-                normal.x = neighbour[0];
-                normal.y = neighbour[1];
-
-                normal
-            }),
+        // SAFETY: IVec3 is [i32; 3]
+        unsafe {
+            std::mem::transmute::<[[i32; 3]; 8], [IPoint3D; 8]>(match axis {
+                Axis::X => [[v, -1, -1], [v, -1, 0], [v, -1, 1], [v, 0, -1], [v, 0, 1], [v, 1, -1], [v, 1, 0], [v, 1, 1]],
+                Axis::Y => [[-1, v, -1], [-1, v, 0], [-1, v, 1], [0, v, -1], [0, v, 1], [1, v, -1], [1, v, 0], [1, v, 1]],
+                Axis::Z => [[-1, -1, v], [-1, 0, v], [-1, 1, v], [0, -1, v], [0, 1, v], [1, -1, v], [1, 0, v], [1, 1, v]],
+            })
         }
     }
 
@@ -192,8 +199,15 @@ impl Face {
         }
     }
 
-    pub fn as_vertice_corners(self) -> [Corner; 4] {
-        self.as_vertices().map(|vertice| Corner::from_vec(self, vertice))
+    pub const fn as_vertex_corners(self) -> [Corner; 4] {
+        let vertices = self.as_vertices();
+
+        [
+            Corner::from_vec(self, vertices[0]),
+            Corner::from_vec(self, vertices[1]),
+            Corner::from_vec(self, vertices[2]),
+            Corner::from_vec(self, vertices[3]),
+        ]
     }
 
     pub const fn as_bool_vertices(self) -> [[bool; 3]; 4] {
@@ -208,36 +222,40 @@ impl Face {
     }
 
     #[must_use]
-    pub const fn as_vertices(self) -> [Vec3; 4] {
+    pub const fn as_vertices(self) -> [Point3D; 4] {
+        const X0Y0Z1: Point3D = Point3D::new(0.0, 0.0, 1.0); // LEFT  BOTTOM FRONT
+        const X1Y0Z1: Point3D = Point3D::new(1.0, 0.0, 1.0); // RIGHT BOTTOM FRONT
+        const X0Y1Z1: Point3D = Point3D::new(0.0, 1.0, 1.0); // LEFT  TOP    FRONT
+        const X1Y1Z1: Point3D = Point3D::new(1.0, 1.0, 1.0); // RIGHT TOP    FRONT
+        const X0Y0Z0: Point3D = Point3D::new(0.0, 0.0, 0.0); // LEFT  BOTTOM BACK
+        const X1Y0Z0: Point3D = Point3D::new(1.0, 0.0, 0.0); // RIGHT BOTTOM BACK
+        const X0Y1Z0: Point3D = Point3D::new(0.0, 1.0, 0.0); // LEFT  TOP    BACK
+        const X1Y1Z0: Point3D = Point3D::new(1.0, 1.0, 0.0); // RIGHT TOP    BACK
+
         match self {
-            Self::Top => [Self::VERTICES[2], Self::VERTICES[6], Self::VERTICES[7], Self::VERTICES[3]],
-            Self::Bottom => [Self::VERTICES[1], Self::VERTICES[5], Self::VERTICES[4], Self::VERTICES[0]],
-            Self::Left => [Self::VERTICES[4], Self::VERTICES[6], Self::VERTICES[2], Self::VERTICES[0]],
-            Self::Right => [Self::VERTICES[1], Self::VERTICES[3], Self::VERTICES[7], Self::VERTICES[5]],
-            Self::Front => [Self::VERTICES[1], Self::VERTICES[0], Self::VERTICES[2], Self::VERTICES[3]],
-            Self::Back => [Self::VERTICES[5], Self::VERTICES[7], Self::VERTICES[6], Self::VERTICES[4]],
+            Self::Top => [X0Y1Z0, X1Y1Z0, X0Y1Z1, X1Y1Z1],
+            Self::Bottom => [X1Y0Z0, X0Y0Z0, X1Y0Z1, X0Y0Z1],
+            Self::Left => [X0Y0Z1, X0Y0Z0, X0Y1Z1, X0Y1Z0],
+            Self::Right => [X1Y0Z0, X1Y0Z1, X1Y1Z0, X1Y1Z1],
+            Self::Front => [X1Y0Z1, X0Y0Z1, X1Y1Z1, X0Y1Z1],
+            Self::Back => [X0Y0Z0, X1Y0Z0, X0Y1Z0, X1Y1Z0],
         }
     }
 
     #[must_use]
-    pub const fn as_uv(self) -> [Vec2; 4] {
-        match self {
-            Self::Top | Self::Front => [vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0)],
-            Self::Bottom => [vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, 0.0), vec2(0.0, 0.0)],
-            Self::Right => [vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0), vec2(0.0, 0.0)],
-            Self::Left | Self::Back => [vec2(0.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(1.0, 0.0)],
-        }
+    pub const fn as_uv(self) -> [Point2D; 4] {
+        [Point2D::ZERO, Point2D::X, Point2D::Y, Point2D::ONE]
     }
 
     #[must_use]
-    pub const fn as_normal(self) -> IVec3 {
+    pub const fn as_normal(self) -> IPoint3D {
         match self {
-            Self::Top => IVec3::Y,
-            Self::Bottom => IVec3::NEG_Y,
-            Self::Right => IVec3::X,
-            Self::Left => IVec3::NEG_X,
-            Self::Front => IVec3::Z,
-            Self::Back => IVec3::NEG_Z,
+            Self::Top => IPoint3D::Y,
+            Self::Bottom => IPoint3D::NEG_Y,
+            Self::Right => IPoint3D::X,
+            Self::Left => IPoint3D::NEG_X,
+            Self::Front => IPoint3D::Z,
+            Self::Back => IPoint3D::NEG_Z,
         }
     }
 
@@ -253,19 +271,19 @@ impl Face {
         }
     }
 
-    #[must_use]
-    pub const fn add_position(self, mut position: U16Vec3) -> U16Vec3 {
-        match self {
-            Self::Top => position.y += 1,
-            Self::Bottom => position.y = position.y.saturating_sub(1),
-            Self::Right => position.x += 1,
-            Self::Left => position.x = position.x.saturating_sub(1),
-            Self::Front => position.z += 1,
-            Self::Back => position.z = position.z.saturating_sub(1),
-        }
+    // #[must_use]
+    // pub const fn add_position(self, mut position: U16Vec3) -> U16Vec3 {
+    //     match self {
+    //         Self::Top => position.y += 1,
+    //         Self::Bottom => position.y = position.y.saturating_sub(1),
+    //         Self::Right => position.x += 1,
+    //         Self::Left => position.x = position.x.saturating_sub(1),
+    //         Self::Front => position.z += 1,
+    //         Self::Back => position.z = position.z.saturating_sub(1),
+    //     }
 
-        position
-    }
+    //     position
+    // }
 }
 
 #[cfg(test)]
@@ -277,7 +295,7 @@ mod tests {
     #[test]
     fn test_face_corners() {
         for face in Face::ALL {
-            println!("{:#?}", face.as_vertice_corners());
+            println!("{:#?}", face.as_vertex_corners());
         }
     }
 

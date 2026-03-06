@@ -1,7 +1,5 @@
 use meralus_shared::{Point2D, RRect2D, Rect2D, Size2D};
 
-use crate::TextRenderer;
-
 use super::{Element, ElementChildren, ElementChildrenMut, Node, RenderContext, Style};
 
 /// Vertically arranges elements.
@@ -18,7 +16,7 @@ impl Column {
         Self {
             style: Style::default(),
             spacing: 0.0,
-            bounding_box: RRect2D::default(),
+            bounding_box: RRect2D::EMPTY,
             children: Vec::new(),
         }
     }

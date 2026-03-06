@@ -1,0 +1,32 @@
+[package]
+name = "meralus-client"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+addons = ["dep:meralus-addons"]
+multiplayer = ["dep:meralus-network"]
+
+[dependencies]
+ahash.workspace = true
+glium.workspace = true
+meralus-addons = { workspace = true, optional = true }
+meralus-animation.workspace = true
+meralus-engine.workspace = true
+meralus-graphics = { workspace = true, features = [
+    "all-basic-rendering",
+    "voxel-rendering",
+] }
+meralus-network = { workspace = true, optional = true }
+meralus-physics.workspace = true
+meralus-shared.workspace = true
+meralus-storage.workspace = true
+meralus-world.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+
+[lints]
+workspace = true

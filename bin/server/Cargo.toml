@@ -1,0 +1,13 @@
+[package]
+name = "meralus-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+meralus-world = { workspace = true }
+meralus-network = { workspace = true }
+meralus-shared = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,16 @@
+println_str("this makes more sense than you might think");
+
+events.on_tick(|| {
+    println_str("so we are tickin' now, ya?");
+});
+
+events.on_world_start(|world| {
+    world.send_chat_message("ого это ли общение...");
+    world.send_chat_message("думаю здесь можно составлять достаточно длинные текста и переносится они будут нормально, по крайней мере я на это надеюсь");
+});
+
+// events.on_message(|world| {
+    // if message.text == "ping" {
+    // world.send_chat_message("pong!");
+    // }
+// });

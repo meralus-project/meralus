@@ -1,8 +1,6 @@
-use glam::Mat4;
 use meralus_shared::{Color, Point2D, RRect2D, Rect2D, Size2D};
 
 use super::{Element, ElementChildren, RenderContext, Style};
-use crate::TextRenderer;
 
 /// Displays text
 #[derive(Debug)]
@@ -18,7 +16,7 @@ impl Text {
     pub fn new<T: Into<String>>(data: T) -> Self {
         Self {
             style: Style::default(),
-            bounding_box: RRect2D::default(),
+            bounding_box: RRect2D::EMPTY,
             data: data.into(),
             size: 12.0,
             color: Color::BLACK,
@@ -66,7 +64,8 @@ impl Element for Text {
 
         self.set_origin(parent.origin);
         self.set_size(
-            context.text_renderer.measure("default", &self.data, self.size, None).unwrap() + Size2D::new(padding.left() + padding.right(), padding.bottom() + padding.top()),
+            context.measure_text("default", &self.data, self.size, None).unwrap()
+                + Size2D::new(padding.left() + padding.right(), padding.bottom() + padding.top()),
         );
     }
 
@@ -79,6 +78,6 @@ impl Element for Text {
             self.bounding_box.origin
         };
 
-        context.draw_text(origin, "default", &self.data, self.size, self.color, None, Mat4::default());
+        context.draw_text(origin, "default", &self.data, self.size, self.color, None);
     }
 }

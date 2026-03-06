@@ -5,7 +5,7 @@ mod value;
 use std::time::Duration;
 
 use ahash::{HashMap, HashMapExt};
-use meralus_shared::Lerp;
+use meralus_shared::{Lerp, TryConvert};
 
 pub use self::{
     curves::{Curve, ICurve},
@@ -167,12 +167,20 @@ impl Transition {
         self.value.into()
     }
 
+    pub fn try_get<T: TryConvert<TweenValue>>(&self) -> Option<T> {
+        TryConvert::try_convert(self.value)
+    }
+
     pub const fn is_backwards(&self) -> bool {
         self.restart_behaviour.is_end_value()
     }
 
     pub const fn get_duration(&self) -> f32 {
         self.delay + self.duration
+    }
+
+    pub const fn get_real_elapsed(&self) -> f32 {
+        self.elapsed
     }
 
     pub const fn get_elapsed(&self) -> f32 {

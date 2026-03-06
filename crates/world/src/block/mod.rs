@@ -1,11 +1,11 @@
 mod face;
 mod state;
 
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use ahash::HashMap;
 pub use face::{Axis, Corner, Face};
-use glam::{Vec2, Vec3};
+use meralus_shared::{Point2D, Point3D};
 use serde::{
     Deserialize, Serialize,
     de::{Error, Visitor},
@@ -22,7 +22,7 @@ pub struct BlockFace {
     pub texture: String,
     /// Optional UV coordinates in the range `0.0..1.0` on both axes (where
     /// `0.0, 0.0` is bottom-left and `1.0, 1.0` is top-right).
-    pub uv: Option<[Vec2; 2]>,
+    pub uv: Option<[Point2D; 2]>,
     /// Specifies whether to apply color of current biome to the texture.
     pub tint: bool,
     /// Face, if there is a block on which this face will be "skipped"
@@ -84,8 +84,14 @@ impl<'de> Deserialize<'de> for BlockFace {
 }
 
 /// Texture path in `mod_name:path/to/file` format.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TexturePath(pub String, pub PathBuf);
+
+impl fmt::Display for TexturePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.0, self.1.display())
+    }
+}
 
 impl<'de> Deserialize<'de> for TexturePath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -127,7 +133,7 @@ impl Serialize for TexturePath {
 }
 
 /// Texture id in `#your-texture-id` format.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextureId(pub String);
 
 impl<'de> Deserialize<'de> for TextureId {
@@ -170,7 +176,7 @@ impl Serialize for TextureId {
 }
 
 /// Reference to a texture, which is either its id or a path to the it.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum TextureRef {
     Id(TextureId),
@@ -184,7 +190,7 @@ pub enum TextureRef {
 pub struct BlockModel {
     /// Optional path to another model whose properties will be merged with
     /// those of current model.
-    pub parent: Option<PathBuf>,
+    pub parent: Option<TexturePath>,
     /// Object of form key-value where key is the texture id and value is the
     /// path to the texture
     #[serde(default)]
@@ -214,7 +220,9 @@ impl BlockModel {
     }
 
     pub fn is_opaque(&self) -> bool {
-        self.elements.iter().any(|element| element.start == Vec3::ZERO && element.end == Vec3::ONE)
+        self.elements
+            .iter()
+            .any(|element| element.start == Point3D::ZERO && element.end == Point3D::ONE)
     }
 }
 
@@ -225,9 +233,9 @@ impl BlockModel {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockElement {
     /// Start point in the range `0.0..1.0` for all axes.
-    pub start: Vec3,
+    pub start: Point3D,
     /// End point in the range `0.0..1.0` for all axes.
-    pub end: Vec3,
+    pub end: Point3D,
     /// Faces with certain UV coordinates, texture and some other parameters.
     #[serde(flatten)]
     pub faces: Faces,
@@ -240,7 +248,7 @@ pub struct BlockElement {
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
 pub struct ElementRotation {
     /// Point around which rotation will be performed.
-    pub origin: Vec3,
+    pub origin: Point3D,
     /// Axis of rotation.
     pub axis: Axis,
     /// Angle of rotation (in degrees).
@@ -266,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_block_model_parsing() {
-        let data = include_bytes!("../../../../crates/app/resources/models/grass_block.json");
+        let data = include_bytes!("../../../../resources/models/grass_block.json");
 
         assert!(serde_json::from_slice::<BlockModel>(data).is_ok());
     }

@@ -47,8 +47,16 @@ impl AnimationPlayer {
         }
     }
 
-    pub fn add<T: Into<String>>(&mut self, name: T, animation: Transition) {
-        self.animations.insert(name.into(), animation);
+    pub fn add<T: AsRef<str>>(&mut self, name: T, animation: fn() -> Transition) -> &mut Transition {
+        let name = name.as_ref();
+
+        if !self.animations.contains_key(name) {
+            self.animations.insert(name.to_string(), animation());
+        }
+
+        let Some(animation) = self.animations.get_mut(name) else { unreachable!() };
+
+        animation
     }
 
     pub fn get_at(&self, index: usize) -> Option<(&str, &Transition)> {
@@ -61,6 +69,12 @@ impl AnimationPlayer {
 
     pub fn get_mut<T: AsRef<str>>(&mut self, name: T) -> Option<&mut Transition> {
         self.animations.get_mut(name.as_ref())
+    }
+
+    pub fn get_mut_unchecked<T: AsRef<str>>(&mut self, name: T) -> &mut Transition {
+        let name = name.as_ref();
+
+        self.get_mut(name).unwrap_or_else(|| panic!("failed to get transition called {name}"))
     }
 
     pub fn play<T: Into<String>>(&mut self, name: T) {
@@ -94,6 +108,13 @@ impl AnimationPlayer {
 
     pub fn get_value<T: AsRef<str>, V: From<TweenValue>>(&self, name: T) -> Option<V> {
         self.animations.get(name.as_ref()).map(Transition::get)
+    }
+
+    pub fn get_value_unchecked<T: AsRef<str>, V: From<TweenValue>>(&self, name: T) -> V {
+        let name = name.as_ref();
+
+        self.get_value(name)
+            .unwrap_or_else(|| panic!("failed to get value from transition called {name}"))
     }
 
     pub fn animations(&self) -> impl Iterator<Item = (&str, &Transition)> {

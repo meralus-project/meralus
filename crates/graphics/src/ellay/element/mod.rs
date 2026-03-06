@@ -12,7 +12,7 @@ pub use self::{
     text::Text,
 };
 use super::Style;
-use crate::{RenderContext, TextRenderer};
+use crate::RenderContext;
 
 pub enum ElementChildren<'a> {
     None,

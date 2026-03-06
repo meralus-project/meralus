@@ -3,21 +3,31 @@ name = "meralus-graphics"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+all-basic-rendering = ["text-rendering", "image-rendering", "shape-rendering"]
+text-rendering = ["image-rendering", "dep:fontdue"]
+image-rendering = ["dep:meck", "dep:image"]
+shape-rendering = ["dep:lyon_tessellation"]
+voxel-rendering = ["dep:meralus-world"]
+polymorpher = ["dep:polymorpher"]
+ellay = []
+
 [dependencies]
 meralus-engine = { workspace = true }
 meralus-shared = { workspace = true }
-meralus-world = { workspace = true }
+meralus-world = { workspace = true, optional = true }
 glium = { workspace = true }
-glam = { workspace = true }
-meck = { workspace = true }
-image = { workspace = true }
+meck = { workspace = true, optional = true }
+image = { workspace = true, optional = true, features = ["png"] }
 ahash = { workspace = true }
-fontdue = { git = "https://github.com/Aiving/fontdue.git", features = ["std"] }
-lyon_tessellation = "1.0.15"
-bytemuck = "1.23.1"
-euclid = { version = "0.22.4", features = ["bytemuck"] }
-ouroboros = "0.18.5"
-
+fontdue = { git = "https://github.com/Aiving/fontdue.git", features = [
+    "std",
+], optional = true }
+lyon_tessellation = { version = "1.0.16", optional = true }
+bytemuck = "1.25.0"
+euclid = { version = "0.22.13", features = ["bytemuck"] }
+polymorpher = { git = "https://github.com/Aiving/polymorpher.git", optional = true }
+indexmap = "2.13.0"
 
 [lints]
 workspace = true

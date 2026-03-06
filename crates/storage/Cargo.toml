@@ -1,0 +1,16 @@
+[package]
+name = "meralus-storage"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ahash.workspace = true
+meralus-physics.workspace = true
+meralus-shared.workspace = true
+meralus-world.workspace = true
+meck.workspace = true
+image.workspace = true
+tracing = "0.1.44"
+
+[lints]
+workspace = true

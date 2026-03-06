@@ -1,7 +1,5 @@
 use meralus_shared::{Point2D, RRect2D, Rect2D};
 
-use crate::TextRenderer;
-
 use super::{Element, ElementChildren, ElementChildrenMut, Node, RenderContext, Style};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -24,7 +22,7 @@ impl Canvas {
     pub const fn default() -> Self {
         Self {
             style: Style::default(),
-            bounding_box: RRect2D::default(),
+            bounding_box: RRect2D::EMPTY,
             children: Vec::new(),
         }
     }

@@ -1,6 +1,7 @@
 use super::{Curve, ICurve, ParametricCurve};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[allow(dead_code)]
 pub struct Interval {
     begin: f32,
     end: f32,

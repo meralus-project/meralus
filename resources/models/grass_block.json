@@ -1,0 +1,68 @@
+{
+  "$schema": "../../schemas/model.json",
+  "textures": {
+    "#top": "game:grass_block_top",
+    "#bottom": "game:dirt",
+    "#side": "game:dirt",
+    "#side-overlay": "game:grass_block_side_overlay"
+  },
+  "elements": [
+    {
+      "start": [0, 0, 0],
+      "end": [1, 1, 1],
+      "faces": {
+        "top": {
+          "texture": "#top",
+          "cull_face": "top",
+          "tint": true
+        },
+        "bottom": {
+          "texture": "#bottom",
+          "cull_face": "bottom"
+        },
+        "left": {
+          "texture": "#side",
+          "cull_face": "left"
+        },
+        "right": {
+          "texture": "#side",
+          "cull_face": "right"
+        },
+        "front": {
+          "texture": "#side",
+          "cull_face": "front"
+        },
+        "back": {
+          "texture": "#side",
+          "cull_face": "back"
+        }
+      }
+    },
+    {
+      "start": [0, 0, 0],
+      "end": [1, 1, 1],
+      "faces": {
+        "left": {
+          "texture": "#side-overlay",
+          "cull_face": "left",
+          "tint": true
+        },
+        "right": {
+          "texture": "#side-overlay",
+          "cull_face": "right",
+          "tint": true
+        },
+        "front": {
+          "texture": "#side-overlay",
+          "cull_face": "front",
+          "tint": true
+        },
+        "back": {
+          "texture": "#side-overlay",
+          "cull_face": "back",
+          "tint": true
+        }
+      }
+    }
+  ]
+}

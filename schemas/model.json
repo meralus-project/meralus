@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "BlockModel",
+  "definitions": {
+    "vec3": {
+      "type": "array",
+      "maxLength": 3,
+      "minLength": 3,
+      "items": { "type": "number" }
+    },
+    "axis": {
+      "type": "string",
+      "oneOf": [{ "const": "x" }, { "const": "y" }, { "const": "z" }]
+    },
+    "rotation": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "$ref": "#/definitions/vec3",
+          "description": "Point around which rotation will be performed."
+        },
+        "axis": {
+          "$ref": "#/definitions/axis",
+          "description": "Axis of rotation."
+        },
+        "angle": {
+          "type": "number",
+          "description": "Angle of rotation (in degrees)."
+        }
+      },
+      "required": ["origin", "axis", "angle"]
+    },
+    "face": {
+      "type": "string",
+      "oneOf": [
+        { "const": "top" },
+        { "const": "bottom" },
+        { "const": "right" },
+        { "const": "left" },
+        { "const": "front" },
+        { "const": "back" }
+      ]
+    },
+    "model_face": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Texture used by all faces.\n\nAt this moment it should always be a reference to an id from `textures` (in `#your-texture-id` format)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "texture": {
+              "type": "string",
+              "description": "Texture used by this face.\n\nAt this moment it should always be a reference to an id from `textures` (in `#your-texture-id` format)."
+            },
+            "uv": {
+              "type": "array",
+              "description": "Optional UV coordinates in the range `0.0..1.0` on both axes (where `0.0, 0.0` is bottom-left and `1.0, 1.0` is top-right).",
+              "maxLength": 2,
+              "minLength": 2,
+              "items": {
+                "type": "array",
+                "maxLength": 2,
+                "minLength": 2,
+                "items": { "type": "number" }
+              }
+            },
+            "tint": {
+              "type": "boolean",
+              "description": "Specifies whether to apply color of current biome to the texture.",
+              "default": false
+            },
+            "cull_face": {
+              "$ref": "#/definitions/face",
+              "description": "Face, if there is a block on which this face will be \"skipped\" when creating a chunk mesh."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "parent": {
+      "type": "string",
+      "description": "Optional path to another model whose properties will be merged with those of current model."
+    },
+    "ambient_occlusion": {
+      "type": "boolean",
+      "default": true,
+      "description": "Specifies whether this model will create ambient occlusion.\n\n`true` by default, but it is recommended to set `false` for models that are not a full cuboid (e.g. levers)."
+    },
+    "textures": {
+      "type": "object",
+      "description": "Object of form key-value where key is the texture id and value is the path to the texture",
+      "additionalProperties": { "type": "string" }
+    },
+    "elements": {
+      "type": "array",
+      "description": "List of block elements describing the individual parts of the model.",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Variant representing the **same** properties for **each** of faces.",
+            "properties": {
+              "start": {
+                "$ref": "#/definitions/vec3",
+                "description": "Start point in the range `0.0..1.0` for all axes."
+              },
+              "end": {
+                "$ref": "#/definitions/vec3",
+                "description": "End point in the range `0.0..1.0` for all axes."
+              },
+              "all": {
+                "$ref": "#/definitions/model_face",
+                "description": "All faces with certain UV coordinates, texture and some other parameters."
+              },
+              "rotation": {
+                "$ref": "#/definitions/rotation",
+                "description": "Optional element rotation."
+              }
+            },
+            "required": ["start", "end", "all"]
+          },
+          {
+            "type": "object",
+            "description": "Variant representing unique properties for each of faces.\n\nIt is not necessary to describe all faces.",
+            "properties": {
+              "start": {
+                "$ref": "#/definitions/vec3",
+                "description": "Start point in the range `0.0..1.0` for all axes."
+              },
+              "end": {
+                "$ref": "#/definitions/vec3",
+                "description": "End point in the range `0.0..1.0` for all axes."
+              },
+              "faces": {
+                "type": "object",
+                "description": "Faces with certain UV coordinates, texture and some other parameters.",
+                "propertyNames": { "$ref": "#/definitions/face" },
+                "additionalProperties": { "$ref": "#/definitions/model_face" }
+              },
+              "rotation": {
+                "$ref": "#/definitions/rotation",
+                "description": "Optional element rotation."
+              }
+            },
+            "required": ["start", "end", "faces"]
+          }
+        ]
+      }
+    }
+  }
+}

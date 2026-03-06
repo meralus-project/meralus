@@ -19,7 +19,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: rustfmt
         run: cargo fmt --all --check
-  dev-build:
+  dev-build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,12 +28,12 @@ jobs:
       - name: Install target
         run: rustup target add x86_64-unknown-linux-gnu
       - name: Build
-        run: cargo build --release --bin meralus-app --target x86_64-unknown-linux-gnu
+        run: cargo build --release --bin meralus-client --target x86_64-unknown-linux-gnu
       - name: Compress
-        run: mkdir tmp && cp -r crates/app/resources tmp && cp target/x86_64-unknown-linux-gnu/release/meralus-app tmp
+        run: mkdir tmp && cp -r resources tmp && cp target/x86_64-unknown-linux-gnu/release/meralus-client tmp
       - uses: actions/upload-artifact@v4
         with:
-          name: meralus-linux
+          name: meralus-client-linux
           path: tmp/**/*
   dev-build-win:
     runs-on: windows-latest
@@ -44,10 +44,10 @@ jobs:
       - name: Install target
         run: rustup target add x86_64-pc-windows-msvc
       - name: Build
-        run: cargo build --release --bin meralus-app --target x86_64-pc-windows-msvc
+        run: cargo build --release --bin meralus-client --target x86_64-pc-windows-msvc
       - name: Compress
-        run: mkdir tmp && cp -r crates/app/resources tmp && cp target/x86_64-pc-windows-msvc/release/meralus-app.exe tmp
+        run: mkdir tmp && cp -r resources tmp && cp target/x86_64-pc-windows-msvc/release/meralus-client.exe tmp
       - uses: actions/upload-artifact@v4
         with:
-          name: meralus-win
+          name: meralus-client-win
           path: tmp/**/*
