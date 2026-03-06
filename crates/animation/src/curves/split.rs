@@ -1,6 +1,7 @@
 use super::{Curve, ICurve};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[allow(dead_code)]
 pub struct Split {
     at: f32,
     begin: Curve,
@@ -19,7 +20,7 @@ impl ICurve for Split {
                 let curve_progress = t / self.at;
                 let transformed = ICurve::transform(&self.begin, curve_progress);
 
-                0.0f32.mul_add(1.0 - transformed, self.at * transformed)
+                0f32.mul_add(1.0 - transformed, self.at * transformed)
             }
             t => {
                 let curve_progress = (t - self.at) / (1.0 - self.at);

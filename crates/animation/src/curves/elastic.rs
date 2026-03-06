@@ -40,9 +40,7 @@ impl ParametricCurve<f32> for ElasticOutCurve {
     fn transform_internal(&self, t: f32) -> f32 {
         let s = self.period / 4.0;
 
-        (-10.0 * t)
-            .exp2()
-            .mul_add(((t - s) * (PI * 2.0) / self.period).sin(), 1.0)
+        (-10.0 * t).exp2().mul_add(((t - s) * (PI * 2.0) / self.period).sin(), 1.0)
     }
 }
 
@@ -62,7 +60,7 @@ impl ParametricCurve<f32> for ElasticInOutCurve {
     fn transform_internal(&self, mut t: f32) -> f32 {
         let s = self.period / 4.0;
 
-        t = 2.0f32.mul_add(t, -1.0);
+        t = 2f32.mul_add(t, -1.0);
 
         if t < 0.0 {
             -0.5 * (10.0 * t).exp2() * ((t - s) * (PI * 2.0) / self.period).sin()

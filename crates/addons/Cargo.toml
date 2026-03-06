@@ -1,0 +1,13 @@
+[package]
+name = "meralus-addons"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+meralus-storage.workspace = true
+mollie = { git = "https://github.com/meralus-project/mollie.git", branch = "refactor/type-system" }
+serde.workspace = true
+toml = "1.0.4"

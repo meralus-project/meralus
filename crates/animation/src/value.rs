@@ -1,4 +1,4 @@
-use meralus_shared::{Color, Lerp};
+use meralus_shared::{Color, Lerp, TryConvert};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum TweenValue {
@@ -42,6 +42,24 @@ impl From<TweenValue> for f32 {
         match value {
             TweenValue::Float(value) => value,
             TweenValue::Color(_) => unreachable!(),
+        }
+    }
+}
+
+impl TryConvert<TweenValue> for Color {
+    fn try_convert(value: TweenValue) -> Option<Self> {
+        match value {
+            TweenValue::Color(value) => Some(value),
+            TweenValue::Float(_) => None,
+        }
+    }
+}
+
+impl TryConvert<TweenValue> for f32 {
+    fn try_convert(value: TweenValue) -> Option<Self> {
+        match value {
+            TweenValue::Float(value) => Some(value),
+            TweenValue::Color(_) => None,
         }
     }
 }

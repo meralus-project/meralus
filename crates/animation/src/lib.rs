@@ -4,7 +4,8 @@ mod value;
 
 use std::time::Duration;
 
-use meralus_shared::Lerp;
+use ahash::{HashMap, HashMapExt};
+use meralus_shared::{Lerp, TryConvert};
 
 pub use self::{
     curves::{Curve, ICurve},
@@ -35,6 +36,12 @@ pub enum RestartBehaviour {
     EndValue,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FinishBehaviour {
+    Reset,
+    StaySame,
+}
+
 impl RestartBehaviour {
     /// Returns `true` if the restart behaviour is [`EndValue`].
     ///
@@ -45,29 +52,53 @@ impl RestartBehaviour {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Animation {
+    Transition(Transition),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Frame {
+    values: HashMap<String, (Curve, TweenValue)>,
+}
+
+impl Frame {
+    pub fn new() -> Self {
+        Self { values: HashMap::new() }
+    }
+
+    #[must_use]
+    pub fn with_value<T: Into<String>, V: Into<TweenValue>>(mut self, name: T, value: V, curve: Curve) -> Self {
+        self.values.insert(name.into(), (curve, value.into()));
+
+        self
+    }
+}
+
+impl Default for Frame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Animation {
+pub struct Transition {
     elapsed: f32,
     duration: f32,
     delay: f32,
     curve: Curve,
     repeat: RepeatMode,
     restart_behaviour: RestartBehaviour,
+    finish_behaviour: FinishBehaviour,
 
     origin: TweenValue,
     value: TweenValue,
     destination: TweenValue,
 }
 
-impl Animation {
+impl Transition {
     #[must_use]
-    pub fn new<T: Into<TweenValue>>(
-        start: T,
-        end: T,
-        duration: u64,
-        curve: Curve,
-        repeat: RepeatMode,
-    ) -> Self {
+    pub fn new<T: Into<TweenValue>>(start: T, end: T, duration: u64, curve: Curve, repeat: RepeatMode) -> Self {
         let [origin, destination] = [start.into(), end.into()];
 
         Self {
@@ -77,6 +108,7 @@ impl Animation {
             curve,
             repeat,
             restart_behaviour: RestartBehaviour::StartValue,
+            finish_behaviour: FinishBehaviour::StaySame,
             origin,
             value: origin,
             destination,
@@ -84,14 +116,7 @@ impl Animation {
     }
 
     #[must_use]
-    pub fn new_with_delay<T: Into<TweenValue>>(
-        start: T,
-        end: T,
-        duration: u64,
-        delay: u64,
-        curve: Curve,
-        repeat: RepeatMode,
-    ) -> Self {
+    pub fn new_with_delay<T: Into<TweenValue>>(start: T, end: T, duration: u64, delay: u64, curve: Curve, repeat: RepeatMode) -> Self {
         let [origin, destination] = [start.into(), end.into()];
 
         Self {
@@ -101,6 +126,7 @@ impl Animation {
             curve,
             repeat,
             restart_behaviour: RestartBehaviour::StartValue,
+            finish_behaviour: FinishBehaviour::StaySame,
             origin,
             value: origin,
             destination,
@@ -114,6 +140,24 @@ impl Animation {
         self
     }
 
+    #[must_use]
+    pub const fn with_finish_behaviour(mut self, behaviour: FinishBehaviour) -> Self {
+        self.finish_behaviour = behaviour;
+
+        self
+    }
+
+    pub fn set<T: Into<TweenValue>>(&mut self, value: T) {
+        let value = value.into();
+
+        self.origin = value;
+        self.value = value;
+    }
+
+    pub fn set_value<T: Into<TweenValue>>(&mut self, value: T) {
+        self.value = value.into();
+    }
+
     pub fn to<T: Into<TweenValue>>(&mut self, value: T) {
         self.origin = self.value;
         self.destination = value.into();
@@ -121,6 +165,10 @@ impl Animation {
 
     pub fn get<T: From<TweenValue>>(&self) -> T {
         self.value.into()
+    }
+
+    pub fn try_get<T: TryConvert<TweenValue>>(&self) -> Option<T> {
+        TryConvert::try_convert(self.value)
     }
 
     pub const fn is_backwards(&self) -> bool {
@@ -131,22 +179,20 @@ impl Animation {
         self.delay + self.duration
     }
 
+    pub const fn get_real_elapsed(&self) -> f32 {
+        self.elapsed
+    }
+
     pub const fn get_elapsed(&self) -> f32 {
         match self.repeat {
             RepeatMode::Once | RepeatMode::Infinite => {
-                if self.repeat.is_infinite()
-                    && self.is_backwards()
-                    && self.elapsed >= self.get_duration()
-                {
-                    self.get_duration()
-                        - (self.elapsed.min(self.get_duration() * 2.0) - self.get_duration())
+                if self.repeat.is_infinite() && self.is_backwards() && self.elapsed >= self.get_duration() {
+                    self.get_duration() - (self.elapsed.min(self.get_duration() * 2.0) - self.get_duration())
                 } else {
                     self.elapsed.min(self.get_duration())
                 }
             }
-            RepeatMode::Times(_) => {
-                self.elapsed.min(self.get_duration()) % (self.get_duration() + 1.0)
-            }
+            RepeatMode::Times(_) => self.elapsed.min(self.get_duration()) % (self.get_duration() + 1.0),
         }
     }
 
@@ -169,16 +215,11 @@ impl Animation {
         let elapsed = self.elapsed - self.delay;
 
         let t = match (self.repeat, self.restart_behaviour) {
-            (RepeatMode::Once, _) | (RepeatMode::Infinite, RestartBehaviour::StartValue) => {
-                elapsed.min(self.duration) / self.duration
-            }
-            (RepeatMode::Times(_), _) => {
-                (elapsed.min(self.duration) % (self.duration + 1.0)) / self.duration
-            }
+            (RepeatMode::Once, _) | (RepeatMode::Infinite, RestartBehaviour::StartValue) => elapsed.min(self.duration) / self.duration,
+            (RepeatMode::Times(_), _) => (elapsed.min(self.duration) % (self.duration + 1.0)) / self.duration,
             (RepeatMode::Infinite, RestartBehaviour::EndValue) => {
                 if elapsed >= self.duration {
-                    (self.duration - (elapsed.min(self.duration * 2.0) - self.duration))
-                        / self.duration
+                    (self.duration - (elapsed.min(self.duration * 2.0) - self.duration)) / self.duration
                 } else {
                     elapsed.min(self.duration) / self.duration
                 }

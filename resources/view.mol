@@ -1,0 +1,9 @@
+
+
+// contained.place(0.0, 0.0);
+// contained.render(context);
+
+context.draw_rect(4.0, 4.0, 96.0, 36.0, Color { red: 101, green: 235, blue: 134 });
+
+// context.draw_text(4.0, 48.0, "default", "ебать это работает?", 36.0, Color { red: 101, green: 235, blue: 134 });
+// context.draw_image(0.0, 0.0, metadata.window_width, metadata.window_height, "/home/aiving/Загрузки/photo_5271633797185668025_y.jpg", ObjectFit::Cover);

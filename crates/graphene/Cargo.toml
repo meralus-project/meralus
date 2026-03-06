@@ -1,0 +1,29 @@
+[package]
+name = "graphene"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["all-basic-rendering", "polymorpher"]
+all-basic-rendering = ["text-rendering", "image-rendering", "shape-rendering"]
+text-rendering = ["image-rendering", "dep:fontdue"]
+image-rendering = ["dep:meck", "dep:image"]
+shape-rendering = ["dep:lyon_tessellation"]
+polymorpher = ["dep:polymorpher"]
+
+[dependencies]
+glam = { version = "0.30.10", features = ["serde", "bytemuck"] }
+glamour = "0.18.0"
+meck = { workspace = true, optional = true }
+image = { workspace = true, optional = true, features = ["png", "webp"] }
+fontdue = { git = "https://github.com/Aiving/fontdue.git", features = [
+    "std",
+], optional = true }
+lyon_tessellation = { version = "1.0.16", optional = true }
+polymorpher = { git = "https://github.com/Aiving/polymorpher.git", optional = true }
+euclid = { version = "0.22.13", features = ["bytemuck"] }
+bytemuck = "1.25.0"
+glow = "0.16.0"
+
+[lints]
+workspace = true

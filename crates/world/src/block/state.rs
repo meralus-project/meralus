@@ -6,19 +6,19 @@ pub struct BlockStates {
     pub variants: Vec<BlockState>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 #[serde(untagged)]
-pub enum PropertyValue<'a> {
+pub enum PropertyValue {
     Number(i64),
-    Float(f32),
-    String(&'a str),
+    // Float(f32),
+    // String(&'a str),
     Boolean(bool),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub struct Property<'a> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+pub struct Property {
     pub name: &'static str,
-    pub value: PropertyValue<'a>,
+    pub value: PropertyValue,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -34,10 +34,7 @@ pub enum ConditionValue {
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 pub enum BlockCondition {
-    Equals {
-        target: String,
-        value: ConditionValue,
-    },
+    Equals { target: String, value: ConditionValue },
 }
 
 impl BlockCondition {
@@ -47,10 +44,8 @@ impl BlockCondition {
                 target == other.name
                     && match (value, other.value) {
                         (ConditionValue::Number(a), PropertyValue::Number(b)) => a == &b,
-                        (ConditionValue::Float(a), PropertyValue::Float(b)) => {
-                            (a - b).abs() < f32::EPSILON
-                        }
-                        (ConditionValue::String(a), PropertyValue::String(b)) => a == b,
+                        // (ConditionValue::Float(a), PropertyValue::Float(b)) => (a - b).abs() < f32::EPSILON,
+                        // (ConditionValue::String(a), PropertyValue::String(b)) => a == b,
                         (ConditionValue::Boolean(a), PropertyValue::Boolean(b)) => a == &b,
                         _ => false,
                     }

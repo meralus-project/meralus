@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schemas/model.json",
+  "parent": "game:cuboid_all_same",
+  "ambient_occlusion": false,
+  "textures": {
+    "#all": "game:ice"
+  }
+}

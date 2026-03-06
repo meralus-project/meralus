@@ -14,15 +14,13 @@ Note: animation player is disabled by default, so you need to press `R` to enabl
 
 - Walking: `WASD`
 - Jumping: `Space`
-- Running: `Shift + W` (does not work with `S`!)
+- Running: `Shift + W`
 - Toggle mouse capture: `TAB`
-- \[Debugging\] Restart all animations (including finished): `R`
-- \[Debugging\] Toggle debug overlay: `O`
+- Select hotbar item: `1-9` or `Mouse Wheel`
 - \[Debugging\] Toggle wireframes: `T`
-- \[Debugging\] Toggle time (day/night): `N`
+- \[Debugging\] Unpause in-game clock: `P`
 - \[Debugging\] Toggle chunk borders: `B`
 - \[Debugging\] Save texture atlas (with mipmaps): `L`
-- ~~\[Debugging\] Select a block under the player for debugging: `Ctrl + F`~~
 
 ## Screenshots (they may not reflect the current state of the game)
 ![image](https://github.com/user-attachments/assets/e75e8014-192e-482b-a9ed-74a86d2336c9)
@@ -39,4 +37,6 @@ The Minimum Supported Rust Version is currently **nightly**.
 
 Dual-licensed to be compatible with the Rust project.
 
-Everything (including textures) is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0) or the [MIT license](http://opensource.org/licenses/MIT), at your option. This project may not be copied, modified, or distributed except according to those terms.
+Code is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0) or the [MIT license](http://opensource.org/licenses/MIT), at your option. It may not be copied, modified, or distributed except according to those terms.
+
+Textures are mostly created by [Crossower](https://github.com/Crossowewer) and licensed under the [Creative Commons BY-NC-SA 4.0 license](https://creativecommons.org/licenses/by-nc-sa/4.0). The author must be credited, commercial use is prohibited, and distribution under other licenses is prohibited.

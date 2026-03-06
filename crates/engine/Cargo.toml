@@ -5,11 +5,10 @@ edition = "2024"
 
 [dependencies]
 meralus-shared = { workspace = true }
-glam = { workspace = true }
 glium = { workspace = true }
-glutin = { version = "0.32.2", features = ["egl"] }
+glutin = { version = "0.32.3", features = ["egl"] }
 glutin-winit = "0.5.0"
-winit = "0.30.9"
+winit = "0.30.13"
 
 [lints]
 workspace = true

@@ -1,9 +1,7 @@
-use glam::{Vec3, Vec4};
-
 use crate::AsValue;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Color type represented as RGBA
 pub struct Color([u8; 4]);
 
@@ -20,47 +18,38 @@ impl AsValue<[f32; 4]> for Color {
 
 impl AsValue<[f32; 3]> for Color {
     fn as_value(&self) -> [f32; 3] {
-        [
-            f32::from(self.0[0]) / 255.0,
-            f32::from(self.0[1]) / 255.0,
-            f32::from(self.0[2]) / 255.0,
-        ]
+        [f32::from(self.0[0]) / 255.0, f32::from(self.0[1]) / 255.0, f32::from(self.0[2]) / 255.0]
     }
 }
 
-impl AsValue<Vec4> for Color {
-    fn as_value(&self) -> Vec4 {
-        Vec4::from_array(self.as_value())
-    }
-}
+// impl AsValue<Vec4> for Color {
+//     fn as_value(&self) -> Vec4 {
+//         Vec4::from_array(self.as_value())
+//     }
+// }
 
-impl AsValue<Vec3> for Color {
-    fn as_value(&self) -> Vec3 {
-        Vec3::from_array(self.as_value())
-    }
-}
+// impl AsValue<Vec3> for Color {
+//     fn as_value(&self) -> Vec3 {
+//         Vec3::from_array(self.as_value())
+//     }
+// }
 
-impl From<Vec4> for Color {
-    fn from(value: Vec4) -> Self {
-        Self([
-            (255.0 * value.x) as u8,
-            (255.0 * value.y) as u8,
-            (255.0 * value.z) as u8,
-            (255.0 * value.w) as u8,
-        ])
-    }
-}
+// impl From<Vec4> for Color {
+//     fn from(value: Vec4) -> Self {
+//         Self([
+//             (255.0 * value.x) as u8,
+//             (255.0 * value.y) as u8,
+//             (255.0 * value.z) as u8,
+//             (255.0 * value.w) as u8,
+//         ])
+//     }
+// }
 
-impl From<Vec3> for Color {
-    fn from(value: Vec3) -> Self {
-        Self([
-            (255.0 * value.x) as u8,
-            (255.0 * value.y) as u8,
-            (255.0 * value.z) as u8,
-            255,
-        ])
-    }
-}
+// impl From<Vec3> for Color {
+//     fn from(value: Vec3) -> Self {
+//         Self([(255.0 * value.x) as u8, (255.0 * value.y) as u8, (255.0 *
+// value.z) as u8, 255])     }
+// }
 
 impl AsValue<[u8; 4]> for Color {
     fn as_value(&self) -> [u8; 4] {
@@ -361,13 +350,24 @@ impl Color {
         Self([red, green, blue, alpha])
     }
 
+    pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
+        Self::new(red, green, blue, 255)
+    }
+
+    pub const fn from_u32_rgb(rgb: u32) -> Self {
+        Self::new(((rgb >> 16) & 0xFF) as u8, ((rgb >> 8) & 0xFF) as u8, (rgb & 0xFF) as u8, 255)
+    }
+
+    pub const fn as_u32(&self) -> u32 {
+        let red = (self.0[0] as u32) << 16;
+        let green = (self.0[1] as u32) << 8;
+        let blue = self.0[2] as u32;
+
+        red | green | blue
+    }
+
     pub const fn new_f32(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-        Self([
-            (255.0 * red) as u8,
-            (255.0 * green) as u8,
-            (255.0 * blue) as u8,
-            (255.0 * alpha) as u8,
-        ])
+        Self([(255.0 * red) as u8, (255.0 * green) as u8, (255.0 * blue) as u8, (255.0 * alpha) as u8])
     }
 
     #[must_use]
@@ -404,7 +404,7 @@ impl Color {
                 lightness * -saturation + (lightness + saturation)
             };
 
-            let p = 2.0f32 * lightness - q;
+            let p = 2f32 * lightness - q;
 
             [
                 hue_to_rgb(p, q, (hue / 360.0) + 1.0 / 3.0),
@@ -417,17 +417,29 @@ impl Color {
     }
 
     pub const fn to_linear(&self) -> [f32; 3] {
+        [color_to_linear(self.0[0]), color_to_linear(self.0[1]), color_to_linear(self.0[2])]
+    }
+
+    pub const fn to_linear_rgba(&self) -> [f32; 4] {
         [
             color_to_linear(self.0[0]),
             color_to_linear(self.0[1]),
             color_to_linear(self.0[2]),
+            self.0[3] as f32 / 255.0,
         ]
     }
 
     #[must_use]
-    pub fn multiply_rgb(self, factor: f32) -> Self {
-        let value: Vec3 = self.as_value();
+    pub const fn multiply_rgb(self, factor: f32) -> Self {
+        Self([
+            (self.0[0] as f32 * factor) as u8,
+            (self.0[1] as f32 * factor) as u8,
+            (self.0[2] as f32 * factor) as u8,
+            self.0[3],
+        ])
+    }
 
-        (value * factor).into()
+    pub fn as_rgb_hex(&self) -> String {
+        format!("{:02x}{:02x}{:02x}", self.0[0], self.0[1], self.0[2])
     }
 }

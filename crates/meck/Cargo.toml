@@ -1,0 +1,12 @@
+[package]
+name = "meck"
+description = "Simple library for creating texture atlases"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glamour = "0.18.0"
+image = { workspace = true, default-features = false }
+
+[lints]
+workspace = true

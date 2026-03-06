@@ -1,0 +1,36 @@
+{
+  "texture": {
+    "path": "game:oak_log_side",
+    "size": [16, 16]
+  },
+  "elements": [
+    {
+      "name": "floating-shit",
+      "type": "cube",
+      "start": [0, 256, 0],
+      "end": [256, 288, 256],
+      "faces": {
+        "bottom": { "from": [0, 0], "to": [16, 16] },
+        "top": { "from": [0, 0], "to": [16, 16] },
+        "front": { "from": [0, 0], "to": [16, 8] },
+        "back": { "from": [0, 0], "to": [16, 8] },
+        "left": { "from": [0, 0], "to": [16, 8] },
+        "right": { "from": [0, 0], "to": [16, 8] }
+      }
+    },
+    {
+      "name": "floating-shit2",
+      "type": "cube",
+      "start": [120, 0, 120],
+      "end": [136, 256, 136],
+      "faces": {
+        "bottom": { "from": [0, 0], "to": [16, 16] },
+        "top": { "from": [0, 0], "to": [16, 16] },
+        "front": { "from": [0, 0], "to": [16, 8] },
+        "back": { "from": [0, 0], "to": [16, 8] },
+        "left": { "from": [0, 0], "to": [16, 8] },
+        "right": { "from": [0, 0], "to": [16, 8] }
+      }
+    }
+  ]
+}

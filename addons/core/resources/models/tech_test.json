@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../../schemas/model.json",
+  "parent": "game:cuboid_all_same",
+  "textures": {
+    "#all": "core:tech_test"
+  }
+}
