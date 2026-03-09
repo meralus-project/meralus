@@ -8,8 +8,6 @@ A voxel game that visually copies Minecraft.
 
 Executable must be in the same folder as the `resources` folder.
 
-Note: animation player is disabled by default, so you need to press `R` to enable it to get past the loading screen. xd.
-
 ## Binds
 
 - Walking: `WASD`
@@ -17,9 +15,9 @@ Note: animation player is disabled by default, so you need to press `R` to enabl
 - Running: `Shift + W`
 - Toggle mouse capture: `TAB`
 - Select hotbar item: `1-9` or `Mouse Wheel`
-- \[Debugging\] Toggle wireframes: `T`
+- \[Debugging\] Open W.I.P chat: `T`
 - \[Debugging\] Unpause in-game clock: `P`
-- \[Debugging\] Toggle chunk borders: `B`
+- \[Debugging\] Toggle entity borders: `B`
 - \[Debugging\] Save texture atlas (with mipmaps): `L`
 
 ## Screenshots (they may not reflect the current state of the game)
