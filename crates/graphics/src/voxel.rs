@@ -1,13 +1,13 @@
 use std::{array, borrow::Borrow, collections::hash_map::Entry, hash::Hash};
 
-use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use ahash::{HashMap, HashMapExt};
 use glium::{
     BackfaceCullingMode, Depth, DepthTest, DrawParameters, Frame, IndexBuffer, PolygonMode, Program, Surface, Texture2d, VertexBuffer,
     index::{IndicesSource, PrimitiveType},
     uniform,
     uniforms::Sampler,
 };
-use indexmap::IndexSet;
+use indexmap::IndexMap;
 use meralus_engine::WindowDisplay;
 use meralus_shared::{Color, Frustum, FrustumCulling, IPoint2D, Point2D, Point3D, Transform3D};
 use meralus_world::{ChunkManager, SUBCHUNK_COUNT, SUBCHUNK_COUNT_F32, SUBCHUNK_SIZE, SUBCHUNK_SIZE_F32};
@@ -61,7 +61,30 @@ impl_vertex! {
 
 pub type SubChunkKey = (IPoint2D, usize);
 pub type SubChunkMesh = [(Vec<VoxelVertex>, Vec<u32>); 2];
-pub type WorldMesh = HashMap<IPoint2D, [([Vec<VoxelFace>; 2], bool); SUBCHUNK_COUNT]>;
+pub type WorldMesh = HashMap<IPoint2D, [[Vec<VoxelFace>; 2]; SUBCHUNK_COUNT]>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SubchunkState {
+    Rendered,
+    Dirty,
+    Hidden,
+}
+
+impl SubchunkState {
+    /// Returns `true` if the subchunk state is [`Rendered`].
+    ///
+    /// [`Rendered`]: SubchunkState::Rendered
+    #[must_use]
+    const fn is_rendered(self) -> bool {
+        matches!(self, Self::Rendered)
+    }
+}
+
+struct RenderChunk {
+    subchunk_states: [SubchunkState; SUBCHUNK_COUNT],
+    solid_buffer: CachedBuffers<VoxelVertex, u32>,
+    translucent_buffer: CachedBuffers<VoxelVertex, u32>,
+}
 
 pub struct VoxelMeshBuilder {
     vertices: Vec<VoxelVertex>,
@@ -165,16 +188,12 @@ impl VoxelMeshBuilder {
 
 pub struct VoxelRenderer {
     shader: Program,
-    opaque_data: HashMap<IPoint2D, CachedBuffers<VoxelVertex, u32>>,
-    translucent_data: HashMap<IPoint2D, CachedBuffers<VoxelVertex, u32>>,
     world_mesh: WorldMesh,
     vertices: usize,
     draw_calls: usize,
     sun_position: f32,
-    rendered_subchunks: HashSet<SubChunkKey>,
-    rendered_chunks: IndexSet<IPoint2D>,
+    rendered_chunks: IndexMap<IPoint2D, RenderChunk>,
     display: WindowDisplay,
-    worst: [Vec<VoxelFace>; 2],
 }
 
 impl VoxelRenderer {
@@ -182,15 +201,11 @@ impl VoxelRenderer {
         Self {
             display: display.clone(),
             shader: VoxelShader::program(display),
-            opaque_data: HashMap::new(),
-            translucent_data: HashMap::new(),
             world_mesh: HashMap::new(),
             vertices: 0,
             draw_calls: 0,
             sun_position: 0.0,
-            rendered_subchunks: HashSet::new(),
-            rendered_chunks: IndexSet::new(),
-            worst: [Vec::new(), Vec::new()],
+            rendered_chunks: IndexMap::new(),
         }
     }
 
@@ -225,11 +240,17 @@ impl VoxelRenderer {
 
     pub fn set_subchunk(&mut self, origin: (IPoint2D, usize), [opaque, translucent]: [Vec<VoxelFace>; 2]) {
         match self.world_mesh.entry(origin.0) {
-            Entry::Occupied(mut occupied_entry) => occupied_entry.get_mut()[origin.1] = ([opaque, translucent], true),
-            Entry::Vacant(vacant_entry) => {
-                let mut subchunks = array::from_fn(|_| ([Vec::new(), Vec::new()], true));
+            Entry::Occupied(mut occupied_entry) => {
+                occupied_entry.get_mut()[origin.1] = [opaque, translucent];
 
-                subchunks[origin.1] = ([opaque, translucent], true);
+                if let Some(chunk) = self.rendered_chunks.get_mut(&origin.0) {
+                    chunk.subchunk_states[origin.1] = SubchunkState::Dirty;
+                }
+            }
+            Entry::Vacant(vacant_entry) => {
+                let mut subchunks = array::from_fn(|_| [Vec::new(), Vec::new()]);
+
+                subchunks[origin.1] = [opaque, translucent];
 
                 vacant_entry.insert(subchunks);
             }
@@ -243,8 +264,12 @@ impl VoxelRenderer {
         }
     }
 
-    pub fn rendered_subchunks(&self) -> usize {
-        self.rendered_subchunks.len()
+    pub fn rendered_chunks(&self) -> usize {
+        self.rendered_chunks.len()
+    }
+
+    pub fn total_chunks(&self) -> usize {
+        self.world_mesh.len()
     }
 
     pub fn total_subchunks(&self) -> usize {
@@ -278,7 +303,7 @@ impl VoxelRenderer {
     where
         IPoint2D: Borrow<Q>,
     {
-        self.opaque_data.contains_key(k) || self.translucent_data.contains_key(k)
+        self.rendered_chunks.contains_key(k)
     }
 
     pub fn draw_full_bright<'a, I: Into<IndicesSource<'a>>>(
@@ -359,47 +384,82 @@ impl VoxelRenderer {
         lightmap: Sampler<'_, Texture2d>,
         params: &DrawParameters,
     ) {
-        for (key, voxels) in &mut self.world_mesh {
-            if Self::is_chunk_visible(frustum, *key) {
-                let mut is_dirty = self.rendered_chunks.insert(*key);
+        for (&origin, subchunks) in &mut self.world_mesh {
+            if Self::is_chunk_visible(frustum, origin) {
+                let mut rendered_subchunks = 0;
+                let subchunk_states = array::from_fn(|i| {
+                    if Self::is_subchunk_visible(frustum, (origin, i)) {
+                        rendered_subchunks += 1;
 
-                self.worst[0].clear();
-                self.worst[1].clear();
+                        SubchunkState::Rendered
+                    } else {
+                        SubchunkState::Hidden
+                    }
+                });
 
-                for (subchunk_idx, (subchunk, is_subchunk_dirty)) in voxels.iter_mut().enumerate() {
-                    if Self::is_subchunk_visible(frustum, (*key, subchunk_idx)) {
-                        if self.rendered_subchunks.insert((*key, subchunk_idx)) || *is_subchunk_dirty {
-                            is_dirty = true;
+                match self.rendered_chunks.entry(origin) {
+                    indexmap::map::Entry::Occupied(mut entry) => {
+                        let entry = entry.get_mut();
 
-                            *is_subchunk_dirty = false;
+                        if entry.subchunk_states != subchunk_states {
+                            let mut solid_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+                            let mut translucent_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+
+                            // generate chunk rendering data if any of subchunks are dirty or now visible
+                            for (state, subchunk) in subchunk_states.iter().zip(subchunks) {
+                                if state.is_rendered() {
+                                    solid_faces.extend_from_slice(&subchunk[0]);
+                                    translucent_faces.extend_from_slice(&subchunk[1]);
+                                }
+                            }
+
+                            solid_faces.sort_unstable_by(|a, b| a.cmp(camera_pos, b));
+                            translucent_faces.sort_unstable_by(|a, b| a.cmp(camera_pos, b).reverse());
+
+                            let solid_voxels = Self::get_voxels_mesh(&solid_faces);
+                            let translucent_voxels = Self::get_voxels_mesh(&translucent_faces);
+
+                            *entry = RenderChunk {
+                                subchunk_states,
+                                solid_buffer: CachedBuffers::new(&self.display, &solid_voxels.0, PrimitiveType::TrianglesList, &solid_voxels.1).unwrap(),
+                                translucent_buffer: CachedBuffers::new(
+                                    &self.display,
+                                    &translucent_voxels.0,
+                                    PrimitiveType::TrianglesList,
+                                    &translucent_voxels.1,
+                                )
+                                .unwrap(),
+                            };
+                        }
+                    }
+                    indexmap::map::Entry::Vacant(entry) => {
+                        let mut solid_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+                        let mut translucent_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+
+                        // generate chunk rendering data if any of subchunks are dirty or now visible
+                        for (state, subchunk) in subchunk_states.iter().zip(subchunks) {
+                            if state.is_rendered() {
+                                solid_faces.extend_from_slice(&subchunk[0]);
+                                translucent_faces.extend_from_slice(&subchunk[1]);
+                            }
                         }
 
-                        self.worst[0].extend_from_slice(&subchunk[0]);
-                        self.worst[1].extend_from_slice(&subchunk[1]);
-                    } else if self.rendered_subchunks.remove(&(*key, subchunk_idx)) {
-                        is_dirty = true;
+                        solid_faces.sort_unstable_by(|a, b| a.cmp(camera_pos, b));
+                        translucent_faces.sort_unstable_by(|a, b| a.cmp(camera_pos, b).reverse());
+
+                        let solid_voxels = Self::get_voxels_mesh(&solid_faces);
+                        let translucent_voxels = Self::get_voxels_mesh(&translucent_faces);
+
+                        entry.insert(RenderChunk {
+                            subchunk_states,
+                            solid_buffer: CachedBuffers::new(&self.display, &solid_voxels.0, PrimitiveType::TrianglesList, &solid_voxels.1).unwrap(),
+                            translucent_buffer: CachedBuffers::new(&self.display, &translucent_voxels.0, PrimitiveType::TrianglesList, &translucent_voxels.1)
+                                .unwrap(),
+                        });
                     }
                 }
-
-                if is_dirty {
-                    self.worst[0].sort_unstable_by(|a, b| a.cmp(camera_pos, b));
-                    self.worst[1].sort_unstable_by(|a, b| a.cmp(camera_pos, b).reverse());
-
-                    let voxels = [Self::get_voxels_mesh(&self.worst[0]), Self::get_voxels_mesh(&self.worst[1])];
-
-                    self.opaque_data.insert(
-                        *key,
-                        CachedBuffers::new(&self.display, &voxels[0].0, PrimitiveType::TrianglesList, &voxels[0].1).unwrap(),
-                    );
-
-                    self.translucent_data.insert(
-                        *key,
-                        CachedBuffers::new(&self.display, &voxels[1].0, PrimitiveType::TrianglesList, &voxels[1].1).unwrap(),
-                    );
-                }
-            } else if self.rendered_chunks.swap_remove(key) {
-                self.opaque_data.remove(key);
-                self.translucent_data.remove(key);
+            } else {
+                self.rendered_chunks.swap_remove(&origin);
             }
         }
 
@@ -414,19 +474,17 @@ impl VoxelRenderer {
 
         self.draw_calls = 0;
 
-        self.rendered_chunks.sort_unstable_by(|&a, &b| {
+        self.rendered_chunks.sort_unstable_by(|&a, _, &b, _| {
             let a = (ChunkManager::to_local(camera_pos.as_()) - a).as_::<f32>().length_squared();
             let b = (ChunkManager::to_local(camera_pos.as_()) - b).as_::<f32>().length_squared();
 
             a.total_cmp(&b)
         });
 
-        for key in &self.rendered_chunks {
-            if let Some(buffer) = self.opaque_data.get(key)
-                && buffer.vertices.len() > 0
-            {
+        for chunk in self.rendered_chunks.values() {
+            if chunk.solid_buffer.vertices.len() > 0 {
                 frame
-                    .draw(&buffer.vertices, &buffer.indices, &self.shader, &uniforms, params)
+                    .draw(&chunk.solid_buffer.vertices, &chunk.solid_buffer.indices, &self.shader, &uniforms, params)
                     .expect("failed to draw!");
 
                 self.draw_calls += 1;
@@ -435,12 +493,16 @@ impl VoxelRenderer {
 
         self.rendered_chunks.reverse();
 
-        for key in &self.rendered_chunks {
-            if let Some(buffer) = self.translucent_data.get(key)
-                && buffer.vertices.len() > 0
-            {
+        for chunk in self.rendered_chunks.values() {
+            if chunk.translucent_buffer.vertices.len() > 0 {
                 frame
-                    .draw(&buffer.vertices, &buffer.indices, &self.shader, &uniforms, params)
+                    .draw(
+                        &chunk.translucent_buffer.vertices,
+                        &chunk.translucent_buffer.indices,
+                        &self.shader,
+                        &uniforms,
+                        params,
+                    )
                     .expect("failed to draw!");
 
                 self.draw_calls += 1;
@@ -448,13 +510,9 @@ impl VoxelRenderer {
         }
 
         self.vertices = self
-            .rendered_subchunks
-            .iter()
-            .map(|chunk| {
-                let voxels = &self.world_mesh[&chunk.0][chunk.1];
-
-                (voxels.0[0].len() + voxels.0[1].len()) * 4
-            })
+            .rendered_chunks
+            .values()
+            .map(|chunk| chunk.solid_buffer.vertices.len() + chunk.translucent_buffer.vertices.len())
             .sum();
     }
 

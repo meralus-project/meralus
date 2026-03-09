@@ -981,8 +981,8 @@ impl State for GameLoop {
                 };
 
                 let version = display.get_opengl_version_string();
-                let rendered_chunks = world.voxel_renderer.rendered_subchunks();
-                let total_chunks = world.voxel_renderer.total_subchunks();
+                let rendered_chunks = world.voxel_renderer.rendered_chunks();
+                let total_chunks = world.voxel_renderer.total_chunks();
 
                 let text = format!(
                     "OpenGL {version}
@@ -997,7 +997,7 @@ TPS: {}
 Looking at {}
 Draw calls: {draw_calls}
 Rotation: {} {} {}
-Rendered subchunks: {rendered_chunks} / {total_chunks}
+Rendered chunks: {rendered_chunks} / {total_chunks}
 Rendered vertices: {vertices}",
                     display.get_opengl_renderer_string(),
                     display.get_opengl_vendor_string(),

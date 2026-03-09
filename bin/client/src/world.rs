@@ -717,13 +717,13 @@ impl World {
                 let neighbours = Face::NORMALS.map(|face| chunk_manager.get_block(world_position + face).filter(|&b| b != 0));
 
                 // not visible
-                if model.is_opaque
-                    && neighbours
-                        .iter()
-                        .all(|neighbour| neighbour.is_some_and(|neighbour| resource_storage.models.get_unchecked(neighbour.into()).is_opaque))
-                {
-                    continue;
-                }
+                // if model.is_opaque
+                //     && neighbours
+                //         .iter()
+                //         .all(|neighbour| neighbour.is_some_and(|neighbour| resource_storage.models.get_unchecked(neighbour.into()).is_opaque))
+                // {
+                //     continue;
+                // }
 
                 let (cull_if_same, tint_color) = resource_storage
                     .get_block(block_id.into())
