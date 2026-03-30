@@ -15,7 +15,7 @@ pub enum PropertyValue {
     Boolean(bool),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]
 pub struct Property {
     pub name: &'static str,
     pub value: PropertyValue,
