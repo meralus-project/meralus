@@ -120,13 +120,8 @@ impl VoxelMeshBuilder {
             visible: true,
         }));
 
-        // if  {
-        //     self.indices
-        //         .extend([self.offset + 1, self.offset + 3, self.offset, self.offset +
-        // 2, self.offset, self.offset + 3]); } else {
         self.indices
             .extend([self.offset, self.offset + 1, self.offset + 2, self.offset + 3, self.offset + 2, self.offset + 1]);
-        // }
 
         self.offset += 4;
     }
@@ -317,7 +312,6 @@ impl VoxelRenderer {
         lightmap: Sampler<'_, Texture2d>,
     ) {
         let uniforms = uniform! {
-            // origin: origin.to_array(),
             sun_position: [0.0, const { (1.0 - 0.5) / 0.96 }, 0.0f32],
             matrix: matrix.to_cols_array_2d(),
             tex: atlas,
@@ -327,11 +321,6 @@ impl VoxelRenderer {
 
         frame
             .draw(vertices, indices, &self.shader, &uniforms, &DrawParameters {
-                // depth: Depth {
-                //     test: DepthTest::IfLessOrEqual,
-                //     write: true,
-                //     ..Depth::default()
-                // },
                 backface_culling: BackfaceCullingMode::CullCounterClockwise,
                 polygon_mode: if wireframe { PolygonMode::Line } else { PolygonMode::Fill },
                 blend: BLENDING,
@@ -351,7 +340,6 @@ impl VoxelRenderer {
         lightmap: Sampler<'_, Texture2d>,
     ) {
         let uniforms = uniform! {
-            // origin: origin.to_array(),
             sun_position: [0.0, self.sun_position, 0.0],
             matrix: matrix.to_cols_array_2d(),
             tex: atlas,
@@ -464,7 +452,6 @@ impl VoxelRenderer {
         }
 
         let uniforms = uniform! {
-            // origin: origin.to_array(),
             sun_position: [0.0, self.sun_position, 0.0],
             matrix: matrix.to_cols_array_2d(),
             tex: atlas,
@@ -475,8 +462,8 @@ impl VoxelRenderer {
         self.draw_calls = 0;
 
         self.rendered_chunks.sort_unstable_by(|&a, _, &b, _| {
-            let a = (ChunkManager::to_local(camera_pos.as_()) - a).as_::<f32>().length_squared();
-            let b = (ChunkManager::to_local(camera_pos.as_()) - b).as_::<f32>().length_squared();
+            let a = (ChunkManager::<()>::to_local(camera_pos.as_()) - a).as_::<f32>().length_squared();
+            let b = (ChunkManager::<()>::to_local(camera_pos.as_()) - b).as_::<f32>().length_squared();
 
             a.total_cmp(&b)
         });

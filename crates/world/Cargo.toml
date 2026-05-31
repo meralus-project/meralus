@@ -8,6 +8,7 @@ ahash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 meralus-shared.workspace = true
+tracing = "0.1.44"
 
 [lints]
 workspace = true

@@ -1,5 +1,5 @@
 use ahash::{HashMap, HashSet};
-use meralus_engine::{KeyCode, MouseButton};
+use meralus_engine::{KeyCode, KeyboardModifiers, MouseButton};
 use meralus_shared::Point2D;
 
 #[derive(Debug, Default)]
@@ -7,6 +7,7 @@ pub struct KeyboardController {
     pressed: HashSet<KeyCode>,
     pressed_once: HashSet<KeyCode>,
     released: HashSet<KeyCode>,
+    pub modifiers: KeyboardModifiers,
 }
 
 impl KeyboardController {

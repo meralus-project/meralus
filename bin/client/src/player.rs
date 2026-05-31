@@ -225,8 +225,19 @@ impl PlayerController {
                 Self::MOVE_SPEED
             };
 
-        self.body.velocity.x = velocity.x;
-        self.body.velocity.z = velocity.z;
+        if self.body.is_on_ground {
+            self.body.velocity.x = velocity.x;
+            self.body.velocity.z = velocity.z;
+        } else {
+            self.body.velocity.x += velocity.x;
+            self.body.velocity.z += velocity.z;
+        }
+
+        if input.keyboard.is_key_pressed_once(KeyCode::KeyE) && !self.body.is_on_ground {
+            let (front, ..) = get_rotation_directions(self.yaw, self.pitch);
+
+            self.body.velocity += front * 20.0;
+        }
 
         if Self::AFFECTED_BY_PHYSICS {
             if input.keyboard.is_key_pressed(KeyCode::Space) && self.body.is_on_ground {

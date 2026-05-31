@@ -10,6 +10,8 @@ use fontdue::{
 };
 #[cfg(feature = "image-rendering")] use glam::Vec3Swizzles;
 use glam::{Mat4, Vec2, Vec3};
+use glamour::Point3;
+#[cfg(feature = "shape-rendering")] use glamour::Vector2;
 use glow::HasContext;
 #[cfg(feature = "image-rendering")] use image::ImageBuffer;
 #[cfg(feature = "shape-rendering")]
@@ -44,8 +46,8 @@ impl Shader for ShapeShader {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CommonVertex {
-    pub position: Vec3,
-    pub uv: Vec2,
+    pub position: Point3,
+    pub uv: Vector2,
     pub color: Color,
 }
 
@@ -64,13 +66,13 @@ pub struct ShapeGeometryBuilder {
     first_index: u32,
     vertex_offset: u32,
     color: Color,
-    pub white_pixel_uv: Vec2,
-    uv_rect: Option<(Vec2, Vec2, Point2D, Size2D)>,
+    pub white_pixel_uv: Vector2,
+    uv_rect: Option<(Point2D, Vector2, Point2D, Size2D)>,
 }
 
 #[cfg(feature = "shape-rendering")]
 impl ShapeGeometryBuilder {
-    pub const fn new(buffers: VertexBuffers<CommonVertex, u32>, white_pixel_uv: Vec2, color: Color) -> Self {
+    pub const fn new(buffers: VertexBuffers<CommonVertex, u32>, white_pixel_uv: Vector2, color: Color) -> Self {
         let first_vertex = buffers.vertices.len() as u32;
         let first_index = buffers.indices.len() as u32;
 
@@ -85,7 +87,7 @@ impl ShapeGeometryBuilder {
         }
     }
 
-    pub const fn set_uv_rect(&mut self, uv_rect: (Vec2, Vec2, Point2D, Size2D)) {
+    pub const fn set_uv_rect(&mut self, uv_rect: (Point2D, Vector2, Point2D, Size2D)) {
         self.uv_rect.replace(uv_rect);
     }
 
@@ -139,13 +141,13 @@ impl GeometryBuilder for ShapeGeometryBuilder {
 #[cfg(feature = "shape-rendering")]
 impl FillGeometryBuilder for ShapeGeometryBuilder {
     fn add_fill_vertex(&mut self, vertex: FillVertex) -> Result<VertexId, GeometryBuilderError> {
-        let position = Vec2::from_array(vertex.position().to_array());
+        let position = Point2D::from_array(vertex.position().to_array());
 
         self.buffers.vertices.push(CommonVertex {
             position: position.extend(0.0),
             color: self.color,
             uv: if let Some((offset, uv_size, origin, size)) = self.uv_rect {
-                offset + uv_size * ((position - Vec2::new(origin.x, origin.y)) / Vec2::new(size.width, size.height))
+                offset.to_vector() + uv_size * ((position - origin) / size.to_vector())
             } else {
                 self.white_pixel_uv
             },
@@ -165,7 +167,7 @@ impl FillGeometryBuilder for ShapeGeometryBuilder {
 impl StrokeGeometryBuilder for ShapeGeometryBuilder {
     fn add_stroke_vertex(&mut self, vertex: StrokeVertex) -> Result<VertexId, GeometryBuilderError> {
         self.buffers.vertices.push(CommonVertex {
-            position: Vec3::from_array(vertex.position().extend(0.0).to_array()),
+            position: Point3::from_array(vertex.position().extend(0.0).to_array()),
             color: self.color,
             uv: self.white_pixel_uv,
         });
@@ -189,7 +191,7 @@ pub struct CommonTessellator {
 
 #[cfg(feature = "shape-rendering")]
 impl CommonTessellator {
-    pub fn new(white_pixel_uv: Vec2) -> Self {
+    pub fn new(white_pixel_uv: Vector2) -> Self {
         let builder = ShapeGeometryBuilder::new(VertexBuffers::new(), white_pixel_uv, Color::RED);
         let tessellator = FillTessellator::new();
         let options = FillOptions::default();
@@ -197,7 +199,7 @@ impl CommonTessellator {
         Self { builder, tessellator, options }
     }
 
-    pub const fn set_uv_rect(&mut self, uv_rect: (Vec2, Vec2, Point2D, Size2D)) {
+    pub const fn set_uv_rect(&mut self, uv_rect: (Point2D, Vector2, Point2D, Size2D)) {
         self.builder.set_uv_rect(uv_rect);
     }
 
@@ -327,7 +329,7 @@ pub struct CommonRenderer<T: HasContext> {
     atlas: TextureAtlas<AtlasKey>,
     pub texture: Texture2d<T>,
     #[cfg(feature = "image-rendering")]
-    images: Vec<(Vec2, Vec2)>,
+    images: Vec<(Point2D, Vector2)>,
 
     // SHAPE RENDERING
     #[cfg(feature = "shape-rendering")]
@@ -389,7 +391,7 @@ impl<T: HasContext> CommonRenderer<T> {
 
         Ok(Self {
             #[cfg(feature = "shape-rendering")]
-            tessellator: CommonTessellator::new(offset + (size / 2.0)),
+            tessellator: CommonTessellator::new((offset + size / 2.0).to_vector()),
             #[cfg(feature = "image-rendering")]
             atlas,
             texture,
@@ -416,7 +418,7 @@ impl<T: HasContext> CommonRenderer<T> {
     }
 
     #[cfg(feature = "text-rendering")]
-    pub const fn white_pixel_uv(&self) -> Vec2 {
+    pub const fn white_pixel_uv(&self) -> Vector2 {
         self.tessellator.builder.white_pixel_uv
     }
 
@@ -514,13 +516,13 @@ impl<T: HasContext> CommonRenderer<T> {
 
             let buffers = self.tessellator.build();
 
-            self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-                vertice.position = self
+            self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+                vertex.position = self
                     .transform
                     .as_ref()
-                    .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
-                vertice
+                vertex
             }));
 
             self.buffers.indices.extend(buffers.indices);
@@ -581,13 +583,13 @@ impl<T: HasContext> CommonRenderer<T> {
 
         let buffers = self.tessellator.build();
 
-        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-            vertice.position = self
+        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+            vertex.position = self
                 .transform
                 .as_ref()
-                .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
-            vertice
+            vertex
         }));
 
         self.buffers.indices.extend(buffers.indices);
@@ -598,39 +600,39 @@ impl<T: HasContext> CommonRenderer<T> {
     #[cfg(feature = "image-rendering")]
     pub fn draw_image(&mut self, origin: Point2D, size: Size2D, key: &AtlasKey, object_fit: ObjectFit) {
         if let Some((offset, uv_size, _)) = self.atlas.get_texture_uv(key) {
-            let resulting_size = size.to_raw() / 4096.0;
+            let resulting_size = size / 4096.0;
 
             let (offset, uv_size) = match object_fit {
                 ObjectFit::Stretch => (offset, uv_size),
                 ObjectFit::Cover => {
-                    let r = resulting_size / uv_size;
+                    let r = resulting_size.to_vector() / uv_size;
                     let ratio = r.max_element();
                     let scaled_size = uv_size * ratio;
-                    let mut diff = Vec2::ZERO;
+                    let mut diff = Vector2::ZERO;
 
-                    if scaled_size.x > resulting_size.x {
-                        diff.x = scaled_size.x - resulting_size.x;
+                    if scaled_size.x > resulting_size.width {
+                        diff.x = scaled_size.x - resulting_size.width;
                     }
 
-                    if scaled_size.y > resulting_size.y {
-                        diff.y = scaled_size.y - resulting_size.y;
+                    if scaled_size.y > resulting_size.height {
+                        diff.y = scaled_size.y - resulting_size.height;
                     }
 
-                    (offset + diff / 2.0 / ratio, resulting_size / ratio)
+                    (offset + diff / 2f32 / ratio, (resulting_size / ratio).to_vector())
                 }
             };
 
             self.buffers.vertices.extend(TEXT_BASE_VERTICES.map(|(position, uv)| {
-                let mut position = (Vec2::new(origin.x, origin.y) + position.xy() * Vec2::new(size.width, size.height)).extend(position.z);
+                let mut position = (origin + Vector2::from_raw(position.xy()) * size.to_vector()).extend(position.z);
 
                 if let Some(transform) = &self.transform {
-                    position = transform.transform_point3(position);
+                    position = transform.transform_point3(position.to_raw()).into();
                 }
 
                 CommonVertex {
                     position,
                     color: Color::WHITE,
-                    uv: offset + (uv * uv_size),
+                    uv: (offset + (Vector2::from_raw(uv) * uv_size)).into(),
                 }
             }));
 
@@ -650,26 +652,26 @@ impl<T: HasContext> CommonRenderer<T> {
     ) -> Result<(), image::ImageError> {
         let path = path.as_ref();
         let key = AtlasKey::ImagePath(path.to_path_buf());
-        let resulting_size = size.to_raw() / 4096.0;
+        let resulting_size = size / 4096.0;
 
-        let (offset, uv_size) = if let Some((offset, size, _)) = self.atlas.get_texture_uv(&key) {
+        let (offset, uv_size) = if let Some((offset, uv_size, _)) = self.atlas.get_texture_uv(&key) {
             match object_fit {
-                ObjectFit::Stretch => (offset, size),
+                ObjectFit::Stretch => (offset, uv_size),
                 ObjectFit::Cover => {
-                    let r = resulting_size / size;
+                    let r = resulting_size.to_vector() / uv_size;
                     let ratio = r.max_element();
-                    let scaled_size = size * ratio;
-                    let mut diff = Vec2::ZERO;
+                    let scaled_size = uv_size * ratio;
+                    let mut diff = Vector2::ZERO;
 
-                    if scaled_size.x > resulting_size.x {
-                        diff.x = scaled_size.x - resulting_size.x;
+                    if scaled_size.x > resulting_size.width {
+                        diff.x = scaled_size.x - resulting_size.width;
                     }
 
-                    if scaled_size.y > resulting_size.y {
-                        diff.y = scaled_size.y - resulting_size.y;
+                    if scaled_size.y > resulting_size.height {
+                        diff.y = scaled_size.y - resulting_size.height;
                     }
 
-                    (offset + diff / 2.0 / ratio, resulting_size / ratio)
+                    (offset + diff / 2.0f32 / ratio, (resulting_size / ratio).to_vector())
                 }
             }
         } else {
@@ -677,50 +679,50 @@ impl<T: HasContext> CommonRenderer<T> {
             let image = image.to_rgba8();
             let (width, height) = image.dimensions();
 
-            let (offset, size, _) = self.atlas.append(key, &image);
+            let (offset, uv_size, _) = self.atlas.append(key, &image);
 
             let texture = self.texture.writable();
 
             texture.write(
                 (offset.x * 4096.0) as u32,
                 (offset.y * 4096.0) as u32,
-                (size.x * 4096.0) as u32,
-                (size.y * 4096.0) as u32,
+                (uv_size.x * 4096.0) as u32,
+                (uv_size.y * 4096.0) as u32,
                 image.as_raw(),
             );
 
             match object_fit {
-                ObjectFit::Stretch => (offset, size),
+                ObjectFit::Stretch => (offset, uv_size),
                 ObjectFit::Cover => {
-                    let r = resulting_size / size;
+                    let r = resulting_size.to_vector() / uv_size;
                     let ratio = r.max_element();
-                    let scaled_size = size * ratio;
-                    let mut diff = Vec2::ZERO;
+                    let scaled_size = uv_size * ratio;
+                    let mut diff = Vector2::ZERO;
 
-                    if scaled_size.x > resulting_size.x {
-                        diff.x = scaled_size.x - resulting_size.x;
+                    if scaled_size.x > resulting_size.width {
+                        diff.x = scaled_size.x - resulting_size.width;
                     }
 
-                    if scaled_size.y > resulting_size.y {
-                        diff.y = scaled_size.y - resulting_size.y;
+                    if scaled_size.y > resulting_size.height {
+                        diff.y = scaled_size.y - resulting_size.height;
                     }
 
-                    (offset + diff / 2.0 / ratio, resulting_size / ratio)
+                    (offset + diff / 2.0f32 / ratio, (resulting_size / ratio).to_vector())
                 }
             }
         };
 
         self.buffers.vertices.extend(TEXT_BASE_VERTICES.map(|(position, uv)| {
-            let mut position = (Vec2::new(origin.x, origin.y) + position.xy() * Vec2::new(size.width, size.height)).extend(position.z);
+            let mut position = (origin + Vector2::from_raw(position.xy()) * size.to_vector()).extend(position.z);
 
             if let Some(transform) = &self.transform {
-                position = transform.transform_point3(position);
+                position = transform.transform_point3(position.to_raw()).into();
             }
 
             CommonVertex {
                 position,
                 color: Color::WHITE,
-                uv: offset + (uv * uv_size),
+                uv: (offset + (Vector2::from_raw(uv) * uv_size)).into(),
             }
         }));
 
@@ -838,13 +840,13 @@ impl<T: HasContext> CommonRenderer<T> {
 
             let buffers = self.tessellator.build();
 
-            self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-                vertice.position = self
+            self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+                vertex.position = self
                     .transform
                     .as_ref()
-                    .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
-                vertice
+                vertex
             }));
 
             self.buffers.indices.extend(buffers.indices);
@@ -950,13 +952,13 @@ impl<T: HasContext> CommonRenderer<T> {
 
         let buffers = self.tessellator.build();
 
-        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-            vertice.position = self
+        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+            vertex.position = self
                 .transform
                 .as_ref()
-                .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
-            vertice
+            vertex
         }));
 
         self.buffers.indices.extend(buffers.indices);
@@ -1005,13 +1007,13 @@ impl<T: HasContext> CommonRenderer<T> {
 
         let buffers = self.tessellator.build();
 
-        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-            vertice.position = self
+        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+            vertex.position = self
                 .transform
                 .as_ref()
-                .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
-            vertice
+            vertex
         }));
 
         self.buffers.indices.extend(buffers.indices);
@@ -1073,16 +1075,16 @@ impl<T: HasContext> CommonRenderer<T> {
                 };
 
                 self.buffers.vertices.extend(TEXT_BASE_VERTICES.map(|(position, uv)| {
-                    let mut position = (Vec2::new(origin.x, origin.y) + Vec2::new(glyph.x, glyph.y) + position.xy() * (size * 4096.0)).extend(position.z);
+                    let mut position = (origin + Vector2::new(glyph.x, glyph.y) + Vector2::from_raw(position.xy()) * (size * 4096.0)).extend(position.z);
 
                     if let Some(transform) = &self.transform {
-                        position = transform.transform_point3(position);
+                        position = transform.transform_point3(position.to_raw()).into();
                     }
 
                     CommonVertex {
                         position,
                         color,
-                        uv: offset + (uv * size),
+                        uv: (offset + (Vector2::from_raw(uv) * size)).into(),
                     }
                 }));
 

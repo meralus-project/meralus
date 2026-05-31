@@ -63,13 +63,13 @@ impl<'a> WindowContext<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct KeyboardModifiers {
-    alt_key: bool,
-    control_key: bool,
-    shift_key: bool,
-    super_key: bool,
+    pub alt_key: bool,
+    pub control_key: bool,
+    pub shift_key: bool,
+    pub super_key: bool,
 }
 
 #[allow(unused)]

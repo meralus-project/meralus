@@ -27,7 +27,7 @@ pub use self::common::{CommonTessellator, Path};
 #[cfg(feature = "voxel-rendering")] pub use self::voxel::*;
 pub use self::{
     common::{CommonRenderer, CommonVertex, ObjectFit},
-    context::{RenderContext, RenderInfo},
+    context::{ArrangeStrategy, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, WidgetId, WidgetState},
 };
 
 pub const FONT: &[u8] = include_bytes!("../../../resources/fonts/Monocraft.ttf");

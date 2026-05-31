@@ -2,6 +2,8 @@ mod cube;
 mod round_rect;
 mod thickness;
 
+pub use glamour::{Point2, Size2};
+
 pub use self::{cube::Cube3D, round_rect::RRect2D, thickness::Thickness};
 
 pub type ISize2D = glamour::Size2<i32>;

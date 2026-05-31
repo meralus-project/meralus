@@ -1,0 +1,300 @@
+@[lang_item = "Option"]
+enum Option<T> {
+    @[lang_item = "Option::Some"]
+    Some { value: T },
+    @[lang_item = "Option::None"]
+    None,
+}
+
+@[lang_item = "IntoIterator"]
+trait Iterable<T> {
+    @[lang_item = "IntoIterator::into_iter"]
+    func iter(self) -> T;
+}
+
+@[lang_item = "Iterator"]
+trait Iterator<T> {
+    @[lang_item = "Iterator::next"]
+    func next(self) -> Option<T>;
+}
+
+struct ArrayIter<T> {
+    index: usize,
+    value: T[]
+}
+
+impl<T> Iterator<T> for ArrayIter<T> {
+    func next(self) -> Option<T> {
+        if self.index == get_size(self.value) {
+            Option::None
+        } else {
+            const value = self.value[self.index];
+
+            self.index += 1;
+
+            Option::Some { value }
+        }
+    }
+}
+
+impl<T> Iterable<ArrayIter<T>> for T[] {
+    func iter(self) -> ArrayIter<T> {
+        ArrayIter {
+            value: self,
+            index: 0
+        }
+    }
+}
+
+impl f32 {
+    func max(self, other: f32) -> f32 {
+        if self > other {
+            self
+        } else {
+            other
+        }
+    }
+}
+
+enum Unit {
+    ParentWeight { value: f32 },
+    Fixed { value: f32 }
+}
+
+impl Unit {
+    func calc(self, parent: f32) -> f32 {
+        if self is Unit::ParentWeight { value } {
+            parent * value
+        } else if self is Unit::Fixed { value } {
+            value
+        } else {
+            0.0
+        }
+    }
+}
+
+postfix func px(value: f32) -> Unit {
+    Unit::Fixed { value }
+}
+
+postfix func wh(value: f32) -> Unit {
+    Unit::ParentWeight { value }
+}
+
+view Rectangle {
+    width: Unit,
+    height: Unit,
+    corner_radius: graphics::CornerRadius = graphics::CornerRadius { top_left: 0.0, top_right: 0.0, bottom_left: 0.0, bottom_right: 0.0 },
+    background: graphics::Color,
+    children: Drawable
+}
+
+view Column {
+    children: Drawable[],
+    spacing: f32 = 0.0
+}
+
+view Row {
+    children: Drawable[],
+    spacing: f32 = 0.0
+}
+
+impl Drawable for Rectangle {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        Size {
+            width: self.width.calc(parent.width),
+            height: self.height.calc(parent.height)
+        }
+    }
+
+    func render(self, origin: Point, parent: Size, ctx: DrawContext) {
+        const width = self.width.calc(parent.width);
+        const height = self.height.calc(parent.height);
+
+        ctx.draw_rrect(origin.x, origin.y, width, height, self.corner_radius, self.background);
+    }
+}
+
+impl Drawable for Column {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        const width = 0.0;
+        const height = 0.0;
+
+        for value in self.children {
+            const measured = value.measure(parent, ctx);
+
+            width = measured.width.max(width);
+            height += measured.height + self.spacing;
+        }
+
+        if height > 0.0 {
+            height -= self.spacing;
+        }
+
+        Size { width, height }
+    }
+
+    func render(self, point: Point, parent: Size, ctx: DrawContext) {
+        for value in self.children {
+            const measured = value.measure(parent, ctx);
+
+            value.render(point, parent, ctx);
+
+            point.y += measured.height + self.spacing;
+            parent.height -= measured.height - self.spacing;
+        }
+    }
+}
+
+impl Drawable for Row {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        const width = 0.0;
+        const height = 0.0;
+
+        for value in self.children {
+            const measured = value.measure(parent, ctx);
+
+            height = measured.width.max(width);
+            width += measured.width + self.spacing;
+        }
+
+        if width > 0.0 {
+            width -= self.spacing;
+        }
+
+        Size { width, height }
+    }
+
+    func render(self, point: Point, parent: Size, ctx: DrawContext) {
+        for value in self.children {
+            const measured = value.measure(parent, ctx);
+
+            value.render(point, parent, ctx);
+
+            point.x += measured.width + self.spacing;
+            parent.width -= measured.width - self.spacing;
+        }
+    }
+}
+
+view Centered {
+    width: Unit,
+    height: Unit,
+    children: Drawable
+}
+
+impl Drawable for Centered {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        Size {
+            width: self.width.calc(parent.width),
+            height: self.height.calc(parent.height)
+        }
+    }
+
+    func render(self, origin: Point, parent: Size, ctx: DrawContext) {
+        const measured = self.children.measure(parent, ctx);
+
+        origin.x -= measured.width / 2.0;
+        origin.y -= measured.height / 2.0;
+
+        self.children.render(origin, parent, ctx);
+    }
+}
+
+view Text {
+    font_size: f32,
+    font: string,
+    color: graphics::Color,
+
+    content: string
+}
+
+impl Drawable for Text {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        ctx.measure_text(self.content, self.font, self.font_size);
+    }
+
+    func render(self, origin: Point, parent: Size, ctx: DrawContext) {
+        ctx.draw_text(origin.x, origin.y, self.content, self.font, self.font_size, self.color);
+    }
+}
+
+view Button {
+    on_click: func(GameContext),
+    background: graphics::Color,
+    children: Drawable,
+}
+
+impl Drawable for Button {
+    func measure(self, parent: Size, ctx: DrawContext) -> Size {
+        self.children.measure(parent, ctx)
+    }
+
+    func render(self, origin: Point, parent: Size, ctx: DrawContext) {
+        const measured = self.children.measure(parent, ctx);
+        
+        ctx.draw_rect(origin.x, origin.y, measured.width, measured.height, self.background);
+
+        self.children.render(origin, parent, ctx);
+    }
+}
+
+Rectangle {
+    background: graphics::Color::new(0x1D, 0x21, 0x1B),
+    width: 1.0wh,
+    height: 1.0wh,
+
+    Centered {
+        width: 1.0wh,
+        height: 1.0wh,
+
+        Column {
+            spacing: 8.0,
+
+            Button {
+                on_click: |context| {
+                    context.play();
+                },
+                background: graphics::Color::new(255, 0, 0),
+
+                Text {
+                    font_size: 20.0,
+                    font: "default",
+                    color: graphics::Color::new(0, 0, 0),
+
+                    content: "Play"
+                }
+            }
+
+            Button {
+                on_click: |context| {
+                    context.set_page("options");
+                },
+                background: graphics::Color::new(255, 0, 0),
+
+                Text {
+                    font_size: 20.0,
+                    font: "default",
+                    color: graphics::Color::new(0, 0, 0),
+
+                    content: "Options"
+                }
+            }
+
+            Button {
+                on_click: |context| {
+                    context.close_window();
+                },
+                background: graphics::Color::new(255, 0, 0),
+
+                Text {
+                    font_size: 20.0,
+                    font: "default",
+                    color: graphics::Color::new(0, 0, 0),
+
+                    content: "Exit"
+                }
+            }
+        }
+    }
+}

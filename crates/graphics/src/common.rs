@@ -152,8 +152,8 @@ impl FillGeometryBuilder for ShapeGeometryBuilder {
             color: self.color,
             uv: if let Some((offset, uv_size, origin, size)) = self.uv_rect {
                 Point2D::new(
-                    offset.x + uv_size.x * ((position.x - origin.x) / size.width),
-                    offset.y + uv_size.y * ((position.y - origin.y) / size.height),
+                    uv_size.x.mul_add((position.x - origin.x) / size.width, offset.x),
+                    uv_size.y.mul_add((position.y - origin.y) / size.height, offset.y),
                 )
             } else {
                 self.white_pixel_uv
@@ -356,11 +356,11 @@ pub struct CommonRenderer {
     window_matrix: Transform3D,
 }
 
-struct OwnedFont {
-    data: Vec<u8>,
-    font: Font,
-    offset: u32,
-    key: CacheKey,
+pub struct OwnedFont {
+    pub data: Vec<u8>,
+    pub font: Font,
+    pub offset: u32,
+    pub key: CacheKey,
 }
 
 impl Borrow<Font> for OwnedFont {
@@ -433,7 +433,7 @@ impl CommonRenderer {
         &self.fonts
     }
 
-    pub fn window_matrix(&self) -> Transform3D {
+    pub const fn window_matrix(&self) -> Transform3D {
         self.window_matrix
     }
 
@@ -555,13 +555,13 @@ impl CommonRenderer {
 
         let buffers = self.tessellator.build();
 
-        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-            vertice.position = self
+        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+            vertex.position = self
                 .transform
                 .as_ref()
-                .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                .map_or(vertex.position, |transform| transform.transform_point3(vertex.position));
 
-            vertice
+            vertex
         }));
 
         self.buffers.indices.extend(buffers.indices);
@@ -795,13 +795,13 @@ impl CommonRenderer {
 
         let buffers = self.tessellator.build();
 
-        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertice| {
-            vertice.position = self
+        self.buffers.vertices.extend(buffers.vertices.into_iter().map(|mut vertex| {
+            vertex.position = self
                 .transform
                 .as_ref()
-                .map_or(vertice.position, |transform| transform.transform_point3(vertice.position));
+                .map_or(vertex.position, |transform| transform.transform_point3(vertex.position));
 
-            vertice
+            vertex
         }));
 
         self.buffers.indices.extend(buffers.indices);
