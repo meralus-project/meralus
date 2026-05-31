@@ -671,7 +671,7 @@ impl<T: HasContext> CommonRenderer<T> {
                         diff.y = scaled_size.y - resulting_size.height;
                     }
 
-                    (offset + diff / 2.0f32 / ratio, (resulting_size / ratio).to_vector())
+                    (offset + diff / 2f32 / ratio, (resulting_size / ratio).to_vector())
                 }
             }
         } else {
@@ -707,7 +707,7 @@ impl<T: HasContext> CommonRenderer<T> {
                         diff.y = scaled_size.y - resulting_size.height;
                     }
 
-                    (offset + diff / 2.0f32 / ratio, (resulting_size / ratio).to_vector())
+                    (offset + diff / 2f32 / ratio, (resulting_size / ratio).to_vector())
                 }
             }
         };
@@ -956,7 +956,7 @@ impl<T: HasContext> CommonRenderer<T> {
             vertex.position = self
                 .transform
                 .as_ref()
-                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
+                .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
             vertex
         }));
@@ -1011,7 +1011,7 @@ impl<T: HasContext> CommonRenderer<T> {
             vertex.position = self
                 .transform
                 .as_ref()
-                    .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
+                .map_or(vertex.position, |transform| transform.transform_point3(vertex.position.to_raw()).into());
 
             vertex
         }));

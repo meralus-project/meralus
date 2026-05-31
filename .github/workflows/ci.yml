@@ -1,6 +1,8 @@
 name: CI
 env:
   CARGO_TERM_COLOR: always
+
+  PACKAGES_LINUX: libasound2-dev libjack-jackd2-dev libjack-jackd2-0 libdbus-1-dev libpipewire-0.3-dev
 on:
   push:
     branches: ["master"]
@@ -10,7 +12,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Cache Linux audio packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: ${{ env.PACKAGES_LINUX }}
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rustfmt
@@ -22,7 +28,11 @@ jobs:
   dev-build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Cache Linux audio packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: ${{ env.PACKAGES_LINUX }}
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Install target
@@ -38,7 +48,7 @@ jobs:
   dev-build-win:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Install target

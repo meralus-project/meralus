@@ -249,7 +249,6 @@ impl Transition {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct TypedTransition<T: Lerp> {
     elapsed: f32,

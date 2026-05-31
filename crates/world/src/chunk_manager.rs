@@ -1,644 +1,641 @@
-use std::{
-  cell::RefCell,
-  ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 use ahash::HashMap;
 use meralus_shared::{IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
 
-use crate::{BfsLight, BiomeBase, BlockSource, Chunk, LightNode, SUBCHUNK_COUNT, SUBCHUNK_COUNT_I32, SUBCHUNK_SIZE, SUBCHUNK_SIZE_I32};
+use crate::{BfsLight, BiomeBase, BlockSource, Chunk, LightNode, SUBCHUNK_COUNT_I32, SUBCHUNK_SIZE, SUBCHUNK_SIZE_I32};
 
 pub trait ChunkCache {
-  fn all(&self) -> impl Iterator<Item = Chunk>;
-  fn get(&self, origin: IPoint2D) -> Option<Chunk>;
-  fn insert(&mut self, origin: IPoint2D, chunk: &Chunk);
+    fn all(&self) -> impl Iterator<Item = Chunk>;
+    fn get(&self, origin: IPoint2D) -> Option<Chunk>;
+    fn insert(&mut self, origin: IPoint2D, chunk: &Chunk);
 }
 
 impl ChunkCache for () {
-  fn all(&self) -> impl Iterator<Item = Chunk> {
-    std::iter::empty()
-  }
+    fn all(&self) -> impl Iterator<Item = Chunk> {
+        std::iter::empty()
+    }
 
-  fn get(&self, _: IPoint2D) -> Option<Chunk> {
-    None
-  }
+    fn get(&self, _: IPoint2D) -> Option<Chunk> {
+        None
+    }
 
-  fn insert(&mut self, _: IPoint2D, _: &Chunk) {}
+    fn insert(&mut self, _: IPoint2D, _: &Chunk) {}
 }
 
 pub trait ChunkManagerLike {
-  fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk>;
-  fn get_chunk_mut(&mut self, origin: IPoint2D) -> Option<&mut Chunk>;
-  fn get_block(&self, position: IPoint3D) -> Option<u8>;
-  fn set_block(&mut self, position: IPoint3D, block: u8);
-  fn get_block_light(&self, position: IPoint3D) -> u8;
-  fn get_sky_light(&self, position: IPoint3D) -> u8;
-  fn get_light_level(&self, position: IPoint3D) -> u8;
-  fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk>;
-  fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk>;
-  fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8;
-  fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light: u8);
+    fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk>;
+    fn get_chunk_mut(&mut self, origin: IPoint2D) -> Option<&mut Chunk>;
+    fn get_block(&self, position: IPoint3D) -> Option<u8>;
+    fn set_block(&mut self, position: IPoint3D, block: u8);
+    fn get_block_light(&self, position: IPoint3D) -> u8;
+    fn get_sky_light(&self, position: IPoint3D) -> u8;
+    fn get_light_level(&self, position: IPoint3D) -> u8;
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk>;
+    fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk>;
+    fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8;
+    fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light: u8);
 }
 
 pub struct LocalChunkManager {
-  chunk: Chunk,
-  neighbours: [Option<Chunk>; 8],
+    chunk: Chunk,
+    neighbours: [Option<Chunk>; 8],
 }
 
 impl LocalChunkManager {
-  pub fn new<C: ChunkCache>(chunk: Chunk, chunk_manager: &ChunkManager<C>) -> Self {
-    let origin = chunk.origin;
+    pub fn new<C: ChunkCache>(chunk: Chunk, chunk_manager: &ChunkManager<C>) -> Self {
+        let origin = chunk.origin;
 
-    Self {
-      chunk,
-      neighbours: [
-        IPoint2D::new(-1, 0),
-        IPoint2D::new(1, 0),
-        IPoint2D::new(0, 1),
-        IPoint2D::new(0, -1),
-        IPoint2D::new(-1, 1),
-        IPoint2D::new(1, 1),
-        IPoint2D::new(-1, -1),
-        IPoint2D::new(1, -1),
-      ]
-      .map(|offset| chunk_manager.get_chunk(origin + offset).cloned()),
+        Self {
+            chunk,
+            neighbours: [
+                IPoint2D::new(-1, 0),
+                IPoint2D::new(1, 0),
+                IPoint2D::new(0, 1),
+                IPoint2D::new(0, -1),
+                IPoint2D::new(-1, 1),
+                IPoint2D::new(1, 1),
+                IPoint2D::new(-1, -1),
+                IPoint2D::new(1, -1),
+            ]
+            .map(|offset| chunk_manager.get_chunk(origin + offset).cloned()),
+        }
     }
-  }
 
-  pub fn into_inner(self) -> (Chunk, [Option<Chunk>; 8]) {
-    (self.chunk, self.neighbours)
-  }
+    pub fn into_inner(self) -> (Chunk, [Option<Chunk>; 8]) {
+        (self.chunk, self.neighbours)
+    }
 }
 
 impl ChunkManagerLike for LocalChunkManager {
-  fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk> {
-    let delta = origin - self.chunk.origin;
+    fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk> {
+        let delta = origin - self.chunk.origin;
 
-    if delta.x == 0 && delta.y == 0 {
-      return Some(&self.chunk);
+        if delta.x == 0 && delta.y == 0 {
+            return Some(&self.chunk);
+        }
+
+        if delta.x.abs() > 1 || delta.y.abs() > 1 {
+            return None;
+        }
+
+        let idx = ((delta.x + 1) + (delta.y + 1) * 3) as usize;
+        let mapping = [6, 3, 4, 0, 99, 1, 7, 2, 5]; // 99 is a placeholder for center
+
+        self.neighbours[mapping[idx]].as_ref()
+
+        // let origin = origin - self.chunk.origin;
+
+        // match origin.to_tuple() {
+        //   // center
+        //   (0, 0) => Some(&self.chunk),
+        //   // left
+        //   (-1, 0) => self.neighbours[0].as_ref(),
+        //   // right
+        //   (1, 0) => self.neighbours[1].as_ref(),
+        //   // top
+        //   (0, 1) => self.neighbours[2].as_ref(),
+        //   // bottom
+        //   (0, -1) => self.neighbours[3].as_ref(),
+        //   // top left
+        //   (-1, 1) => self.neighbours[4].as_ref(),
+        //   // top right
+        //   (1, 1) => self.neighbours[5].as_ref(),
+        //   // bottom left
+        //   (-1, -1) => self.neighbours[6].as_ref(),
+        //   // bottom right
+        //   (1, -1) => self.neighbours[7].as_ref(),
+        //   _ => None,
+        // }
     }
 
-    if delta.x.abs() > 1 || delta.y.abs() > 1 {
-      return None;
+    fn get_chunk_mut(&mut self, origin: IPoint2D) -> Option<&mut Chunk> {
+        let delta = origin - self.chunk.origin;
+
+        if delta.x == 0 && delta.y == 0 {
+            return Some(&mut self.chunk);
+        }
+
+        if delta.x.abs() > 1 || delta.y.abs() > 1 {
+            return None;
+        }
+
+        let idx = ((delta.x + 1) + (delta.y + 1) * 3) as usize;
+        let mapping = [6, 3, 4, 0, 99, 1, 7, 2, 5]; // 99 is a placeholder for center
+
+        self.neighbours[mapping[idx]].as_mut()
+
+        // let origin = origin - self.chunk.origin;
+
+        // match origin.to_tuple() {
+        //   // center
+        //   (0, 0) => Some(&self.chunk),
+        //   // left
+        //   (-1, 0) => self.neighbours[0].as_ref(),
+        //   // right
+        //   (1, 0) => self.neighbours[1].as_ref(),
+        //   // top
+        //   (0, 1) => self.neighbours[2].as_ref(),
+        //   // bottom
+        //   (0, -1) => self.neighbours[3].as_ref(),
+        //   // top left
+        //   (-1, 1) => self.neighbours[4].as_ref(),
+        //   // top right
+        //   (1, 1) => self.neighbours[5].as_ref(),
+        //   // bottom left
+        //   (-1, -1) => self.neighbours[6].as_ref(),
+        //   // bottom right
+        //   (1, -1) => self.neighbours[7].as_ref(),
+        //   _ => None,
+        // }
     }
 
-    let idx = ((delta.x + 1) + (delta.y + 1) * 3) as usize;
-    let mapping = [6, 3, 4, 0, 99, 1, 7, 2, 5]; // 99 is a placeholder for center
+    fn get_block(&self, position: IPoint3D) -> Option<u8> {
+        if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+            let chunk = self.get_chunk(ChunkManager::<()>::to_local(position))?;
 
-    self.neighbours[mapping[idx]].as_ref()
-
-    // let origin = origin - self.chunk.origin;
-
-    // match origin.to_tuple() {
-    //   // center
-    //   (0, 0) => Some(&self.chunk),
-    //   // left
-    //   (-1, 0) => self.neighbours[0].as_ref(),
-    //   // right
-    //   (1, 0) => self.neighbours[1].as_ref(),
-    //   // top
-    //   (0, 1) => self.neighbours[2].as_ref(),
-    //   // bottom
-    //   (0, -1) => self.neighbours[3].as_ref(),
-    //   // top left
-    //   (-1, 1) => self.neighbours[4].as_ref(),
-    //   // top right
-    //   (1, 1) => self.neighbours[5].as_ref(),
-    //   // bottom left
-    //   (-1, -1) => self.neighbours[6].as_ref(),
-    //   // bottom right
-    //   (1, -1) => self.neighbours[7].as_ref(),
-    //   _ => None,
-    // }
-  }
-
-  fn get_chunk_mut(&mut self, origin: IPoint2D) -> Option<&mut Chunk> {
-    let delta = origin - self.chunk.origin;
-
-    if delta.x == 0 && delta.y == 0 {
-      return Some(&mut self.chunk);
+            Some(chunk.get_block_unchecked(Chunk::to_local(position)))
+        } else {
+            None
+        }
     }
 
-    if delta.x.abs() > 1 || delta.y.abs() > 1 {
-      return None;
+    fn set_block(&mut self, position: IPoint3D, block: u8) {
+        if position.y >= 0
+            && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 }
+            && let Some(chunk) = self.get_chunk_mut(ChunkManager::<()>::to_local(position))
+        {
+            chunk.set_block_unchecked(Chunk::to_local(position), block);
+        }
     }
 
-    let idx = ((delta.x + 1) + (delta.y + 1) * 3) as usize;
-    let mapping = [6, 3, 4, 0, 99, 1, 7, 2, 5]; // 99 is a placeholder for center
-
-    self.neighbours[mapping[idx]].as_mut()
-
-    // let origin = origin - self.chunk.origin;
-
-    // match origin.to_tuple() {
-    //   // center
-    //   (0, 0) => Some(&self.chunk),
-    //   // left
-    //   (-1, 0) => self.neighbours[0].as_ref(),
-    //   // right
-    //   (1, 0) => self.neighbours[1].as_ref(),
-    //   // top
-    //   (0, 1) => self.neighbours[2].as_ref(),
-    //   // bottom
-    //   (0, -1) => self.neighbours[3].as_ref(),
-    //   // top left
-    //   (-1, 1) => self.neighbours[4].as_ref(),
-    //   // top right
-    //   (1, 1) => self.neighbours[5].as_ref(),
-    //   // bottom left
-    //   (-1, -1) => self.neighbours[6].as_ref(),
-    //   // bottom right
-    //   (1, -1) => self.neighbours[7].as_ref(),
-    //   _ => None,
-    // }
-  }
-
-  fn get_block(&self, position: IPoint3D) -> Option<u8> {
-    if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-      let chunk = self.get_chunk(ChunkManager::<()>::to_local(position))?;
-
-      Some(chunk.get_block_unchecked(Chunk::to_local(position)))
-    } else {
-      None
+    fn get_block_light(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(15, |chunk| {
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_block_light_unchecked(Chunk::to_local(position))
+            } else {
+                15
+            }
+        })
     }
-  }
 
-  fn set_block(&mut self, position: IPoint3D, block: u8) {
-    if position.y >= 0
-      && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 }
-      && let Some(chunk) = self.get_chunk_mut(ChunkManager::<()>::to_local(position))
-    {
-      chunk.set_block_unchecked(Chunk::to_local(position), block);
+    fn get_sky_light(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(15, |chunk| {
+            let local_position = Chunk::to_local(position);
+
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_sky_light_unchecked(local_position)
+            } else {
+                15
+            }
+        })
     }
-  }
 
-  fn get_block_light(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(15, |chunk| {
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_block_light_unchecked(Chunk::to_local(position))
-      } else {
-        15
-      }
-    })
-  }
-
-  fn get_sky_light(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(15, |chunk| {
-      let local_position = Chunk::to_local(position);
-
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_sky_light_unchecked(local_position)
-      } else {
-        15
-      }
-    })
-  }
-
-  fn get_light_level(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(240, |chunk| {
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_light_level_unchecked(Chunk::to_local(position))
-      } else {
-        240
-      }
-    })
-  }
-
-  fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8 {
-    self.get_chunk(origin).map_or(0, |chunk| chunk.get_light(position, is_sky_light))
-  }
-
-  fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light_level: u8) {
-    if let Some(chunk) = self.get_chunk_mut(origin) {
-      chunk.set_light(position, is_sky_light, light_level);
+    fn get_light_level(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(ChunkManager::<()>::to_local(position)).map_or(240, |chunk| {
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_light_level_unchecked(Chunk::to_local(position))
+            } else {
+                240
+            }
+        })
     }
-  }
 
-  fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
-    self.get_chunk(ChunkManager::<()>::to_local(position))
-  }
+    fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8 {
+        self.get_chunk(origin).map_or(0, |chunk| chunk.get_light(position, is_sky_light))
+    }
 
-  fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk> {
-    self.get_chunk_mut(ChunkManager::<()>::to_local(position))
-  }
+    fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light_level: u8) {
+        if let Some(chunk) = self.get_chunk_mut(origin) {
+            chunk.set_light(position, is_sky_light, light_level);
+        }
+    }
+
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
+        self.get_chunk(ChunkManager::<()>::to_local(position))
+    }
+
+    fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk> {
+        self.get_chunk_mut(ChunkManager::<()>::to_local(position))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChunkStage {
-  Unloaded,
-  Bare,                 // Блоки сгенерированы (ландшафт), но деревьев/декораций еще нет
-  PopulationInProgress, // Деревья выращены, структуры на месте (требует соседей в состоянии >= Proto)
-  Populated,            // Деревья выращены, структуры на месте (требует соседей в состоянии >= Proto)
-  LightningInProgress,  // Свет (BFS) рассчитан (требует соседей в состоянии >= Populated)
-  Lighted,              // Свет (BFS) рассчитан (требует соседей в состоянии >= Populated)
-  MeshingInProgress,    // Сетка построена и готова к рендеру (требует соседей в состоянии >= Lighted)
-  Meshed,               // Сетка построена и готова к рендеру (требует соседей в состоянии >= Lighted)
+    Unloaded,
+    Bare,                 // Блоки сгенерированы (ландшафт), но деревьев/декораций еще нет
+    PopulationInProgress, // Деревья выращены, структуры на месте (требует соседей в состоянии >= Proto)
+    Populated,            // Деревья выращены, структуры на месте (требует соседей в состоянии >= Proto)
+    LightningInProgress,  // Свет (BFS) рассчитан (требует соседей в состоянии >= Populated)
+    Lighted,              // Свет (BFS) рассчитан (требует соседей в состоянии >= Populated)
+    MeshingInProgress,    // Сетка построена и готова к рендеру (требует соседей в состоянии >= Lighted)
+    Meshed,               // Сетка построена и готова к рендеру (требует соседей в состоянии >= Lighted)
 }
 
 #[derive(Debug, Clone)]
 pub struct ChunkManager<C: ChunkCache> {
-  cache: C,
-  pub chunks: HashMap<IPoint2D, Chunk>,
-  pub stages: HashMap<IPoint2D, ChunkStage>,
+    cache: C,
+    pub chunks: HashMap<IPoint2D, Chunk>,
+    pub stages: HashMap<IPoint2D, ChunkStage>,
 }
 
 impl<C: ChunkCache> ChunkManager<C> {
-  pub fn new(cache: C) -> Self {
-    let chunks: HashMap<IPoint2D, Chunk> = cache.all().map(|chunk| (chunk.origin, chunk)).collect();
-    let stages = chunks.keys().map(|&origin| (origin, ChunkStage::Lighted)).collect();
+    pub fn new(cache: C) -> Self {
+        let chunks: HashMap<IPoint2D, Chunk> = cache.all().map(|chunk| (chunk.origin, chunk)).collect();
+        let stages = chunks.keys().map(|&origin| (origin, ChunkStage::Lighted)).collect();
 
-    Self { cache, chunks, stages }
-  }
-
-  pub fn push(&mut self, chunk: Chunk, stage: ChunkStage) {
-    self.stages.insert(chunk.origin, stage);
-    self.chunks.insert(chunk.origin, chunk);
-  }
-
-  pub fn set_stage(&mut self, origin: IPoint2D, stage: ChunkStage) {
-    self.stages.insert(origin, stage);
-  }
-
-  // pub fn stages(&self) -> impl Iterator<Item = (IPoint2D, ChunkStage)> {
-  //   self.stages.iter().map(|(&key, &stage)| (key, stage))
-  // }
-
-  // pub fn stages_mut(&mut self) -> impl Iterator<Item = (IPoint2D, &mut
-  // ChunkStage)> {   self.stages.iter_mut().map(|(&key, stage)| (key, stage))
-  // }
-
-  pub fn neighbours_at_least(&self, origin: IPoint2D, stage: ChunkStage) -> bool {
-    [
-      IPoint2D::new(-1, 0),  // left
-      IPoint2D::new(1, 0),   // right
-      IPoint2D::new(0, 1),   // top
-      IPoint2D::new(0, -1),  // bottom
-      IPoint2D::new(-1, 1),  // top left
-      IPoint2D::new(1, 1),   // top right
-      IPoint2D::new(-1, -1), // bottom left
-      IPoint2D::new(1, -1),  // bottom right
-    ]
-    .into_iter()
-    .all(|offset| self.stages.get(&(origin + offset.to_vector())).is_none_or(|&chunk_stage| chunk_stage >= stage))
-  }
-
-  pub fn update_neighbors(&mut self, center_origin: IPoint2D, modified_neighbors: [Option<Chunk>; 8], stage: ChunkStage) {
-    let offsets = [
-      IPoint2D::new(-1, 0),  // left
-      IPoint2D::new(1, 0),   // right
-      IPoint2D::new(0, 1),   // top
-      IPoint2D::new(0, -1),  // bottom
-      IPoint2D::new(-1, 1),  // top left
-      IPoint2D::new(1, 1),   // top right
-      IPoint2D::new(-1, -1), // bottom left
-      IPoint2D::new(1, -1),  // bottom right
-    ];
-
-    for (offset, neighbor_opt) in offsets.into_iter().zip(modified_neighbors) {
-      if let Some(modified_neighbor) = neighbor_opt {
-        let neighbor_origin = center_origin + offset;
-
-        // if let Some(existing_chunk) = self.chunks.get_mut(&neighbor_origin) {
-        //   for i in 0..SUBCHUNK_COUNT {
-        //     if existing_chunk.subchunks[i] != modified_neighbor.subchunks[i] {
-        //       existing_chunk.subchunks[i] = modified_neighbor.subchunks[i];
-        //     }
-        //   }
-        // }
-
-        self.stages.insert(neighbor_origin, stage);
-      }
+        Self { cache, chunks, stages }
     }
-  }
 
-  pub fn local_of(&self, origin: IPoint2D) -> Option<LocalChunkManager> {
-    self.chunks.get(&origin).cloned().map(|chunk| LocalChunkManager::new(chunk, self))
-  }
+    pub fn push(&mut self, chunk: Chunk, stage: ChunkStage) {
+        self.stages.insert(chunk.origin, stage);
+        self.chunks.insert(chunk.origin, chunk);
+    }
 
-  pub fn from_range<T: Iterator<Item = i32> + Clone>(mut cache: C, x: T, z: &T) -> Self {
-    let chunks: HashMap<IPoint2D, Chunk> = x
-      .flat_map(|x| z.clone().map(move |z| IPoint2D::new(x, z)))
-      .map(|origin| {
-        let chunk = cache.get(origin).unwrap_or_else(|| {
-          let chunk = Chunk::new(origin);
+    pub fn set_stage(&mut self, origin: IPoint2D, stage: ChunkStage) {
+        self.stages.insert(origin, stage);
+    }
 
-          cache.insert(origin, &chunk);
+    // pub fn stages(&self) -> impl Iterator<Item = (IPoint2D, ChunkStage)> {
+    //   self.stages.iter().map(|(&key, &stage)| (key, stage))
+    // }
 
-          chunk
-        });
+    // pub fn stages_mut(&mut self) -> impl Iterator<Item = (IPoint2D, &mut
+    // ChunkStage)> {   self.stages.iter_mut().map(|(&key, stage)| (key, stage))
+    // }
 
-        (origin, chunk)
-      })
-      .collect();
+    pub fn neighbours_at_least(&self, origin: IPoint2D, stage: ChunkStage) -> bool {
+        [
+            IPoint2D::new(-1, 0),  // left
+            IPoint2D::new(1, 0),   // right
+            IPoint2D::new(0, 1),   // top
+            IPoint2D::new(0, -1),  // bottom
+            IPoint2D::new(-1, 1),  // top left
+            IPoint2D::new(1, 1),   // top right
+            IPoint2D::new(-1, -1), // bottom left
+            IPoint2D::new(1, -1),  // bottom right
+        ]
+        .into_iter()
+        .all(|offset| self.stages.get(&(origin + offset.to_vector())).is_none_or(|&chunk_stage| chunk_stage >= stage))
+    }
 
-    let stages = chunks.keys().map(|&origin| (origin, ChunkStage::Unloaded)).collect();
+    pub fn update_neighbors(&mut self, center_origin: IPoint2D, modified_neighbors: [Option<Chunk>; 8], stage: ChunkStage) {
+        let offsets = [
+            IPoint2D::new(-1, 0),  // left
+            IPoint2D::new(1, 0),   // right
+            IPoint2D::new(0, 1),   // top
+            IPoint2D::new(0, -1),  // bottom
+            IPoint2D::new(-1, 1),  // top left
+            IPoint2D::new(1, 1),   // top right
+            IPoint2D::new(-1, -1), // bottom left
+            IPoint2D::new(1, -1),  // bottom right
+        ];
 
-    Self { cache, chunks, stages }
-  }
+        for (offset, neighbor_opt) in offsets.into_iter().zip(modified_neighbors) {
+            if neighbor_opt.is_some() {
+                let neighbor_origin = center_origin + offset;
 
-  // pub fn from_chunks<T: IntoIterator<Item = Chunk>>(cache: C, chunks: T) ->
-  // Self {   Self {
-  //     cache,
-  //     chunks: chunks.into_iter().map(|chunk| (chunk.origin, chunk)).collect(),
-  //   }
-  // }
+                // if let Some(existing_chunk) = self.chunks.get_mut(&neighbor_origin) {
+                //   for i in 0..SUBCHUNK_COUNT {
+                //     if existing_chunk.subchunks[i] != modified_neighbor.subchunks[i] {
+                //       existing_chunk.subchunks[i] = modified_neighbor.subchunks[i];
+                //     }
+                //   }
+                // }
 
-  pub fn generate_sky_lights<T: BlockSource>(&mut self, block_source: &T) {
-    let mut queue = Vec::new();
-
-    for chunk in self.chunks_mut() {
-      for z in 0..SUBCHUNK_SIZE {
-        for x in 0..SUBCHUNK_SIZE {
-          let position = USizePoint3D::new(x, 255, z);
-
-          if chunk.get_block_unchecked(position) == 0
-          //_or(|block| !resource_manager.read().models.get(block.into()).unwrap().is_opaque)
-          {
-            chunk.set_sky_light(position, 15);
-            queue.push(LightNode(position, chunk.origin));
-          }
+                self.stages.insert(neighbor_origin, stage);
+            }
         }
-      }
     }
 
-    let mut bfs_light = BfsLight::new(self).apply_to_sky_light();
-
-    bfs_light.addition_queue = queue.into();
-    bfs_light.calculate(block_source);
-  }
-
-  pub fn surface_size(&self) -> IPoint3D {
-    let mut min = IPoint2D::ZERO;
-    let mut max = IPoint2D::ZERO;
-
-    for chunk in self.chunks.keys() {
-      min = min.min(*chunk);
-      max = max.max(*chunk);
+    pub fn local_of(&self, origin: IPoint2D) -> Option<LocalChunkManager> {
+        self.chunks.get(&origin).cloned().map(|chunk| LocalChunkManager::new(chunk, self))
     }
 
-    let size = (max - min) * 16;
+    pub fn from_range<T: Iterator<Item = i32> + Clone>(mut cache: C, x: T, z: &T) -> Self {
+        let chunks: HashMap<IPoint2D, Chunk> = x
+            .flat_map(|x| z.clone().map(move |z| IPoint2D::new(x, z)))
+            .map(|origin| {
+                let chunk = cache.get(origin).unwrap_or_else(|| {
+                    let chunk = Chunk::new(origin);
 
-    IPoint3D::new(size.x + SUBCHUNK_SIZE_I32, SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32, size.y + SUBCHUNK_SIZE_I32)
-  }
+                    cache.insert(origin, &chunk);
 
-  pub fn bounds(&self) -> (IPoint2D, IPoint2D) {
-    let mut min = IPoint2D::ZERO;
-    let mut max = IPoint2D::ZERO;
+                    chunk
+                });
 
-    for chunk in self.chunks.keys() {
-      min = min.min(*chunk);
-      max = max.max(*chunk);
+                (origin, chunk)
+            })
+            .collect();
+
+        let stages = chunks.keys().map(|&origin| (origin, ChunkStage::Unloaded)).collect();
+
+        Self { cache, chunks, stages }
     }
 
-    (min * SUBCHUNK_SIZE_I32, max * SUBCHUNK_SIZE_I32)
-  }
+    // pub fn from_chunks<T: IntoIterator<Item = Chunk>>(cache: C, chunks: T) ->
+    // Self {   Self {
+    //     cache,
+    //     chunks: chunks.into_iter().map(|chunk| (chunk.origin, chunk)).collect(),
+    //   }
+    // }
 
-  pub const fn to_local(position: IPoint3D) -> IPoint2D {
-    IPoint2D::new(position.x >> 4, position.z >> 4)
-  }
+    pub fn generate_sky_lights<T: BlockSource>(&mut self, block_source: &T) {
+        let mut queue = Vec::new();
 
-  pub fn to_chunk_local(&self, position: IPoint3D) -> Option<USizePoint3D> {
-    self.get_chunk(Self::to_local(position)).map(|_| Chunk::to_local(position))
-  }
+        for chunk in self.chunks_mut() {
+            for z in 0..SUBCHUNK_SIZE {
+                for x in 0..SUBCHUNK_SIZE {
+                    let position = USizePoint3D::new(x, 255, z);
 
-  pub fn get_biome(&self, position: IPoint3D) -> Option<BiomeBase> {
-    if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-      let chunk = self.get_chunk(Self::to_local(position))?;
-      let local = Chunk::to_local(position);
-
-      Some(chunk.get_biome_unchecked(USizePoint2D::new(local.x, local.z)))
-    } else {
-      None
-    }
-  }
-
-  pub fn remove_block<T: BlockSource>(&mut self, position: IPoint3D, block_source: &T) -> Vec<IPoint2D> {
-    let chunk_position = Self::to_local(position);
-    let mut affected_chunks = Vec::with_capacity(8);
-
-    if let Some(chunk) = self.get_chunk_mut(chunk_position) {
-      let local = Chunk::to_local(position);
-
-      chunk.set_block(local, 0);
-
-      let mut bfs_light = BfsLight::new(self);
-
-      bfs_light.remove(LightNode(local, chunk_position));
-
-      for chunk in bfs_light.calculate_with_info(block_source) {
-        if !affected_chunks.contains(&chunk) {
-          affected_chunks.push(chunk);
+                    if chunk.get_block_unchecked(position) == 0
+                    //_or(|block| !resource_manager.read().models.get(block.into()).unwrap().is_opaque)
+                    {
+                        chunk.set_sky_light(position, 15);
+                        queue.push(LightNode(position, chunk.origin));
+                    }
+                }
+            }
         }
-      }
 
-      let mut bfs_light = bfs_light.apply_to_sky_light();
+        let mut bfs_light = BfsLight::new(self).apply_to_sky_light();
 
-      bfs_light.remove(LightNode(local, chunk_position));
+        bfs_light.addition_queue = queue.into();
+        bfs_light.calculate(block_source);
+    }
 
-      for chunk in bfs_light.calculate_with_info(block_source) {
-        if !affected_chunks.contains(&chunk) {
-          affected_chunks.push(chunk);
+    pub fn surface_size(&self) -> IPoint3D {
+        let mut min = IPoint2D::ZERO;
+        let mut max = IPoint2D::ZERO;
+
+        for chunk in self.chunks.keys() {
+            min = min.min(*chunk);
+            max = max.max(*chunk);
         }
-      }
 
-      let up = local + USizePoint3D::Y;
+        let size = (max - min) * 16;
 
-      if up.y < 256 && bfs_light.chunk_manager[chunk_position].get_sky_light(up) == 15 {
-        let mut y = local.y;
+        IPoint3D::new(size.x + SUBCHUNK_SIZE_I32, SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32, size.y + SUBCHUNK_SIZE_I32)
+    }
 
-        loop {
-          if bfs_light.chunk_manager[chunk_position].get_block(local.with_y(y)).is_some_and(|b| b != 0) {
-            break;
-          }
+    pub fn bounds(&self) -> (IPoint2D, IPoint2D) {
+        let mut min = IPoint2D::ZERO;
+        let mut max = IPoint2D::ZERO;
 
-          bfs_light.add_custom(LightNode(local.with_y(y), chunk_position), 15);
-
-          if y == 0 {
-            break;
-          }
-
-          y -= 1;
+        for chunk in self.chunks.keys() {
+            min = min.min(*chunk);
+            max = max.max(*chunk);
         }
-      }
 
-      for chunk in bfs_light.calculate_with_info(block_source) {
-        if !affected_chunks.contains(&chunk) {
-          affected_chunks.push(chunk);
+        (min * SUBCHUNK_SIZE_I32, max * SUBCHUNK_SIZE_I32)
+    }
+
+    pub const fn to_local(position: IPoint3D) -> IPoint2D {
+        IPoint2D::new(position.x >> 4, position.z >> 4)
+    }
+
+    pub fn to_chunk_local(&self, position: IPoint3D) -> Option<USizePoint3D> {
+        self.get_chunk(Self::to_local(position)).map(|_| Chunk::to_local(position))
+    }
+
+    pub fn get_biome(&self, position: IPoint3D) -> Option<BiomeBase> {
+        if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+            let chunk = self.get_chunk(Self::to_local(position))?;
+            let local = Chunk::to_local(position);
+
+            Some(chunk.get_biome_unchecked(USizePoint2D::new(local.x, local.z)))
+        } else {
+            None
         }
-      }
     }
 
-    affected_chunks
-  }
+    pub fn remove_block<T: BlockSource>(&mut self, position: IPoint3D, block_source: &T) -> Vec<IPoint2D> {
+        let chunk_position = Self::to_local(position);
+        let mut affected_chunks = Vec::with_capacity(8);
 
-  pub fn set_block_light(&mut self, position: IPoint3D, light_level: u8) {
-    if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
-      chunk.set_block_light(Chunk::to_local(position), light_level);
+        if let Some(chunk) = self.get_chunk_mut(chunk_position) {
+            let local = Chunk::to_local(position);
+
+            chunk.set_block(local, 0);
+
+            let mut bfs_light = BfsLight::new(self);
+
+            bfs_light.remove(LightNode(local, chunk_position));
+
+            for chunk in bfs_light.calculate_with_info(block_source) {
+                if !affected_chunks.contains(&chunk) {
+                    affected_chunks.push(chunk);
+                }
+            }
+
+            let mut bfs_light = bfs_light.apply_to_sky_light();
+
+            bfs_light.remove(LightNode(local, chunk_position));
+
+            for chunk in bfs_light.calculate_with_info(block_source) {
+                if !affected_chunks.contains(&chunk) {
+                    affected_chunks.push(chunk);
+                }
+            }
+
+            let up = local + USizePoint3D::Y;
+
+            if up.y < 256 && bfs_light.chunk_manager[chunk_position].get_sky_light(up) == 15 {
+                let mut y = local.y;
+
+                loop {
+                    if bfs_light.chunk_manager[chunk_position].get_block(local.with_y(y)).is_some_and(|b| b != 0) {
+                        break;
+                    }
+
+                    bfs_light.add_custom(LightNode(local.with_y(y), chunk_position), 15);
+
+                    if y == 0 {
+                        break;
+                    }
+
+                    y -= 1;
+                }
+            }
+
+            for chunk in bfs_light.calculate_with_info(block_source) {
+                if !affected_chunks.contains(&chunk) {
+                    affected_chunks.push(chunk);
+                }
+            }
+        }
+
+        affected_chunks
     }
-  }
 
-  pub fn set_sky_light(&mut self, position: IPoint3D, light_level: u8) {
-    if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
-      chunk.set_sky_light(Chunk::to_local(position), light_level);
+    pub fn set_block_light(&mut self, position: IPoint3D, light_level: u8) {
+        if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
+            chunk.set_block_light(Chunk::to_local(position), light_level);
+        }
     }
-  }
 
-  pub fn set_light(&mut self, position: IPoint3D, is_sky_light: bool, light_level: u8) {
-    if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
-      chunk.set_light(Chunk::to_local(position), is_sky_light, light_level);
+    pub fn set_sky_light(&mut self, position: IPoint3D, light_level: u8) {
+        if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
+            chunk.set_sky_light(Chunk::to_local(position), light_level);
+        }
     }
-  }
 
-  pub fn contains_block(&self, position: IPoint3D) -> bool {
-    self.get_chunk(Self::to_local(position)).is_some_and(|chunk| chunk.check_for_block(position))
-  }
-
-  pub fn contains_chunk(&self, origin: &IPoint2D) -> bool {
-    self.chunks.contains_key(origin)
-  }
-
-  pub fn get_light(&self, position: IPoint3D, is_sky_light: bool) -> u8 {
-    self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
-      let local_position = Chunk::to_local(position);
-
-      if chunk.contains_local_position(local_position) {
-        chunk.get_light(local_position, is_sky_light)
-      } else {
-        15
-      }
-    })
-  }
-
-  pub fn len(&self) -> usize {
-    self.chunks.len()
-  }
-
-  pub fn is_empty(&self) -> bool {
-    self.chunks.is_empty()
-  }
-
-  // #[must_use]
-  // pub fn take(&mut self) -> Self {
-  //     let mut chunks = HashMap::with_capacity(self.chunks.capacity());
-
-  //     for chunk in self.chunks_mut() {
-  //         chunks.insert(chunk.origin, std::mem::replace(chunk,
-  // Chunk::new(chunk.origin)));     }
-
-  //     Self { chunks }
-  // }
-
-  pub fn take_chunks(self) -> impl Iterator<Item = Chunk> {
-    self.chunks.into_values()
-  }
-
-  pub fn chunks(&self) -> impl Iterator<Item = &Chunk> {
-    self.chunks.values()
-  }
-
-  pub fn chunks_mut(&mut self) -> impl Iterator<Item = &mut Chunk> {
-    self.chunks.values_mut()
-  }
-
-  pub fn save(&mut self) {
-    for (origin, chunk) in &self.chunks {
-      self.cache.insert(*origin, chunk);
+    pub fn set_light(&mut self, position: IPoint3D, is_sky_light: bool, light_level: u8) {
+        if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
+            chunk.set_light(Chunk::to_local(position), is_sky_light, light_level);
+        }
     }
-  }
+
+    pub fn contains_block(&self, position: IPoint3D) -> bool {
+        self.get_chunk(Self::to_local(position)).is_some_and(|chunk| chunk.check_for_block(position))
+    }
+
+    pub fn contains_chunk(&self, origin: &IPoint2D) -> bool {
+        self.chunks.contains_key(origin)
+    }
+
+    pub fn get_light(&self, position: IPoint3D, is_sky_light: bool) -> u8 {
+        self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
+            let local_position = Chunk::to_local(position);
+
+            if chunk.contains_local_position(local_position) {
+                chunk.get_light(local_position, is_sky_light)
+            } else {
+                15
+            }
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.chunks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.chunks.is_empty()
+    }
+
+    // #[must_use]
+    // pub fn take(&mut self) -> Self {
+    //     let mut chunks = HashMap::with_capacity(self.chunks.capacity());
+
+    //     for chunk in self.chunks_mut() {
+    //         chunks.insert(chunk.origin, std::mem::replace(chunk,
+    // Chunk::new(chunk.origin)));     }
+
+    //     Self { chunks }
+    // }
+
+    pub fn take_chunks(self) -> impl Iterator<Item = Chunk> {
+        self.chunks.into_values()
+    }
+
+    pub fn chunks(&self) -> impl Iterator<Item = &Chunk> {
+        self.chunks.values()
+    }
+
+    pub fn chunks_mut(&mut self) -> impl Iterator<Item = &mut Chunk> {
+        self.chunks.values_mut()
+    }
+
+    pub fn save(&mut self) {
+        for (origin, chunk) in &self.chunks {
+            self.cache.insert(*origin, chunk);
+        }
+    }
 }
 
 impl<C: ChunkCache> ChunkManagerLike for ChunkManager<C> {
-  fn get_chunk(&self, position: IPoint2D) -> Option<&Chunk> {
-    self.chunks.get(&position)
-  }
-
-  fn get_chunk_mut(&mut self, position: IPoint2D) -> Option<&mut Chunk> {
-    self.chunks.get_mut(&position)
-  }
-
-  fn get_block(&self, position: IPoint3D) -> Option<u8> {
-    if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-      let chunk = self.get_chunk(Self::to_local(position))?;
-
-      Some(chunk.get_block_unchecked(Chunk::to_local(position)))
-    } else {
-      None
+    fn get_chunk(&self, position: IPoint2D) -> Option<&Chunk> {
+        self.chunks.get(&position)
     }
-  }
 
-  fn set_block(&mut self, position: IPoint3D, block: u8) {
-    if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
-      chunk.set_block(Chunk::to_local(position), block);
+    fn get_chunk_mut(&mut self, position: IPoint2D) -> Option<&mut Chunk> {
+        self.chunks.get_mut(&position)
     }
-  }
 
-  fn get_block_light(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_block_light_unchecked(Chunk::to_local(position))
-      } else {
-        15
-      }
-    })
-  }
+    fn get_block(&self, position: IPoint3D) -> Option<u8> {
+        if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+            let chunk = self.get_chunk(Self::to_local(position))?;
 
-  fn get_sky_light(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
-      let local_position = Chunk::to_local(position);
-
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_sky_light_unchecked(local_position)
-      } else {
-        15
-      }
-    })
-  }
-
-  fn get_light_level(&self, position: IPoint3D) -> u8 {
-    self.get_chunk(Self::to_local(position)).map_or(240, |chunk| {
-      if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
-        chunk.get_light_level_unchecked(Chunk::to_local(position))
-      } else {
-        240
-      }
-    })
-  }
-
-  fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8 {
-    self.get_chunk(origin).map_or(0, |chunk| chunk.get_light(position, is_sky_light))
-  }
-
-  fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light_level: u8) {
-    if let Some(chunk) = self.get_chunk_mut(origin) {
-      chunk.set_light(position, is_sky_light, light_level);
+            Some(chunk.get_block_unchecked(Chunk::to_local(position)))
+        } else {
+            None
+        }
     }
-  }
 
-  fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
-    self.chunks.get(&Self::to_local(position))
-  }
+    fn set_block(&mut self, position: IPoint3D, block: u8) {
+        if let Some(chunk) = self.get_chunk_mut(Self::to_local(position)) {
+            chunk.set_block(Chunk::to_local(position), block);
+        }
+    }
 
-  fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk> {
-    self.chunks.get_mut(&Self::to_local(position))
-  }
+    fn get_block_light(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_block_light_unchecked(Chunk::to_local(position))
+            } else {
+                15
+            }
+        })
+    }
+
+    fn get_sky_light(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(Self::to_local(position)).map_or(15, |chunk| {
+            let local_position = Chunk::to_local(position);
+
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_sky_light_unchecked(local_position)
+            } else {
+                15
+            }
+        })
+    }
+
+    fn get_light_level(&self, position: IPoint3D) -> u8 {
+        self.get_chunk(Self::to_local(position)).map_or(240, |chunk| {
+            if position.y >= 0 && position.y < const { SUBCHUNK_SIZE_I32 * SUBCHUNK_COUNT_I32 } {
+                chunk.get_light_level_unchecked(Chunk::to_local(position))
+            } else {
+                240
+            }
+        })
+    }
+
+    fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8 {
+        self.get_chunk(origin).map_or(0, |chunk| chunk.get_light(position, is_sky_light))
+    }
+
+    fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light_level: u8) {
+        if let Some(chunk) = self.get_chunk_mut(origin) {
+            chunk.set_light(position, is_sky_light, light_level);
+        }
+    }
+
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
+        self.chunks.get(&Self::to_local(position))
+    }
+
+    fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk> {
+        self.chunks.get_mut(&Self::to_local(position))
+    }
 }
 
 impl Default for ChunkManager<()> {
-  fn default() -> Self {
-    Self::new(())
-  }
+    fn default() -> Self {
+        Self::new(())
+    }
 }
 
 impl<C: ChunkCache> Index<IPoint2D> for ChunkManager<C> {
-  type Output = Chunk;
+    type Output = Chunk;
 
-  fn index(&self, index: IPoint2D) -> &Self::Output {
-    &self.chunks[&index]
-  }
+    fn index(&self, index: IPoint2D) -> &Self::Output {
+        &self.chunks[&index]
+    }
 }
 
 impl<C: ChunkCache> IndexMut<IPoint2D> for ChunkManager<C> {
-  fn index_mut(&mut self, index: IPoint2D) -> &mut Self::Output {
-    self.chunks.get_mut(&index).unwrap()
-  }
+    fn index_mut(&mut self, index: IPoint2D) -> &mut Self::Output {
+        self.chunks.get_mut(&index).unwrap()
+    }
 }
