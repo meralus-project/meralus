@@ -130,6 +130,8 @@ pub struct PlayerController {
     // CAMERA BOBBING START
     pub bob_time: f32,
     pub bob_offset: Point3D,
+
+    pub dash_time: f32,
     // INVENTORY
     pub inventory: Inventory,
 }
@@ -142,6 +144,7 @@ impl Default for PlayerController {
             body: PhysicsBody::new(Point3D::Y, Self::PLAYER_SIZE.as_()),
             bob_time: 0.0,
             bob_offset: Point3D::ZERO,
+            dash_time: 0.0,
             inventory: Inventory::default(),
         }
     }
@@ -193,7 +196,25 @@ impl PlayerController {
         const BOB_FREQ: f32 = 3.0;
         const BOB_AMP: f32 = 0.15;
 
-        if (self.body.velocity.x == 0.0 && self.body.velocity.z == 0.0) || !self.body.is_on_ground {
+        const DASH_SPEED: f32 = 30.0; // Скорость во время рывка
+        const DASH_DURATION: f32 = 0.2; // Сколько длится рывок (в секундах)
+
+        let was_dashing = self.dash_time > 0.0;
+
+        if was_dashing {
+            self.dash_time -= delta;
+
+            if self.dash_time <= 0.0 {
+                self.body.velocity.x = 0.0;
+                self.body.velocity.z = 0.0;
+
+                if self.body.velocity.y > 0.0 {
+                    self.body.velocity.y *= 0.5;
+                }
+            }
+        }
+
+        if (self.body.velocity.x == 0.0 && self.body.velocity.z == 0.0) || !self.body.is_on_ground || self.dash_time > 0.0 {
             self.bob_time = 0.0;
             self.bob_offset = self.bob_offset.lerp(Point3D::ZERO, (delta * 16.0).min(1.0));
         } else {
@@ -206,9 +227,16 @@ impl PlayerController {
         }
 
         let direction = get_movement_direction(input);
+
+        if input.keyboard.is_key_pressed_once(KeyCode::KeyE) && !self.body.is_on_ground {
+            let (front, right, _) = get_rotation_directions(self.yaw, self.pitch);
+
+            self.body.velocity += front * DASH_SPEED;
+        }
+
         let (front, right, _) = get_rotation_directions(self.yaw, 0.0);
 
-        let velocity = ((front * direction.z) + (right * direction.x))
+        let velocity = (front * direction.z + right * direction.x)
             * if input.keyboard.is_key_pressed(KeyCode::ShiftLeft) && direction.z > 0.0 {
                 camera.fov = camera.fov.lerp(
                     &(65f32.to_radians() * (self.body.velocity.y.abs() / 8.0).clamp(1.0, 1.75)),
@@ -228,29 +256,13 @@ impl PlayerController {
         if self.body.is_on_ground {
             self.body.velocity.x = velocity.x;
             self.body.velocity.z = velocity.z;
-        } else {
-            self.body.velocity.x += velocity.x;
-            self.body.velocity.z += velocity.z;
-        }
 
-        if input.keyboard.is_key_pressed_once(KeyCode::KeyE) && !self.body.is_on_ground {
-            let (front, ..) = get_rotation_directions(self.yaw, self.pitch);
-
-            self.body.velocity += front * 20.0;
-        }
-
-        if Self::AFFECTED_BY_PHYSICS {
-            if input.keyboard.is_key_pressed(KeyCode::Space) && self.body.is_on_ground {
+            if input.keyboard.is_key_pressed(KeyCode::Space) {
                 self.body.velocity.y = 8.0;
             }
         } else {
-            if input.keyboard.is_key_pressed(KeyCode::Space) {
-                self.body.position.y += 0.5;
-            }
-
-            if input.keyboard.is_key_pressed(KeyCode::ControlLeft) {
-                self.body.position.y -= 0.5;
-            }
+            self.body.velocity.x += velocity.x * delta;
+            self.body.velocity.z += velocity.z * delta;
         }
     }
 }

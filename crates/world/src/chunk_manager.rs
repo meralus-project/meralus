@@ -1,4 +1,7 @@
-use std::ops::{Index, IndexMut};
+use std::{
+    ops::{Index, IndexMut},
+    sync::Arc,
+};
 
 use ahash::HashMap;
 use meralus_shared::{IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
@@ -24,26 +27,26 @@ impl ChunkCache for () {
 }
 
 pub trait ChunkAccess {
-    fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk>;
+    fn get_chunk(&self, origin: IPoint2D) -> Option<&Arc<Chunk>>;
     fn get_chunk_mut(&mut self, origin: IPoint2D) -> Option<&mut Chunk>;
     fn get_block(&self, position: IPoint3D) -> Option<u8>;
     fn set_block(&mut self, position: IPoint3D, block: u8);
     fn get_block_light(&self, position: IPoint3D) -> u8;
     fn get_sky_light(&self, position: IPoint3D) -> u8;
     fn get_light_level(&self, position: IPoint3D) -> u8;
-    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk>;
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Arc<Chunk>>;
     fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk>;
     fn get_local_light(&self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool) -> u8;
     fn set_local_light(&mut self, origin: IPoint2D, position: USizePoint3D, is_sky_light: bool, light: u8);
 }
 
 pub struct LocalChunkManager {
-    chunk: Chunk,
-    neighbours: [Chunk; 8],
+    chunk: Arc<Chunk>,
+    neighbours: [Arc<Chunk>; 8],
 }
 
 impl LocalChunkManager {
-    pub fn new<C: ChunkCache>(chunk: Chunk, chunk_manager: &ChunkManager<C>) -> Self {
+    pub fn new<C: ChunkCache>(chunk: Arc<Chunk>, chunk_manager: &ChunkManager<C>) -> Self {
         let origin = chunk.origin;
 
         Self {
@@ -62,18 +65,18 @@ impl LocalChunkManager {
                 chunk_manager
                     .get_chunk(origin + offset)
                     .cloned()
-                    .unwrap_or_else(|| Chunk::empty().with_origin(origin + offset))
+                    .unwrap_or_else(|| Arc::new(Chunk::empty().with_origin(origin + offset)))
             }),
         }
     }
 
-    pub fn into_inner(self) -> (Chunk, [Chunk; 8]) {
+    pub fn into_inner(self) -> (Arc<Chunk>, [Arc<Chunk>; 8]) {
         (self.chunk, self.neighbours)
     }
 }
 
 impl ChunkAccess for LocalChunkManager {
-    fn get_chunk(&self, origin: IPoint2D) -> Option<&Chunk> {
+    fn get_chunk(&self, origin: IPoint2D) -> Option<&Arc<Chunk>> {
         let delta = origin - self.chunk.origin;
 
         if delta.x == 0 && delta.y == 0 {
@@ -94,7 +97,7 @@ impl ChunkAccess for LocalChunkManager {
         let delta = origin - self.chunk.origin;
 
         if delta.x == 0 && delta.y == 0 {
-            return Some(&mut self.chunk);
+            return Some(Arc::make_mut(&mut self.chunk));
         }
 
         if delta.x.abs() > 1 || delta.y.abs() > 1 {
@@ -104,7 +107,7 @@ impl ChunkAccess for LocalChunkManager {
         let idx = ((delta.x + 1) + (delta.y + 1) * 3) as usize;
         let mapping = [6, 3, 4, 0, 99, 1, 7, 2, 5]; // 99 is a placeholder for center
 
-        Some(&mut self.neighbours[mapping[idx]])
+        Some(Arc::make_mut(&mut self.neighbours[mapping[idx]]))
     }
 
     fn get_block(&self, position: IPoint3D) -> Option<u8> {
@@ -168,7 +171,7 @@ impl ChunkAccess for LocalChunkManager {
         }
     }
 
-    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Arc<Chunk>> {
         self.get_chunk(ChunkManager::<()>::to_local(position))
     }
 
@@ -192,19 +195,24 @@ pub enum ChunkStage {
 #[derive(Debug, Clone)]
 pub struct ChunkManager<C: ChunkCache> {
     cache: C,
-    pub chunks: HashMap<IPoint2D, Chunk>,
+    pub chunks: HashMap<IPoint2D, Arc<Chunk>>,
     pub stages: HashMap<IPoint2D, ChunkStage>,
 }
 
 impl<C: ChunkCache> ChunkManager<C> {
     pub fn new(cache: C) -> Self {
-        let chunks: HashMap<IPoint2D, Chunk> = cache.all().map(|chunk| (chunk.origin, chunk)).collect();
+        let chunks: HashMap<IPoint2D, _> = cache.all().map(|chunk| (chunk.origin, Arc::new(chunk))).collect();
         let stages = chunks.keys().map(|&origin| (origin, ChunkStage::Lighted)).collect();
 
         Self { cache, chunks, stages }
     }
 
     pub fn push(&mut self, chunk: Chunk, stage: ChunkStage) {
+        self.stages.insert(chunk.origin, stage);
+        self.chunks.insert(chunk.origin, Arc::new(chunk));
+    }
+
+    pub fn replace(&mut self, chunk: Arc<Chunk>, stage: ChunkStage) {
         self.stages.insert(chunk.origin, stage);
         self.chunks.insert(chunk.origin, chunk);
     }
@@ -274,7 +282,7 @@ impl<C: ChunkCache> ChunkManager<C> {
     }
 
     pub fn from_range<T: Iterator<Item = i32> + Clone>(mut cache: C, x: T, z: &T) -> Self {
-        let chunks: HashMap<IPoint2D, Chunk> = x
+        let chunks: HashMap<IPoint2D, _> = x
             .flat_map(|x| z.clone().map(move |z| IPoint2D::new(x, z)))
             .map(|origin| {
                 let chunk = cache.get(origin).unwrap_or_else(|| {
@@ -285,7 +293,7 @@ impl<C: ChunkCache> ChunkManager<C> {
                     chunk
                 });
 
-                (origin, chunk)
+                (origin, Arc::new(chunk))
             })
             .collect();
 
@@ -486,16 +494,16 @@ impl<C: ChunkCache> ChunkManager<C> {
     //     Self { chunks }
     // }
 
-    pub fn take_chunks(self) -> impl Iterator<Item = Chunk> {
+    pub fn take_chunks(self) -> impl Iterator<Item = Arc<Chunk>> {
         self.chunks.into_values()
     }
 
-    pub fn chunks(&self) -> impl Iterator<Item = &Chunk> {
+    pub fn chunks(&self) -> impl Iterator<Item = &Arc<Chunk>> {
         self.chunks.values()
     }
 
     pub fn chunks_mut(&mut self) -> impl Iterator<Item = &mut Chunk> {
-        self.chunks.values_mut()
+        self.chunks.values_mut().map(|chunk| Arc::make_mut(chunk))
     }
 
     pub fn save(&mut self) {
@@ -506,12 +514,12 @@ impl<C: ChunkCache> ChunkManager<C> {
 }
 
 impl<C: ChunkCache> ChunkAccess for ChunkManager<C> {
-    fn get_chunk(&self, position: IPoint2D) -> Option<&Chunk> {
+    fn get_chunk(&self, position: IPoint2D) -> Option<&Arc<Chunk>> {
         self.chunks.get(&position)
     }
 
     fn get_chunk_mut(&mut self, position: IPoint2D) -> Option<&mut Chunk> {
-        self.chunks.get_mut(&position)
+        self.chunks.get_mut(&position).map(|chunk| Arc::make_mut(chunk))
     }
 
     fn get_block(&self, position: IPoint3D) -> Option<u8> {
@@ -572,12 +580,12 @@ impl<C: ChunkCache> ChunkAccess for ChunkManager<C> {
         }
     }
 
-    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Chunk> {
+    fn get_chunk_by_block(&self, position: IPoint3D) -> Option<&Arc<Chunk>> {
         self.chunks.get(&Self::to_local(position))
     }
 
     fn get_chunk_by_block_mut(&mut self, position: IPoint3D) -> Option<&mut Chunk> {
-        self.chunks.get_mut(&Self::to_local(position))
+        self.chunks.get_mut(&Self::to_local(position)).map(|chunk| Arc::make_mut(chunk))
     }
 }
 
@@ -597,7 +605,7 @@ impl<C: ChunkCache> Index<IPoint2D> for ChunkManager<C> {
 
 impl<C: ChunkCache> IndexMut<IPoint2D> for ChunkManager<C> {
     fn index_mut(&mut self, index: IPoint2D) -> &mut Self::Output {
-        self.chunks.get_mut(&index).unwrap()
+        Arc::make_mut(self.chunks.get_mut(&index).unwrap())
     }
 }
 
@@ -633,7 +641,7 @@ mod tests {
             let chunk_manager = chunk_manager.local_of(IPoint2D::ZERO)?;
 
             for chunk in chunks {
-                assert_eq!(chunk_manager.get_chunk(chunk.origin), Some(&chunk));
+                assert!(chunk_manager.get_chunk(chunk.origin).is_some_and(|inside| &**inside == &chunk));
             }
 
             Some(())

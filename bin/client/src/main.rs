@@ -67,6 +67,7 @@ use crate::{
     player::{Item, ItemType, PlayerController},
     posteffects::{ParticleSystem, WorldScene, kawase::DualKawase},
     progress::{Progress, ProgressInfo, ProgressSender},
+    scenes::{Screen, loading_overlay::LoadingOverlay},
     util::{aabb_outline, cube_outline, get_movement_direction, get_rotation_directions, vertex_ao},
     world::{EntityData, EntityManager, Weather, World, WorldType},
 };
@@ -199,6 +200,7 @@ struct GameLoop {
     lightmap_atlas: Texture2d,
 
     context: UiContext,
+    overlay: LoadingOverlay,
     current_page: Page,
     progress: Progress,
 
@@ -474,6 +476,9 @@ impl State for GameLoop {
             drpc,
             context: UiContext::new(),
             particles: ParticleSystem::new(display),
+            overlay: LoadingOverlay {
+                progress: TypedTransition::new(0.0, 1.0, 1000, Curve::LINEAR, RepeatMode::Once),
+            },
         }
     }
 
@@ -551,25 +556,15 @@ impl State for GameLoop {
                             affected_chunks.push(chunk + offset);
                         }
 
-                        if subchunk_y == 0 && subchunk_idx > 0 {
-                            _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx - 1));
-                        } else if subchunk_y == const { SUBCHUNK_SIZE - 1 } && subchunk_idx < const { SUBCHUNK_COUNT - 1 } {
-                            _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx + 1));
-                        }
-
                         for chunk in affected_chunks {
-                            if subchunk_idx < const { SUBCHUNK_COUNT - 1 } {
-                                _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx + 1));
-                            }
-
-                            _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx));
-
-                            if subchunk_idx > 0 {
-                                _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx - 1));
+                            if let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk) {
+                                chunk.dirty = true;
                             }
                         }
 
-                        _ = self.action_sender.send(Action::UpdateSubChunkMesh(chunk, subchunk_idx));
+                        if let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk) {
+                            chunk.dirty = true;
+                        }
 
                         let provider = AabbProvider {
                             chunk_manager: &world.chunk_manager,
@@ -619,6 +614,16 @@ impl State for GameLoop {
     #[allow(clippy::too_many_lines, clippy::significant_drop_tightening)]
     fn update(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration) {
         self.accel += delta;
+
+        self.overlay.update(delta);
+
+        if let Some(info) = &self.progress.info {
+            self.overlay.progress.to(info.completed as f32 / info.total as f32);
+
+            if self.overlay.progress.is_finished() {
+                self.overlay.progress.reset();
+            }
+        }
 
         self.progress
             .update(&mut self.animation_player, &self.texture_atlas, &self.lightmap_atlas, &self.resource_manager);
@@ -1539,6 +1544,8 @@ Rendered vertices: {vertices}",
                     });
                 });
             }
+
+            self.overlay.draw(&mut root);
 
             drop(root);
 

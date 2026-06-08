@@ -7,7 +7,7 @@ use glium::{
     uniform,
 };
 use meralus_graphics::{Shader, impl_vertex};
-use meralus_physics::{AabbSource, PhysicsBody, PhysicsContext};
+use meralus_physics::{AabbSource, PhysicsBody, PhysicsContext, RayCastResult};
 use meralus_shared::{Color, Point2D, Point3D, Size3D, Transform3D, Vector3D};
 
 pub mod kawase;
@@ -141,9 +141,34 @@ impl ParticleSystem {
         let mut mapping = self.particle_instances.map();
 
         for (body, particle) in self.particles.iter_mut().zip(mapping.iter_mut()) {
-            // context.physics_step(body, delta);
+            body.velocity += Vector3D::Z * -3.8 * delta;
 
-            particle.world_position.y += 0.001;
+            let origin = body.position.as_();
+            let speed = body.velocity.length();
+
+            let (dist, norm) = context
+                .raycast(origin, origin + body.velocity.as_() * delta as f64, true)
+                .filter(RayCastResult::is_block)
+                .map_or((0.0, Vector3D::ZERO), |raycast| {
+                    (
+                        body.position.distance(raycast.position.as_()),
+                        raycast.hit_side.as_normal().to_vector().as_::<f32>(),
+                    )
+                });
+
+            if dist <= speed * delta {
+                const BOUNCENESS: f32 = 0.05;
+                const DAMPENING: f32 = 0.05;
+
+                body.position += body.velocity / speed * (dist - 0.001);
+                body.velocity = (body.velocity.reflect(norm) * 0.5f32.mul_add(BOUNCENESS, 0.5) + body.velocity * 0.5f32.mul_add(-BOUNCENESS, 0.5)).normalize()
+                    * speed
+                    * DAMPENING;
+            } else {
+                body.position += body.velocity * delta;
+            }
+
+            particle.world_position += body.position;
         }
     }
 

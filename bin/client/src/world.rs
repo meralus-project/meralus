@@ -299,13 +299,13 @@ enum JobResult {
     },
     /// Populated terrain with lakes, trees, etc.
     Population {
-        chunk: Chunk,
-        neighbours: [Chunk; 8],
+        chunk: Arc<Chunk>,
+        neighbours: [Arc<Chunk>; 8],
     },
     /// Populated terrain with lights.
     Lightning {
-        chunk: Chunk,
-        neighbours: [Chunk; 8],
+        chunk: Arc<Chunk>,
+        neighbours: [Arc<Chunk>; 8],
     },
     Meshing {
         origin: IPoint2D,
@@ -448,8 +448,6 @@ pub struct World {
 
     pub chat_history: Vec<String>,
 
-    pub current_task: Option<()>,
-
     #[allow(dead_code)]
     pub ty: WorldType,
     pub resource_storage: Arc<ResourceStorage>,
@@ -484,7 +482,6 @@ impl World {
             ty,
             entities: EntityManager::new(resource_storage),
             seed: 0,
-            current_task: None,
             marked: None,
         }
     }
@@ -528,6 +525,10 @@ impl World {
                 if let Some(chunk) = self.chunk_manager.get_chunk_mut(chunk) {
                     chunk.dirty = true;
                 }
+            }
+
+            if let Some(chunk) = self.chunk_manager.get_chunk_mut(origin) {
+                chunk.dirty = true;
             }
         }
     }
@@ -657,17 +658,17 @@ impl World {
                 }
                 JobResult::Population { chunk, neighbours } => {
                     self.job_manager.jobs.remove(&chunk.origin);
-                    self.chunk_manager.push(chunk, ChunkStage::Populated);
+                    self.chunk_manager.replace(chunk, ChunkStage::Populated);
 
                     for chunk in neighbours {
                         self.job_manager.jobs.remove(&chunk.origin);
 
-                        self.chunk_manager.push(chunk, ChunkStage::Populated);
+                        self.chunk_manager.replace(chunk, ChunkStage::Populated);
                     }
                 }
                 JobResult::Lightning { chunk, neighbours } => {
                     self.job_manager.jobs.remove(&chunk.origin);
-                    self.chunk_manager.push(chunk, ChunkStage::Lighted);
+                    self.chunk_manager.replace(chunk, ChunkStage::Lighted);
 
                     for chunk in neighbours {
                         self.job_manager.jobs.remove(&chunk.origin);
@@ -747,7 +748,7 @@ impl World {
                     queue.push((origin, ChunkStage::MeshingInProgress));
                 }
                 ChunkStage::Meshed
-                    if self.chunk_manager.neighbours_at_least(origin, ChunkStage::Meshed)
+                    if self.chunk_manager.neighbours_at_least(origin, ChunkStage::Lighted)
                         && self.chunk_manager.get_chunk(origin).is_some_and(|chunk| chunk.dirty)
                         && !self.job_manager.jobs.contains(&origin) =>
                 {
@@ -798,15 +799,14 @@ impl World {
                 for origin in chunks {
                     self.job_manager.spawn_generation_job(self.seed, origin, self.resource_storage.clone());
                     self.job_manager.jobs.insert(origin);
-                    self.current_task.replace(());
                 }
             }
         }
     }
 
     pub fn chunk_borders(&self, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
-        self.chunk_manager.chunks().fold(Vec::new(), |mut lines, Chunk { origin, .. }| {
-            let origin = origin.as_::<f32>() * SUBCHUNK_SIZE_F32;
+        self.chunk_manager.chunks().fold(Vec::new(), |mut lines, chunk| {
+            let origin = chunk.origin.as_::<f32>() * SUBCHUNK_SIZE_F32;
 
             lines.extend(cube_outline(
                 Cube3D::new(

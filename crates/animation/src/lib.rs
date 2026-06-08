@@ -325,7 +325,7 @@ impl<T: Lerp + Clone> TypedTransition<T> {
         self.destination = value;
     }
 
-    pub fn get(&self) -> &T {
+    pub const fn get(&self) -> &T {
         &self.value
     }
 

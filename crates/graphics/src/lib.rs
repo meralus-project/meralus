@@ -21,13 +21,17 @@ use glium::{
     vertex::VertexBufferSlice,
 };
 use meralus_engine::WindowDisplay;
+use meralus_shared::Rect2D;
 
 #[cfg(feature = "shape-rendering")]
 pub use self::common::{CommonTessellator, Path};
 #[cfg(feature = "voxel-rendering")] pub use self::voxel::*;
 pub use self::{
     common::{CommonRenderer, CommonVertex, ObjectFit},
-    context::{ArrangeStrategy, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, WidgetId, WidgetState},
+    context::{
+        ArrangeStrategy, Arrangement, CenterStrategy, ColumnStrategy, MeasureStrategy, RenderContext, RenderInfo, RowStrategy, SingleChildStrategy, UiContext,
+        UiSubcontext, WidgetId, WidgetState,
+    },
 };
 
 pub const FONT: &[u8] = include_bytes!("../../../resources/fonts/Monocraft.ttf");
@@ -182,5 +186,20 @@ impl<V, I> VertexBuffers<V, I> {
 impl<V, I> Default for VertexBuffers<V, I> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+pub trait Rect2DExt {
+    fn padding(self, value: f32) -> Self;
+}
+
+impl Rect2DExt for Rect2D {
+    fn padding(mut self, value: f32) -> Self {
+        self.origin.x += value;
+        self.origin.y += value;
+        self.size.width -= value * 2.0;
+        self.size.height -= value * 2.0;
+
+        self
     }
 }

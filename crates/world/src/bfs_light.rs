@@ -119,7 +119,7 @@ impl<'a, C: ChunkAccess> BfsLight<'a, C> {
                     let skip_decrease = self.is_sky_light && face == Face::Bottom && light_level == 15;
 
                     if !block_source.blocks_light(block) && chunk.get_light(position, self.is_sky_light) + 2 <= light_level {
-                        chunk.set_light(position, self.is_sky_light, light_level - u8::from(!skip_decrease));
+                        chunk.set_light(position, self.is_sky_light, light_level - block_source.light_consumption(block) - u8::from(!skip_decrease));
 
                         self.addition_queue.push_back(LightNode(position, chunk.origin));
                     }

@@ -93,8 +93,14 @@ impl MeasureStrategy for RowStrategy {
     }
 }
 
+pub enum Arrangement {
+    Start,
+    End,
+}
+
 pub struct ColumnStrategy {
     spacing: f32,
+    arrangement: Arrangement,
 }
 
 impl ArrangeStrategy for ColumnStrategy {
@@ -108,6 +114,16 @@ impl ArrangeStrategy for ColumnStrategy {
                 context.translate(w, offset);
 
                 offset += Vector2D::new(0.0, item_size.height + self.spacing);
+            }
+        }
+
+        if matches!(self.arrangement, Arrangement::End) {
+            let offset = Point2D::Y * (context.layout_node(widget).size.height - offset.y);
+
+            for w in widget.into_iter(context.all_children(widget)) {
+                if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
+                    context.translate(w, offset);
+                }
             }
         }
     }
@@ -398,6 +414,10 @@ impl UiSubcontext<'_, RowStrategy, RowStrategy> {
 }
 
 impl UiSubcontext<'_, ColumnStrategy, ColumnStrategy> {
+    pub const fn set_arrangement(&mut self, arrangement: Arrangement) {
+        self.arrange_strategy.arrangement = arrangement;
+    }
+
     pub const fn set_spacing(&mut self, pixels: f32) {
         self.arrange_strategy.spacing = pixels;
         self.measure_strategy.spacing = pixels;
@@ -531,7 +551,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
     }
 
     pub fn column(&mut self, ui: impl FnOnce(&mut UiSubcontext<'_, ColumnStrategy, ColumnStrategy>)) {
-        self.scope(ColumnStrategy { spacing: 0.0 }, ColumnStrategy { spacing: 0.0 }, ui);
+        self.scope(ColumnStrategy { spacing: 0.0, arrangement: Arrangement::Start }, ColumnStrategy { spacing: 0.0, arrangement: Arrangement::Start }, ui);
     }
 
     pub fn center(&mut self, ui: impl FnOnce(&mut UiSubcontext<'_, CenterStrategy, SingleChildStrategy>)) {

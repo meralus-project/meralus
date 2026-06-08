@@ -404,7 +404,31 @@ impl VoxelRenderer {
                             let mut new_solid_indices = Vec::new();
                             let mut new_translucent_indices = Vec::new();
 
-                            // generate chunk rendering data if any of subchunks are dirty or now visible
+                            // generate chunk rendering data if any of subchunks are dirty
+
+                            if entry.subchunk_states.iter().any(|state| matches!(state, SubchunkState::Dirty)) {
+                                let mut solid_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+                                let mut translucent_faces = Vec::with_capacity(rendered_subchunks * SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE * 6);
+
+                                for (subchunk_idx, subchunk) in subchunks.iter_mut().enumerate() {
+                                    entry.subchunk_slices[subchunk_idx].solid_start = solid_faces.len() as u32;
+                                    entry.subchunk_slices[subchunk_idx].solid_count = subchunk[0].len() as u32;
+                                    entry.subchunk_slices[subchunk_idx].translucent_start = translucent_faces.len() as u32;
+                                    entry.subchunk_slices[subchunk_idx].translucent_count = subchunk[1].len() as u32;
+
+                                    solid_faces.extend_from_slice(&subchunk[0]);
+                                    translucent_faces.extend_from_slice(&subchunk[1]);
+                                }
+
+                                let (solid_vertices, solid_indices) = Self::get_voxels_mesh(&solid_faces);
+                                let (translucent_vertices, translucent_indices) = Self::get_voxels_mesh(&translucent_faces);
+
+                                entry.solid_indices = solid_indices;
+                                entry.translucent_indices = translucent_indices;
+                                entry.solid_buffer.vertices = VertexBuffer::new(&self.display, &solid_vertices).unwrap();
+                                entry.translucent_buffer.vertices = VertexBuffer::new(&self.display, &translucent_vertices).unwrap();
+                            }
+
                             for (state, subchunk) in subchunk_states.iter().zip(&entry.subchunk_slices) {
                                 if state.is_rendered() {
                                     let start = subchunk.solid_start * 6;
