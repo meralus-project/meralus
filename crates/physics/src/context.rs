@@ -27,7 +27,7 @@ impl<T: AabbSource> PhysicsContext<T> {
         }
 
         let offset = Vector3D::new(0.0, step_height, 0.0);
-        let max_y = (((half.to_vector() - offset * 0.5)[NY] - Self::E) * 2.0 / Self::S) as i32;
+        let max_y = (((half - offset * 0.5)[NY] - Self::E) * 2.0 / Self::S) as i32;
 
         for iy in 0..=max_y {
             let mut coord = Point3D::ZERO;
@@ -63,7 +63,7 @@ impl<T: AabbSource> PhysicsContext<T> {
         }
 
         let offset = Vector3D::new(0.0, step_height, 0.0);
-        let max_y = (((half.to_vector() - offset * 0.5)[NY] - Self::E) * 2.0 / Self::S) as i32;
+        let max_y = (((half - offset * 0.5)[NY] - Self::E) * 2.0 / Self::S) as i32;
 
         for iy in 0..=max_y {
             let mut coord = Point3D::ZERO;
@@ -93,13 +93,13 @@ impl<T: AabbSource> PhysicsContext<T> {
 
     fn calc_step_height(&self, pos: Point3D, half: Size3D, step_height: f32) -> f32 {
         if step_height > 0.0 {
-            for ix in 0..=((half.width - Self::E) * 2.0 / Self::S) as i32 {
-                let x = (ix as f32).mul_add(Self::S, pos.x - half.width + Self::E);
+            for ix in 0..=((half.x - Self::E) * 2.0 / Self::S) as i32 {
+                let x = (ix as f32).mul_add(Self::S, pos.x - half.x + Self::E);
 
-                for iz in 0..=((half.depth - Self::E) * 2.0 / Self::S) as i32 {
-                    let z = (iz as f32).mul_add(Self::S, pos.z - half.depth + Self::E);
+                for iz in 0..=((half.z - Self::E) * 2.0 / Self::S) as i32 {
+                    let z = (iz as f32).mul_add(Self::S, pos.z - half.z + Self::E);
 
-                    if self.is_obstacle(Point3D::new(x, pos.y + half.height + step_height, z)).is_some() {
+                    if self.is_obstacle(Point3D::new(x, pos.y + half.y + step_height, z)).is_some() {
                         return 0.0;
                     }
                 }
@@ -122,17 +122,17 @@ impl<T: AabbSource> PhysicsContext<T> {
         }
 
         if step_height > 0.0 && body.velocity.y <= 0.0 {
-            for ix in 0..=((half.width - Self::E) * 2.0 / Self::S) as i32 {
-                let x = (ix as f32).mul_add(Self::S, body.position.x - half.width + Self::E);
+            for ix in 0..=((half.x - Self::E) * 2.0 / Self::S) as i32 {
+                let x = (ix as f32).mul_add(Self::S, body.position.x - half.x + Self::E);
 
-                for iz in 0..=((half.depth - Self::E) * 2.0 / Self::S) as i32 {
-                    let z = (iz as f32).mul_add(Self::S, body.position.z - half.depth + Self::E);
-                    let y = body.position.y - half.height + Self::E;
+                for iz in 0..=((half.z - Self::E) * 2.0 / Self::S) as i32 {
+                    let z = (iz as f32).mul_add(Self::S, body.position.z - half.z + Self::E);
+                    let y = body.position.y - half.y + Self::E;
 
                     if let Some(aabb) = self.is_obstacle(Point3D::new(x, y, z)) {
                         body.velocity.y = 0.0;
 
-                        let newy = y.floor() + aabb.max.y as f32 + half.height;
+                        let newy = y.floor() + aabb.max.y as f32 + half.y;
 
                         if (newy - body.position.y).abs() <= Self::MAX_FIX + step_height {
                             body.position.y = newy;
@@ -145,17 +145,17 @@ impl<T: AabbSource> PhysicsContext<T> {
         }
 
         if body.velocity.y > 0.0 {
-            for ix in 0..=((half.width - Self::E) * 2.0 / Self::S) as i32 {
-                let x = (ix as f32).mul_add(Self::S, body.position.x - half.width + Self::E);
+            for ix in 0..=((half.x - Self::E) * 2.0 / Self::S) as i32 {
+                let x = (ix as f32).mul_add(Self::S, body.position.x - half.x + Self::E);
 
-                for iz in 0..=((half.depth - Self::E) * 2.0 / Self::S) as i32 {
-                    let z = (iz as f32).mul_add(Self::S, body.position.z - half.depth + Self::E);
-                    let y = body.position.y + half.height + Self::E;
+                for iz in 0..=((half.z - Self::E) * 2.0 / Self::S) as i32 {
+                    let z = (iz as f32).mul_add(Self::S, body.position.z - half.z + Self::E);
+                    let y = body.position.y + half.y + Self::E;
 
                     if let Some(aabb) = self.is_obstacle(Point3D::new(x, y, z)) {
                         body.velocity.y = 0.0;
 
-                        let newy = y.floor() - half.height + aabb.min.y as f32 - Self::E;
+                        let newy = y.floor() - half.y + aabb.min.y as f32 - Self::E;
 
                         if (newy - body.position.y).abs() <= Self::MAX_FIX {
                             body.position.y = newy;

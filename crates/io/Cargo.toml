@@ -1,0 +1,13 @@
+[package]
+name = "meralus-io"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ahash.workspace = true
+meralus-shared = { workspace = true, features = ["geometry", "face", "serde"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

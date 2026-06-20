@@ -1,10 +1,5 @@
 use std::{borrow::Cow, mem::replace, sync::mpsc};
 
-use glium::{
-    Rect, Texture2d,
-    texture::{ClientFormat, RawImage2d},
-};
-use meralus_animation::AnimationPlayer;
 use meralus_storage::ResourceStorage;
 
 pub enum ProgressChange {
@@ -50,7 +45,7 @@ impl Progress {
         }
     }
 
-    pub fn update(&mut self, animation: &mut AnimationPlayer, texture: &Texture2d, lightmap: &Texture2d, resource_manager: &ResourceStorage) {
+    pub fn update(&mut self, texture: &Texture2d, lightmap: &Texture2d, resource_manager: &ResourceStorage) {
         if let Ok(info) = self.receiver.try_recv() {
             match info {
                 ProgressChange::SetInitialInfo(info) => {
@@ -64,35 +59,41 @@ impl Progress {
 
                         let previous_tasks = replace(&mut info.total, tasks);
 
-                        animation.play_transition_to("stage-progress", info.current_stage as f32 / info.total_stages as f32);
-                        animation.play_transition_to("stage-substage-progress", 0.0);
+                        // animation.play_transition_to("stage-progress", info.current_stage as f32 /
+                        // info.total_stages as f32);
+                        // animation.play_transition_to("stage-substage-progress", 0.0);
 
                         {
-                            let anim = animation.get_mut_unchecked("stage-previous-progress");
+                            // let anim =
+                            // animation.get_mut_unchecked("
+                            // stage-previous-progress");
 
-                            anim.set_value((previous_tasks - 1) as f32 / previous_tasks as f32);
-                            anim.to(1.0);
+                            // anim.set_value((previous_tasks - 1) as f32 /
+                            // previous_tasks as f32);
+                            // anim.to(1.0);
                         };
 
-                        animation.play("stage-previous-progress");
-                        animation.play("stage-substage-translation");
+                        // animation.play("stage-previous-progress");
+                        // animation.play("stage-substage-translation");
                     }
                 }
                 ProgressChange::TaskCompleted => {
                     if let Some(info) = &mut self.info {
                         info.completed += 1;
 
-                        animation.play_transition_to("stage-substage-progress", info.completed as f32 / info.total as f32);
+                        // animation.play_transition_to("
+                        // stage-substage-progress", info.completed as f32 /
+                        // info.total as f32);
                     }
                 }
                 ProgressChange::SetVisible(visible) => {
                     self.visible = visible;
 
-                    animation.play_transition_to("progress-opacity", f32::from(visible));
+                    // animation.play_transition_to("progress-opacity", f32::from(visible));
 
                     if visible {
-                        animation.play("text-scaling");
-                        animation.play("shape-morph");
+                        // animation.play("text-scaling");
+                        // animation.play("shape-morph");
                     }
 
                     if !visible {

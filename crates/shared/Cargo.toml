@@ -4,17 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-glam = { version = "0.30.10", features = ["serde", "bytemuck"] }
-glamour = { version = "0.18.0", features = ["serde"] }
+glam = { version = "0.30.10", features = ["bytemuck"], optional = true }
 serde = { workspace = true, optional = true }
-lyon_tessellation = { version = "1.0.16", optional = true }
-
-[dev-dependencies]
-lyon_tessellation = "1.0.16"
 
 [features]
 default = []
-lyon-path-api = ["dep:lyon_tessellation"]
+color = []
+convert = []
+face = []
+frustum = []
+geometry = ["dep:glam"]
+lerp = []
+random = []
+serde = ["dep:serde", "glam?/serde"]
 
 [lints]
 workspace = true

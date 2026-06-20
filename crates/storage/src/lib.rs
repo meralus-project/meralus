@@ -75,10 +75,11 @@ impl ResourceStorage {
         if let Some(path) = self.mappings.get(mapping) {
             let path = path.join("models").join(id).with_extension("json");
 
-            self.models.load(&mut self.textures, &self.mappings, path).unwrap();
+            let model = self.models.load(&mut self.textures, &self.mappings, path).unwrap();
+
+            self.blocks.register(format!("{mapping}:{id}"), block, model);
         }
 
-        self.blocks.register(block);
     }
 
     pub fn load_entity_model<T: AsRef<str>>(&mut self, mapping: &str, id: T) -> usize {
@@ -140,8 +141,8 @@ impl ResourceStorage {
         self.textures.get_texture(name.as_ref())
     }
 
-    pub fn get_block(&self, id: usize) -> Option<&dyn Block> {
-        self.blocks.get(id)
+    pub fn get_block(&self, id: &str) -> Option<&dyn Block> {
+        self.blocks.get(self.blocks.get_by_name(id))
     }
 
     pub fn debug_save(&self) {
@@ -219,11 +220,11 @@ impl BlockSource for ResourceStorage {
         self.blocks.get_by_name(name) as u8
     }
 
-    fn blocks_light(&self, block: u8) -> bool {
-        unsafe { self.blocks.get(block as usize).unwrap_unchecked() }.blocks_light()
+    fn blocks_light(&self, block: &str) -> bool {
+        unsafe { self.blocks.get(self.blocks.get_by_name(block)).unwrap_unchecked() }.blocks_light()
     }
 
-    fn light_consumption(&self, block: u8) -> u8 {
-        unsafe { self.blocks.get(block as usize).unwrap_unchecked() }.consume_light_level()
+    fn light_consumption(&self, block: &str) -> u8 {
+        unsafe { self.blocks.get(self.blocks.get_by_name(block)).unwrap_unchecked() }.consume_light_level()
     }
 }

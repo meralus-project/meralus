@@ -1,19 +1,8 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
-use std::{
-    num::NonZeroU32,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
-use glium::Display;
-use glutin::{
-    config::ConfigTemplateBuilder,
-    context::{ContextApi, ContextAttributesBuilder},
-    display::GetGlDisplay,
-    prelude::{GlDisplay, GlSurface, NotCurrentGlContext},
-    surface::{SurfaceAttributesBuilder, WindowSurface},
-};
-use glutin_winit::DisplayBuilder;
+use horns::RenderBackend;
 use meralus_shared::{InspectMut, Point2D, USize2D, Vector2D};
 use winit::{
     application::ApplicationHandler,
@@ -21,12 +10,10 @@ use winit::{
     event::{DeviceEvent, DeviceId, MouseScrollDelta, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::PhysicalKey,
-    raw_window_handle::HasWindowHandle,
+    raw_window_handle::{HasDisplayHandle, HasWindowHandle},
     window::{Window, WindowId},
 };
 pub use winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode};
-
-pub type WindowDisplay = Display<WindowSurface>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct WindowContext<'a> {
@@ -76,28 +63,23 @@ pub struct KeyboardModifiers {
 pub trait State {
     type Args;
 
-    fn new(context: WindowContext, display: &WindowDisplay, args: Self::Args) -> Self;
+    fn new(context: WindowContext, display: &RenderBackend, args: Self::Args) -> Self;
 
-    fn handle_window_resize(&mut self, display: &WindowDisplay, size: USize2D, scale_factor: f64) {}
+    fn handle_window_resize(&mut self, display: &RenderBackend, size: USize2D, scale_factor: f64) {}
     fn handle_keyboard_modifiers(&mut self, modifiers: KeyboardModifiers) {}
     fn handle_keyboard_input(&mut self, key: KeyCode, is_pressed: bool, repeat: bool) {}
     fn handle_mouse_motion(&mut self, delta: Option<Vector2D>, position: Option<Point2D>) {}
     fn handle_mouse_wheel(&mut self, delta: Vector2D) {}
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
-    // /// Runs every 50ms
-    // fn tick(&mut self, event_loop: &ActiveEventLoop, display: &WindowDisplay,
-    // delta: Duration) {} /// Runs every 16.66ms
-    // fn fixed_update(&mut self, event_loop: &ActiveEventLoop, display:
-    // &WindowDisplay, delta: f32) {}
-    fn update(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration) {}
-    fn render(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration);
+    fn update(&mut self, context: WindowContext, display: &RenderBackend, delta: Duration) {}
+    fn render(&mut self, context: WindowContext, display: &RenderBackend, delta: Duration);
 }
 
 pub struct ApplicationWindow<T: State> {
     state: T,
     window: Window,
-    display: WindowDisplay,
+    backend: RenderBackend,
     last_time: Option<Instant>,
     delta: Duration,
 }
@@ -141,54 +123,15 @@ impl<T: State> ApplicationWindow<T> {
     #[allow(clippy::missing_panics_doc)]
     pub fn new(event_loop: &ActiveEventLoop, args: T::Args) -> Self {
         let window_attrs = Window::default_attributes().with_transparent(false);
-
-        let template_builder = ConfigTemplateBuilder::new().with_transparency(true);
-        let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attrs));
-
-        let (window, gl_config) = display_builder
-            .build(event_loop, template_builder, |mut configs| {
-                configs.next().expect("failed to retrieve configuration")
-            })
-            .expect("failed to build display");
-
-        let window = window.expect("failed to get window");
-
-        let window_handle = window.window_handle().expect("failed to get window handle");
-        let context_attrs = ContextAttributesBuilder::new().build(Some(window_handle.into()));
-        let fallback_context_attrs = ContextAttributesBuilder::new()
-            .with_context_api(ContextApi::Gles(None))
-            .build(Some(window_handle.into()));
-
-        let gl_context = unsafe {
-            gl_config.display().create_context(&gl_config, &context_attrs).unwrap_or_else(|_| {
-                gl_config
-                    .display()
-                    .create_context(&gl_config, &fallback_context_attrs)
-                    .expect("failed to create context")
-            })
-        };
-
+        let window = event_loop.create_window(window_attrs).expect("failed to create window");
         let (width, height): (u32, u32) = window.inner_size().into();
-        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-            window_handle.into(),
-            NonZeroU32::new(width).expect("failed to create window width"),
-            NonZeroU32::new(height).expect("failed to create window height"),
-        );
-
-        let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).expect("failed to create surface") };
-        let current_context = gl_context.make_current(&surface).expect("failed to obtain opengl context");
-
-        surface.set_swap_interval(&current_context, glutin::surface::SwapInterval::DontWait).unwrap();
-
-        let display = Display::from_context_surface(current_context, surface).expect("failed to create display from context and surface");
+        let backend = RenderBackend::new(window.display_handle().unwrap(), window.window_handle().unwrap(), width, height).unwrap();
 
         Self {
-            state: T::new(WindowContext::new(event_loop, &window), &display, args),
+            state: T::new(WindowContext::new(event_loop, &window), &backend, args),
             window,
-            display,
+            backend,
             last_time: None,
-            // tick_acceleration: Duration::ZERO,
-            // fixed_acceleration: Duration::ZERO,
             delta: Duration::ZERO,
         }
     }
@@ -208,10 +151,10 @@ impl<T: State> ApplicationHandler for Application<T> {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::Resized(physical_size) => self.window.inspect_mut(move |window| {
-                window.display.resize(physical_size.into());
+                _ = window.backend.resize(physical_size.width, physical_size.height);
 
                 window.state.handle_window_resize(
-                    &window.display,
+                    &window.backend,
                     USize2D::new(physical_size.width, physical_size.height),
                     window.window.scale_factor(),
                 );
@@ -270,24 +213,15 @@ impl<T: State> ApplicationHandler for Application<T> {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         self.window.inspect_mut(|window| {
-            // let update = Instant::now();
+            window
+                .state
+                .update(WindowContext::new(event_loop, &window.window), &window.backend, window.delta);
 
             window
                 .state
-                .update(WindowContext::new(event_loop, &window.window), &window.display, window.delta);
-
-            // println!("update took {:?}", update.elapsed());
-
-            // let render = Instant::now();
-
-            window
-                .state
-                .render(WindowContext::new(event_loop, &window.window), &window.display, window.delta);
-
-            // println!("render took {:?}", render.elapsed());
+                .render(WindowContext::new(event_loop, &window.window), &window.backend, window.delta);
 
             window.delta = window.last_time.map_or_else(|| Duration::ZERO, |last_time| last_time.elapsed());
-
             window.last_time.replace(Instant::now());
         });
     }

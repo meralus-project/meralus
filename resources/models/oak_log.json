@@ -1,0 +1,39 @@
+{
+  "$schema": "../../schemas/model.json",
+  "textures": {
+    "#vertical": "game:oak_log_top",
+    "#side": "game:oak_log_side"
+  },
+  "elements": [
+    {
+      "start": [0, 0, 0],
+      "end": [1, 1, 1],
+      "faces": {
+        "top": {
+          "texture": "#vertical",
+          "cull_face": "top"
+        },
+        "bottom": {
+          "texture": "#vertical",
+          "cull_face": "bottom"
+        },
+        "left": {
+          "texture": "#side",
+          "cull_face": "left"
+        },
+        "right": {
+          "texture": "#side",
+          "cull_face": "right"
+        },
+        "front": {
+          "texture": "#side",
+          "cull_face": "front"
+        },
+        "back": {
+          "texture": "#side",
+          "cull_face": "back"
+        }
+      }
+    }
+  ]
+}

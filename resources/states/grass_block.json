@@ -1,4 +1,9 @@
 {
-    "model": "game:models/grass_block",
-    "variants": []
+  "model": "game:models/grass_block",
+  "variants": [
+    {
+      "when": { "snowy": "huh", "dusted": 99, "hello": true },
+      "model": "game:models/grass_block_snowy"
+    }
+  ]
 }

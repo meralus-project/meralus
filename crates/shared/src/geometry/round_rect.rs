@@ -1,4 +1,4 @@
-use super::{Box2D, Point2D, Rect2D, Size2D, Thickness};
+use super::{Box2D, Point2D, Rect, Size2D, Thickness};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RRect2D {
@@ -21,29 +21,29 @@ impl RRect2D {
         Self { origin, size, corner_radius }
     }
 
-    pub const fn as_rect(&self) -> Rect2D {
-        Rect2D {
+    pub const fn as_rect(&self) -> Rect {
+        Rect {
             origin: self.origin,
             size: self.size,
         }
     }
 
     pub const fn width(&self) -> f32 {
-        self.size.width
+        self.size.x
     }
 
     pub const fn height(&self) -> f32 {
-        self.size.height
+        self.size.y
     }
 
     pub fn center(&self) -> Point2D {
-        self.origin + self.size.to_vector() / 2.0
+        self.origin + self.size / 2.0
     }
 
     pub fn as_box(&self) -> Box2D {
         Box2D {
             min: self.origin,
-            max: self.origin + self.size.to_vector(),
+            max: self.origin + self.size,
         }
     }
 

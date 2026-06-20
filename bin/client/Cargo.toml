@@ -6,33 +6,34 @@ edition = "2024"
 [features]
 default = []
 addons = ["dep:meralus-addons"]
-multiplayer = ["dep:meralus-network"]
+multiplayer = ["dep:meralus-network", "dep:tokio"]
 
 [dependencies]
-ahash.workspace = true
-cpal = { version = "0.17.3", features = ["jack"] }
-crossbeam-channel = "0.5.15"
-discord-presence = "3.2.0"
-glium.workspace = true
-jack = "0.13.5"
-kira = "0.12.1"
 meralus-addons = { workspace = true, optional = true }
-meralus-animation.workspace = true
 meralus-engine.workspace = true
-meralus-graphics = { workspace = true, features = [
-    "all-basic-rendering",
-    "voxel-rendering",
-] }
 meralus-network = { workspace = true, optional = true }
 meralus-physics.workspace = true
 meralus-shared.workspace = true
 meralus-storage.workspace = true
+meralus-tween.workspace = true
 meralus-world.workspace = true
-rayon = "1.12.0"
+meralus-worldgen.workspace = true
+
+ahash.workspace = true
 serde.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+horns.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"], optional = true }
+
+cpal = { version = "0.17.3", features = ["jack"] }
+crossbeam-channel = "0.5.15"
+discord-presence = "3.2.0"
+jack = "0.13.5"
+kira = "0.12.1"
+rayon = "1.12.0"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
+tracy-client = { version = "0.18.4", features = ["demangle"] }
+bytemuck = { version = "1.25.0", features = ["derive"] }
 
 [lints]
 workspace = true

@@ -46,8 +46,8 @@ impl PhysicsBody {
     }
 
     pub fn aabb(&self) -> Aabb {
-        let half_size = self.size.to_vector() / 2.0;
+        let half_size = self.size / 2.0;
 
-        Aabb::new((self.position - half_size).as_::<f64>(), (self.position + half_size).as_::<f64>())
+        Aabb::new((self.position - half_size).as_dvec3(), (self.position + half_size).as_dvec3())
     }
 }

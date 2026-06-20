@@ -12,55 +12,38 @@ mod camera;
 mod clock;
 mod input;
 mod player;
-mod posteffects;
 mod progress;
+mod render;
 mod scenes;
 mod util;
 mod world;
 
 use std::{
     env::consts::{ARCH, OS},
-    f32, fmt, fs,
+    f32, fmt,
     path::PathBuf,
     sync::{Arc, mpsc},
     time::Duration,
 };
 
-use ahash::HashMap;
 use cpal::traits::HostTrait;
 use discord_presence::models::{ActivityType, DisplayType};
-use glium::{
-    Surface, Texture2d,
-    texture::MipmapsOption,
-    uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
-};
-use kira::{
-    AudioManager, AudioManagerSettings,
-    backend::cpal::CpalBackendSettings,
-    sound::{
-        PlaybackState,
-        static_sound::{StaticSoundData, StaticSoundHandle},
-    },
-};
-use meralus_animation::{AnimationPlayer, Curve, FinishBehaviour, RepeatMode, RestartBehaviour, Transition, TypedTransition};
+use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use meralus_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext, WindowDisplay};
-use meralus_graphics::{
-    ArrangeStrategy, CommonRenderer, CommonVertex, FONT, FONT_BOLD, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, VoxelFace,
-    VoxelMeshBuilder, WidgetState,
-};
 use meralus_physics::{Aabb, AabbSource, PhysicsContext};
 use meralus_shared::{
-    Angle, Color, Cube3D, IPoint2D, IPoint3D, Lerp, MatrixExt, Point2D, Point3D, Quat, RRect2D, Rect2D, Size2D, Thickness, Transform3D, USize2D, USizePoint3D,
+    Angle, Color, IPoint2D, IPoint3D, Lerp, MatrixExt, Point2D, Point3D, Quat, RRect2D, Rect2D, Size2D, Thickness, Transform3D, USize2D, USizePoint3D,
     Vector2D, Vector3D,
 };
 use meralus_storage::{Block, ResourceStorage, TextureStorage};
-use meralus_world::{BfsLight, BlockSource, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SUBCHUNK_COUNT, SUBCHUNK_SIZE};
+use meralus_world::{BfsLight, BlockSource, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SubChunkBlockState};
 use tracing::info;
+use tracy_client::{set_thread_name, span};
 
 use crate::{
     blocks::{
-        AirBlock, BlueRoseBlock, BricksBlock, CobbleStoneBlock, DebugBlock, DirtBlock, GrassBlock, GreenGlassBlock, IceBlock, OakLeavesBlock, RoseBlock,
-        SandBlock, SnowBlock, StoneBlock, StoneBricksBlock, TorchBlock, WaterBlock, WoodBlock,
+        AirBlock, BlueRoseBlock, BricksBlock, CobbleStoneBlock, DebugBlock, DirtBlock, GrassBlock, GreenGlassBlock, IceBlock, OakLeavesBlock, OakLogBlock,
+        RoseBlock, SandBlock, SnowBlock, StoneBlock, StoneBricksBlock, TorchBlock, WaterBlock, WoodBlock,
     },
     camera::Camera,
     input::Input,
@@ -69,7 +52,7 @@ use crate::{
     progress::{Progress, ProgressInfo, ProgressSender},
     scenes::{Screen, loading_overlay::LoadingOverlay},
     util::{aabb_outline, cube_outline, get_movement_direction, get_rotation_directions, vertex_ao},
-    world::{EntityData, EntityManager, Weather, World, WorldType},
+    world::{EntityData, EntityManager, World, WorldType},
 };
 
 pub const TICK_RATE_MS: usize = 50;
@@ -134,13 +117,11 @@ impl Default for Debugging {
 }
 
 enum Action {
-    UpdateSubChunkMesh(IPoint2D, usize),
     #[allow(dead_code)]
     RemoveBlock(IPoint2D, USizePoint3D),
     ReplaceResourceManager(ResourceStorage),
     #[cfg(feature = "addons")]
     ReplaceAddonManager(meralus_addons::AddonManager),
-    // ReplaceEventManager(EventManager),
 }
 
 struct Interval {
@@ -171,27 +152,167 @@ impl Interval {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum LightStyle {
+    Smooth,
+    BlockyWithAO,
+    Blocky,
+}
+
+impl LightStyle {
+    #[inline]
+    fn does_block_have_ao(resource_storage: &ResourceStorage, block: &str) -> bool {
+        if block == "game:air" {
+            false
+        } else {
+            resource_storage
+                .models
+                .get_unchecked(resource_storage.blocks.get_model_by_name(block))
+                .ambient_occlusion
+        }
+    }
+
+    fn smooth_light<T: ChunkAccess>(
+        chunks: &T,
+        resource_storage: &ResourceStorage,
+        world_position: IPoint3D,
+        light_source: IPoint3D,
+        corners: [[IPoint3D; 3]; 4],
+        have_ao: bool,
+    ) -> ([f32; 4], [u8; 4]) {
+        let mut aos = [1.0; 4];
+        let mut lights = [0; 4];
+        let init_light = chunks.get_light_level(light_source);
+
+        for (([side1, side2, corner], ao), light) in corners.into_iter().zip(&mut aos).zip(&mut lights) {
+            if have_ao {
+                let side1_block: IPoint3D = world_position + side1;
+                let side2_block: IPoint3D = world_position + side2;
+                let corner_block: IPoint3D = world_position + corner;
+
+                let (side1_block, side1_light) = chunks.get_block_with_light_level(side1_block);
+                let (side2_block, side2_light) = chunks.get_block_with_light_level(side2_block);
+                let (corner_block, corner_light) = chunks.get_block_with_light_level(corner_block);
+
+                let block_light = (Chunk::block_light_from_level(init_light)
+                    + Chunk::block_light_from_level(side1_light)
+                    + Chunk::block_light_from_level(side2_light)
+                    + Chunk::block_light_from_level(corner_light))
+                    / 4;
+
+                let sky_light = (Chunk::sky_light_from_level(init_light)
+                    + Chunk::sky_light_from_level(side1_light)
+                    + Chunk::sky_light_from_level(side2_light)
+                    + Chunk::sky_light_from_level(corner_light))
+                    / 4;
+
+                *light = (sky_light << 4) | (block_light & 0xF);
+
+                *ao = vertex_ao(
+                    Self::does_block_have_ao(resource_storage, side1_block.map_or("game:air", |state| &state.name)),
+                    Self::does_block_have_ao(resource_storage, side2_block.map_or("game:air", |state| &state.name)),
+                    Self::does_block_have_ao(resource_storage, corner_block.map_or("game:air", |state| &state.name)),
+                );
+            } else {
+                *light = chunks.get_light_level(light_source);
+            }
+        }
+
+        (aos, lights)
+    }
+
+    fn blocky_with_ao<T: ChunkAccess>(
+        chunks: &T,
+        resource_storage: &ResourceStorage,
+        world_position: IPoint3D,
+        light_source: IPoint3D,
+        corners: [[IPoint3D; 3]; 4],
+        have_ao: bool,
+    ) -> ([f32; 4], [u8; 4]) {
+        let mut aos: [f32; 4] = [1.0; 4];
+        let light = chunks.get_light_level(light_source);
+
+        for ([side1, side2, corner], ao) in corners.into_iter().zip(&mut aos) {
+            if have_ao {
+                *ao = vertex_ao(
+                    Self::does_block_have_ao(
+                        resource_storage,
+                        chunks.get_block(world_position + side1).map_or("game:air", |state| &state.name),
+                    ),
+                    Self::does_block_have_ao(
+                        resource_storage,
+                        chunks.get_block(world_position + side2).map_or("game:air", |state| &state.name),
+                    ),
+                    Self::does_block_have_ao(
+                        resource_storage,
+                        chunks.get_block(world_position + corner).map_or("game:air", |state| &state.name),
+                    ),
+                );
+            }
+        }
+
+        (aos, [light; 4])
+    }
+
+    fn blocky<T: ChunkAccess>(chunks: &T, _: &ResourceStorage, _: IPoint3D, light_source: IPoint3D, _: [[IPoint3D; 3]; 4], _: bool) -> ([f32; 4], [u8; 4]) {
+        let light = chunks.get_light_level(light_source);
+
+        ([0.0; 4], [light; 4])
+    }
+
+    #[inline]
+    pub const fn get_light_fn<T: ChunkAccess>(self) -> fn(&T, &ResourceStorage, IPoint3D, IPoint3D, [[IPoint3D; 3]; 4], bool) -> ([f32; 4], [u8; 4]) {
+        match self {
+            Self::Smooth => Self::smooth_light::<T>,
+            Self::BlockyWithAO => Self::blocky_with_ao::<T>,
+            Self::Blocky => Self::blocky::<T>,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GraphicsSettings {
+    light_style: LightStyle,
+    render_distance: usize,
+}
+
+impl Default for GraphicsSettings {
+    fn default() -> Self {
+        Self {
+            light_style: LightStyle::Smooth,
+            render_distance: 12,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Settings {
+    graphics: GraphicsSettings,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            graphics: GraphicsSettings::default(),
+        }
+    }
+}
+
 struct GameLoop {
     audio_manager: AudioManager,
     input: Input,
     animation_player: AnimationPlayer,
     common_renderer: CommonRenderer,
     resource_manager: Arc<ResourceStorage>,
-    sounds: HashMap<String, StaticSoundData>,
-    current_sound: Option<(&'static str, StaticSoundHandle)>,
-    weather_tween: TypedTransition<f32>,
 
     particles: ParticleSystem,
 
-    debugging: Debugging,
-
-    action_sender: mpsc::Sender<Action>,
     action_receiver: mpsc::Receiver<Action>,
 
     #[cfg(feature = "addons")]
     addons: meralus_addons::AddonManager,
 
-    accel: Duration,
+    debug_interval: Interval,
     fixed_interval: Interval,
 
     scene: WorldScene,
@@ -205,47 +326,13 @@ struct GameLoop {
     progress: Progress,
 
     world: Option<World>,
+    settings: Settings,
 
     drpc: discord_presence::Client,
 }
 
 const INVENTORY_HOTBAR_SLOTS: u8 = 8;
 const SLOT_SIZE: f32 = 48f32;
-
-fn init_animation_player(animation_player: &mut AnimationPlayer) {
-    animation_player.enable();
-
-    animation_player.add("scale", || Transition::new(0.0, 1.0, 500, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("scale-vertical", || Transition::new(0.0, 1.0, 500, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("opacity", || Transition::new(0.0, 1.0, 500, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("loading-screen", || Transition::new(1.0, 0.0, 1000, Curve::LINEAR, RepeatMode::Once));
-    animation_player.add("show-settings", || Transition::new(0.0, 1.0, 500, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("overlay-width", || Transition::new(0.0, 1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("text-scaling", || {
-        Transition::new(0.5, 1.0, 600, Curve::EASE_IN_OUT, RepeatMode::Infinite).with_restart_behaviour(RestartBehaviour::EndValue)
-    });
-
-    animation_player.add("shape-morph", || {
-        Transition::new(0.0, 1.0, 600, Curve::EASE_IN_OUT_EXPO, RepeatMode::Infinite).with_restart_behaviour(RestartBehaviour::EndValue)
-    });
-
-    animation_player.add("stage-substage-translation", || {
-        Transition::new(0.0, -1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once).with_finish_behaviour(FinishBehaviour::Reset)
-    });
-
-    animation_player.add("chunks-opacity", || Transition::new(1.0, 1.0, 400, Curve::LINEAR, RepeatMode::Once));
-    animation_player.add("chunks-progress", || Transition::new(0.0, 1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-
-    animation_player.add("progress-opacity", || Transition::new(1.0, 1.0, 400, Curve::LINEAR, RepeatMode::Once));
-    animation_player.add("stage-previous-progress", || {
-        Transition::new(0.0, 1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once)
-    });
-
-    animation_player.add("stage-progress", || Transition::new(0.0, 1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once));
-    animation_player.add("stage-substage-progress", || {
-        Transition::new(0.0, 1.0, 400, Curve::EASE_IN_OUT_EXPO, RepeatMode::Once)
-    });
-}
 
 fn register_block<T: Block + 'static>(
     resources: &mut ResourceStorage,
@@ -259,60 +346,6 @@ fn register_block<T: Block + 'static>(
     Ok(())
 }
 
-// #[derive(Clone, Copy)]
-// #[non_exhaustive]
-// enum Event<'a> {
-//     Tick,
-//     WorldStart(&'a WorldData<'a>),
-//     Message(&'a WorldData<'a>),
-// }
-
-// #[non_exhaustive]
-// enum EventHandler {
-//     Tick(fn()),
-//     WorldStart(fn(&WorldData)),
-//     Message(fn(&WorldData)),
-// }
-
-// struct WorldData<'a> {
-//     world: &'a mut World,
-// }
-
-// impl WorldData<'_> {
-//     fn send_chat_message(&mut self, text: &str) {
-//         self.world.send_chat_message(text);
-//     }
-// }
-
-// struct EventManager {
-//     handlers: Vec<EventHandler>,
-// }
-
-// impl EventManager {
-//     fn on_tick(&mut self, callback: fn()) {
-//         self.handlers.push(EventHandler::Tick(callback));
-//     }
-
-//     fn on_world_start(&mut self, callback: fn(&WorldData)) {
-//         self.handlers.push(EventHandler::WorldStart(callback));
-//     }
-
-//     fn on_message(&mut self, callback: fn(&WorldData)) {
-//         self.handlers.push(EventHandler::Message(callback));
-//     }
-
-//     fn trigger(&self, event: Event) {
-//         for handler in &self.handlers {
-//             match (handler, event) {
-//                 (EventHandler::Tick(callback), Event::Tick) => callback(),
-//                 (EventHandler::WorldStart(callback), Event::WorldStart(data))
-// => callback(data),                 (EventHandler::Message(callback),
-// Event::Message(data)) => callback(data),                 _ => (),
-//             }
-//         }
-//     }
-// }
-
 impl State for GameLoop {
     type Args = ();
 
@@ -322,9 +355,9 @@ impl State for GameLoop {
 
         let resource_manager = Arc::new(ResourceStorage::new("./resources"));
 
-        let action_sender_clone = action_sender.clone();
-
         std::thread::spawn(move || {
+            set_thread_name!("Resources Loading");
+
             let mut resources = ResourceStorage::new("./resources");
 
             let sender = ProgressSender(tx);
@@ -337,29 +370,56 @@ impl State for GameLoop {
             sender.set_visible(true)?;
             sender.set_initial_info(ProgressInfo::new(total_stages, 0, 1, 0))?;
 
-            sender.new_stage("Blocks loading", 19)?;
+            sender.new_stage("Blocks loading", 20)?;
+
+            let zone = span!("Models Loading");
 
             resources.load_entity_model("game", "player");
+
+            zone.emit_text("Registered entities:game/player");
+
             resources.load_entity_model("game", "floating");
 
+            zone.emit_text("Registered entities:game/player");
+
             register_block(&mut resources, &sender, AirBlock)?;
+            zone.emit_text("Registered blocks:game/air");
             register_block(&mut resources, &sender, StoneBlock)?;
+            zone.emit_text("Registered blocks:game/stone");
             register_block(&mut resources, &sender, WaterBlock)?;
+            zone.emit_text("Registered blocks:game/water");
             register_block(&mut resources, &sender, DirtBlock)?;
+            zone.emit_text("Registered blocks:game/dirt");
             register_block(&mut resources, &sender, GrassBlock)?;
+            zone.emit_text("Registered blocks:game/grass");
             register_block(&mut resources, &sender, WoodBlock)?;
+            zone.emit_text("Registered blocks:game/wood");
             register_block(&mut resources, &sender, SandBlock)?;
+            zone.emit_text("Registered blocks:game/sand");
             register_block(&mut resources, &sender, OakLeavesBlock)?;
+            zone.emit_text("Registered blocks:game/oak_leaves");
+            register_block(&mut resources, &sender, OakLogBlock)?;
+            zone.emit_text("Registered blocks:game/oak_log");
             register_block(&mut resources, &sender, IceBlock)?;
+            zone.emit_text("Registered blocks:game/ice");
             register_block(&mut resources, &sender, GreenGlassBlock)?;
+            zone.emit_text("Registered blocks:game/green_glass");
             register_block(&mut resources, &sender, TorchBlock)?;
+            zone.emit_text("Registered blocks:game/torch");
             register_block(&mut resources, &sender, SnowBlock)?;
+            zone.emit_text("Registered blocks:game/snow");
             register_block(&mut resources, &sender, RoseBlock)?;
+            zone.emit_text("Registered blocks:game/rose");
             register_block(&mut resources, &sender, BlueRoseBlock)?;
+            zone.emit_text("Registered blocks:game/blue_rose");
             register_block(&mut resources, &sender, CobbleStoneBlock)?;
+            zone.emit_text("Registered blocks:game/cobblestone");
             register_block(&mut resources, &sender, BricksBlock)?;
+            zone.emit_text("Registered blocks:game/bricks");
             register_block(&mut resources, &sender, StoneBricksBlock)?;
+            zone.emit_text("Registered blocks:game/stone_bricks");
             register_block(&mut resources, &sender, DebugBlock)?;
+            zone.emit_text("Registered blocks:game/debug");
 
             #[cfg(feature = "addons")]
             {
@@ -370,58 +430,59 @@ impl State for GameLoop {
                 addons.insert_mappings(&mut resources);
                 addons.execute(&mut resources);
 
-                _ = action_sender_clone.send(Action::ReplaceAddonManager(addons));
+                _ = action_sender.send(Action::ReplaceAddonManager(addons));
             }
 
             sender.new_stage("Mip-maps generation", 4)?;
+
+            let zone = span!("Mip-maps generation");
 
             for level in 1..=4 {
                 resources.generate_mipmap(level);
 
                 sender.complete_task()?;
+
+                zone.emit_text("Generated mip-map");
             }
 
-            _ = action_sender_clone.send(Action::ReplaceResourceManager(resources));
+            _ = action_sender.send(Action::ReplaceResourceManager(resources));
 
             sender.set_visible(false)
         });
 
         let (width, height) = display.get_framebuffer_dimensions();
 
-        let size = window.window_size().as_::<f32>() / window.window_scale_factor() as f32;
+        let size = window.window_size().as_vec2() / window.window_scale_factor() as f32;
 
         let mut common_renderer = CommonRenderer::new(display).unwrap_or_else(|e| panic!("failed to create CommonRenderer: {e}"));
 
         common_renderer.add_font("default", FONT);
         common_renderer.add_font("default_bold", FONT_BOLD);
-        common_renderer.set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.width, size.height, 0.0, -100.0, 100.0));
+        common_renderer.set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.x, size.y, 0.0, -100.0, 100.0));
 
         let mut animation_player = AnimationPlayer::default();
 
-        init_animation_player(&mut animation_player);
+        // init_animation_player(&mut animation_player);
 
         let mut drpc = discord_presence::Client::new(1488208518765871164);
 
-        drpc.on_connected(|e| println!("E: {:#?}", e.event)).persist();
-        drpc.on_ready(|e| println!("E: {:#?}", e.event)).persist();
-
         drpc.start();
 
-        let sounds = fs::read_dir("./resources/sounds")
-            .unwrap()
-            .flatten()
-            .filter_map(|sound| {
-                let path = sound.path();
+        // let sounds = fs::read_dir("./resources/sounds")
+        //     .unwrap()
+        //     .flatten()
+        //     .filter_map(|sound| {
+        //         let path = sound.path();
 
-                if path.is_file() {
-                    StaticSoundData::from_file(path)
-                        .ok()
-                        .and_then(|data| Some((sound.file_name().into_string().ok()?, data)))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        //         if path.is_file() {
+        //             StaticSoundData::from_file(path)
+        //                 .ok()
+        //                 .and_then(|data| Some((sound.file_name().into_string().ok()?,
+        // data)))         } else {
+        //             None
+        //         }
+        //     })
+        //     .collect();
 
         Self {
             audio_manager: AudioManager::new(AudioManagerSettings {
@@ -435,9 +496,6 @@ impl State for GameLoop {
                 ..AudioManagerSettings::default()
             })
             .unwrap(),
-            weather_tween: TypedTransition::new(0.0, 1.0, 2000, Curve::FAST_OUT_SLOW_IN, RepeatMode::Once),
-            sounds,
-            current_sound: None,
             input: Input::with_binds([
                 ("walk.forward", KeyCode::KeyW),
                 ("walk.backward", KeyCode::KeyS),
@@ -447,15 +505,14 @@ impl State for GameLoop {
             animation_player,
             common_renderer,
             current_page: Page::Main,
-            debugging: Debugging::default(),
             resource_manager,
             #[cfg(feature = "addons")]
             addons: meralus_addons::AddonManager::new("./addons").unwrap(),
-            accel: Duration::ZERO,
+            debug_interval: Interval::new(Duration::from_secs(5)),
             fixed_interval: Interval::new(FIXED_FRAMERATE),
-            action_sender,
             action_receiver,
             world: None,
+            settings: Settings::default(),
             progress: Progress::new(rx),
             texture_atlas: Texture2d::empty_with_mipmaps(
                 display,
@@ -486,13 +543,13 @@ impl State for GameLoop {
         self.scene.resize(facade, size.to_array()).unwrap();
         self.kawase.resize(facade, size.to_array()).unwrap();
 
-        let size = size.as_::<f32>() / scale_factor as f32;
+        let size = size.as_vec2() / scale_factor as f32;
 
         self.common_renderer
-            .set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.width, size.height, 0.0, -1000.0, 1000.0));
+            .set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.x, size.y, 0.0, -1000.0, 1000.0));
 
         if let Some(world) = &mut self.world {
-            world.camera.aspect_ratio = size.width / size.height;
+            world.camera.aspect_ratio = size.x / size.y;
         }
     }
 
@@ -517,53 +574,25 @@ impl State for GameLoop {
                     && world
                         .chunk_manager
                         .get_block(looking_at.position + looking_at.hit_side.as_normal())
-                        .is_some_and(|block| block == 0)
+                        .is_some_and(|block| block.name == "game:air")
                     && let Some((item, _)) = world.player.inventory.take_hotbar_item(current_slot)
                 {
                     let position = looking_at.position + looking_at.hit_side.as_normal();
                     let chunk = ChunkManager::<()>::to_local(position);
 
                     if let Some(local) = world.chunk_manager.to_chunk_local(position) {
-                        let [subchunk_idx, subchunk_y] = Chunk::get_subchunk_index(local.y);
+                        let block = self.resource_manager.get_block(&item).unwrap();
 
-                        world.chunk_manager.set_block(position, item as u8);
-
-                        let block = self.resource_manager.get_block(item).unwrap();
+                        world.chunk_manager.set_block(position, SubChunkBlockState::new(item));
 
                         let mut light = BfsLight::new(&mut world.chunk_manager);
 
-                        let mut affected_chunks = if block.light_level() > 0 {
-                            light.add_custom(LightNode(local, chunk), block.light_level());
-                            light.calculate_with_info(self.resource_manager.as_ref())
+                        if block.light_level() > 0 {
+                            light.add_block_custom(LightNode(local, chunk), block.light_level());
+                            light.calculate_block_light(self.resource_manager.as_ref());
                         } else if block.blocks_light() {
-                            let mut light = light.apply_to_sky_light();
-
-                            light.remove(LightNode(local, chunk));
-                            light.calculate_with_info(self.resource_manager.as_ref())
-                        } else {
-                            Vec::new()
-                        };
-
-                        if let Some(chunks) = Chunk::corner(local) {
-                            for offset in chunks {
-                                if !affected_chunks.contains(&(chunk + offset)) {
-                                    affected_chunks.push(chunk + offset);
-                                }
-                            }
-                        } else if let Some(offset) = Chunk::side(local)
-                            && !affected_chunks.contains(&(chunk + offset))
-                        {
-                            affected_chunks.push(chunk + offset);
-                        }
-
-                        for chunk in affected_chunks {
-                            if let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk) {
-                                chunk.dirty = true;
-                            }
-                        }
-
-                        if let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk) {
-                            chunk.dirty = true;
+                            light.remove_sky(LightNode(local, chunk));
+                            light.calculate_sky_light(self.resource_manager.as_ref());
                         }
 
                         let provider = AabbProvider {
@@ -613,8 +642,6 @@ impl State for GameLoop {
 
     #[allow(clippy::too_many_lines, clippy::significant_drop_tightening)]
     fn update(&mut self, context: WindowContext, display: &WindowDisplay, delta: Duration) {
-        self.accel += delta;
-
         self.overlay.update(delta);
 
         if let Some(info) = &self.progress.info {
@@ -644,21 +671,19 @@ impl State for GameLoop {
                     self.particles.physics_update(&context, FIXED_FRAMERATE.as_secs_f32());
 
                     if let Some(entity) = world.entities.get_mut(0) {
-                        entity.set_rotation(0, world.player.get_vector_for_rotation().as_());
+                        entity.set_rotation(0, world.player.get_vector_for_rotation().as_vec3());
                     }
                 }
             }
 
             for _ in 0..world.tick_interval.update(delta) {
-                world.tick(self.debugging.time_paused);
+                world.tick(true);
             }
 
-            world.update();
+            world.update(self.settings.graphics);
         }
 
-        if self.accel >= const { Duration::from_secs(5) } {
-            self.accel = Duration::ZERO;
-
+        for _ in 0..self.debug_interval.update(delta) {
             let mut drpc = self.drpc.clone();
             let chunks = self.world.as_ref().map(|world| world.chunk_manager.len());
 
@@ -696,10 +721,6 @@ impl State for GameLoop {
             }
         }
 
-        if self.input.keyboard.is_key_pressed_once(KeyCode::Escape) && self.animation_player.get_value("show-settings") > Some(0f32) {
-            self.animation_player.play_transition_to("show-settings", 0.0);
-        }
-
         self.animation_player.advance(delta.as_secs_f32());
 
         if let Some(world) = &mut self.world {
@@ -710,57 +731,6 @@ impl State for GameLoop {
             }
         }
 
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyT) {
-            self.debugging.wireframe = !self.debugging.wireframe;
-
-            if let Some(world) = &self.world {
-                println!(
-                    "Point3 {{ x: -48, y: 72, z: 143 }} sky light: {:?}",
-                    world.chunk_manager.get_sky_light(IPoint3D { x: -48, y: 72, z: 143 })
-                );
-            }
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyV) {
-            self.debugging.inventory_open = !self.debugging.inventory_open;
-
-            if self.debugging.inventory_open {
-                let scale = self.animation_player.get_mut_unchecked("scale");
-
-                scale.set_delay(0);
-                scale.to(1.0);
-
-                let scale_vertical = self.animation_player.get_mut_unchecked("scale-vertical");
-
-                scale_vertical.set_delay(400);
-                scale_vertical.to(1.0);
-
-                let opacity = self.animation_player.get_mut_unchecked("opacity");
-
-                opacity.set_delay(0);
-                opacity.to(1.0);
-            } else {
-                let scale = self.animation_player.get_mut_unchecked("scale");
-
-                scale.set_delay(400);
-                scale.to(0.0);
-
-                let scale_vertical = self.animation_player.get_mut_unchecked("scale-vertical");
-
-                scale_vertical.set_delay(0);
-                scale_vertical.to(0.0);
-
-                let opacity = self.animation_player.get_mut_unchecked("opacity");
-
-                opacity.set_delay(400);
-                opacity.to(0.0);
-            }
-
-            self.animation_player.play("scale");
-            self.animation_player.play("opacity");
-            self.animation_player.play("scale-vertical");
-        }
-
         if self.input.keyboard.modifiers.control_key
             && self.input.keyboard.is_key_pressed_once(KeyCode::KeyS)
             && let Some(world) = &mut self.world
@@ -768,29 +738,6 @@ impl State for GameLoop {
             info!("Saving world ({} chunks)", world.chunk_manager.len());
 
             world.chunk_manager.save();
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyX) {
-            self.debugging.item_rotation_x += const { 1f32.to_radians() };
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyY) {
-            self.debugging.item_rotation_y += const { 1f32.to_radians() };
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyZ) {
-            self.debugging.item_rotation_z += const { 1f32.to_radians() };
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyP) {
-            self.debugging.time_paused = !self.debugging.time_paused;
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyO) {
-            self.debugging.overlay = !self.debugging.overlay;
-
-            self.animation_player
-                .play_transition_to("overlay-width", if self.debugging.overlay { 1.0 } else { 0.0 });
         }
 
         for (digit, i) in [
@@ -822,14 +769,6 @@ impl State for GameLoop {
 
         if let Ok(action) = self.action_receiver.try_recv() {
             match action {
-                Action::UpdateSubChunkMesh(origin, subchunk_idx) => {
-                    // if let Some(world) = self.world.as_mut()
-                    //     && let Some(subchunk) =
-                    // world.compute_subchunk_mesh_at((origin,
-                    // subchunk_idx)) {
-                    //     world.voxel_renderer.set_subchunk((origin,
-                    // subchunk_idx), subchunk); }
-                }
                 Action::RemoveBlock(chunk, position) => {
                     if let Some(world) = self.world.as_mut() {
                         world.destroy_block_local(chunk, position);
@@ -838,68 +777,11 @@ impl State for GameLoop {
                 Action::ReplaceResourceManager(manager) => self.resource_manager = Arc::new(manager),
                 #[cfg(feature = "addons")]
                 Action::ReplaceAddonManager(addons) => self.addons = addons,
-                // Action::ReplaceEventManager(manager) => self.event_manager = manager,
             }
-        }
-
-        if self.input.keyboard.is_key_pressed_once(KeyCode::KeyB) {
-            self.debugging.draw_borders = !self.debugging.draw_borders;
         }
 
         if self.input.keyboard.is_key_pressed_once(KeyCode::KeyL) {
             self.resource_manager.debug_save();
-        }
-
-        if let Some((name, sound)) = &self.current_sound {
-            match (*name, sound.state()) {
-                ("intro" | "loop", PlaybackState::Stopped) => {
-                    if let Some(sound_data) = self.sounds.get("weather[thunder]-loop.wav") {
-                        self.current_sound = Some(("loop", self.audio_manager.play(sound_data.clone()).unwrap()));
-                    }
-                }
-                (_, PlaybackState::Stopped) => {
-                    self.current_sound.take();
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(world) = &mut self.world {
-            if matches!(world.current_weather, Weather::Thunder) {
-                self.weather_tween.advance(delta.as_secs_f32());
-            }
-
-            if self.input.keyboard.is_key_pressed_once(KeyCode::KeyR) {
-                match world.current_weather {
-                    Weather::Clear => {
-                        world.current_weather = Weather::Thunder;
-
-                        println!("{:#?}", self.sounds);
-
-                        if let Some(sound_data) = self.sounds.get("weather[thunder]-intro.wav") {
-                            println!("Playing!");
-
-                            self.current_sound = Some(("intro", self.audio_manager.play(sound_data.clone()).unwrap()));
-
-                            let player_position = world.player.body.position;
-
-                            self.particles.spawn_batch(
-                                display,
-                                (-50i16..50).flat_map(|x| (-50i16..50).map(move |z| player_position + Vector3D::new(f32::from(x), 5.0, f32::from(z)))),
-                                Color::BLUE,
-                            );
-                        }
-                    }
-                    Weather::Rain => (),
-                    Weather::Thunder => {
-                        world.current_weather = Weather::Clear;
-
-                        if let Some(sound_data) = self.sounds.get("weather[thunder]-outro.wav") {
-                            self.current_sound = Some(("outro", self.audio_manager.play(sound_data.clone()).unwrap()));
-                        }
-                    }
-                }
-            }
         }
 
         self.context.update();
@@ -911,7 +793,7 @@ impl State for GameLoop {
 
     #[allow(clippy::too_many_lines)]
     fn render(&mut self, window_context: WindowContext, display: &WindowDisplay, delta: Duration) {
-        let RenderInfo { draw_calls, vertices } = self.debugging.render_info.take();
+        let RenderInfo { draw_calls, vertices } = RenderInfo::default();
 
         let (width, height) = display.get_framebuffer_dimensions();
         let mut frame = display.draw();
@@ -931,13 +813,11 @@ impl State for GameLoop {
                 .draw_rect(
                     Point2D::ZERO,
                     Size2D::new(width as f32, height as f32),
-                    get_sky_color(world.clock.get_visual_progress(), *self.weather_tween.get()),
+                    get_sky_color(world.clock.get_visual_progress(), 0.0),
                 )
                 .unwrap();
 
-            self.debugging
-                .render_info
-                .extend(&self.common_renderer.render(&mut buffer, display, None).unwrap());
+            self.common_renderer.render(&mut buffer, display, None).unwrap();
 
             world.voxel_renderer.render(
                 &mut buffer,
@@ -980,52 +860,59 @@ impl State for GameLoop {
 
             self.scene.render(&mut frame).unwrap();
             self.particles.render(&mut frame, world.camera.matrix()).unwrap();
-            self.debugging.render_info.extend(&world.voxel_renderer.get_debug_info());
+            // self.debugging.render_info.extend(&world.voxel_renderer.get_debug_info());
 
-            if self.debugging.draw_borders {
-                self.common_renderer.set_matrix(world.camera.matrix());
+            // if self.debugging.draw_borders {
+            //     self.common_renderer.set_matrix(world.camera.matrix());
 
-                let size = world.player.player_aabb().size().as_();
-                let lines = cube_outline(
-                    Cube3D::new(world.player.body.position - Vector3D::new(size.width * 0.5, 0.0, size.depth * 0.5), size),
-                    self.common_renderer.white_pixel_uv(),
-                );
+            //     let size = world.player.player_aabb().size().as_();
+            //     let lines = cube_outline(
+            //         Cube3D::new(world.player.body.position - Vector3D::new(size.x *
+            // 0.5, 0.0, size.z * 0.5), size),         self.common_renderer.
+            // white_pixel_uv(),     );
 
-                self.debugging
-                    .render_info
-                    .extend(&self.common_renderer.render_lines(&mut frame, display, &lines, None).unwrap());
+            //     self.debugging
+            //         .render_info
+            //         .extend(&self.common_renderer.render_lines(&mut frame, display,
+            // &lines, None).unwrap());
 
-                for (_, entity) in &world.entities {
-                    let aabb = entity.body.aabb();
-                    let lines = cube_outline(Cube3D::new(aabb.min.as_(), aabb.size().as_()), self.common_renderer.white_pixel_uv());
+            //     for (_, entity) in &world.entities {
+            //         let aabb = entity.body.aabb();
+            //         let lines = cube_outline(Cube3D::new(aabb.min.as_(),
+            // aabb.size().as_()), self.common_renderer.white_pixel_uv());
 
-                    self.debugging
-                        .render_info
-                        .extend(&self.common_renderer.render_lines(&mut frame, display, &lines, None).unwrap());
-                }
+            //         self.debugging
+            //             .render_info
+            //             .extend(&self.common_renderer.render_lines(&mut frame, display,
+            // &lines, None).unwrap());     }
 
-                self.common_renderer.set_default_matrix();
-            }
+            //     self.common_renderer.set_default_matrix();
+            // }
 
             if let Some(result) = world.camera.looking_at
                 && let Some(mut model) = world
                     .chunk_manager
                     .get_block(result.position)
-                    .filter(|&b| b != 0)
-                    .and_then(|block| self.resource_manager.models.get(block.into()).map(|model| model.bounding_box))
+                    .filter(|&b| b.name != "game:air")
+                    .and_then(|block| {
+                        self.resource_manager
+                            .models
+                            .get(self.resource_manager.blocks.get_model_by_name(&block.name))
+                            .map(|model| model.bounding_box)
+                    })
             {
                 let white_pixel = self.common_renderer.white_pixel_uv();
 
-                model.min += result.position.as_::<f64>();
-                model.max += result.position.as_::<f64>();
+                model.min += result.position.as_dvec3();
+                model.max += result.position.as_dvec3();
 
                 self.common_renderer.set_matrix(world.camera.matrix());
-                self.debugging.render_info.extend(
-                    &self
-                        .common_renderer
-                        .render_lines(&mut frame, display, &aabb_outline(model, white_pixel), None)
-                        .unwrap(),
-                );
+                // self.debugging.render_info.extend(
+                &self
+                    .common_renderer
+                    .render_lines(&mut frame, display, &aabb_outline(model, white_pixel), None)
+                    .unwrap();
+                // );
 
                 self.common_renderer.set_default_matrix();
             }
@@ -1067,42 +954,43 @@ impl State for GameLoop {
             let mut context = RenderContext::new(display, &mut self.common_renderer);
             let bounds = context.bounds;
 
-            if self.debugging.wireframe {
-                context.ui(|context, bounds| {
-                    let height = 200.0;
-                    let y_offset = bounds.size.height - height;
+            // if self.debugging.wireframe {
+            //     context.ui(|context, bounds| {
+            //         let height = 200.0;
+            //         let y_offset = bounds.size.y - height;
 
-                    context.draw_rect(
-                        Rect2D::new(Point2D::new(0.0, y_offset), Size2D::new(480.0, height)),
-                        Color::from_hsl(0.0, 0.0, 0.5),
-                    );
+            //         context.draw_rect(
+            //             Rect2D::new(Point2D::new(0.0, y_offset), Size2D::new(480.0,
+            // height)),             Color::from_hsl(0.0, 0.0, 0.5),
+            //         );
 
-                    let skip_messages = world.chat_history.len().max(10) - 10;
-                    let mut y_offset = y_offset;
+            //         let skip_messages = world.chat_history.len().max(10) - 10;
+            //         let mut y_offset = y_offset;
 
-                    for message in world.chat_history.iter().skip(skip_messages).take(10) {
-                        let measured = context
-                            .measure_text("default", message, 18.0, Some(480.0 - 4.0))
-                            .unwrap_or_else(|| panic!("failed to measure next text: {message}"));
+            //         for message in world.chat_history.iter().skip(skip_messages).take(10)
+            // {             let measured = context
+            //                 .measure_text("default", message, 18.0, Some(480.0 - 4.0))
+            //                 .unwrap_or_else(|| panic!("failed to measure next text:
+            // {message}"));
 
-                        context.draw_text(
-                            Point2D::new(2.0, y_offset + 1.0),
-                            "default",
-                            message,
-                            18.0,
-                            Color::from_hsl(0.0, 0.0, 1.0),
-                            Some(480.0 - 4.0),
-                        );
+            //             context.draw_text(
+            //                 Point2D::new(2.0, y_offset + 1.0),
+            //                 "default",
+            //                 message,
+            //                 18.0,
+            //                 Color::from_hsl(0.0, 0.0, 1.0),
+            //                 Some(480.0 - 4.0),
+            //             );
 
-                        y_offset += measured.height + 1.0;
-                    }
-                });
-            }
+            //             y_offset += measured.y + 1.0;
+            //         }
+            //     });
+            // }
 
             context.ui(|context, bounds| {
                 let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS + 1) * SLOT_SIZE;
 
-                let origin = Point2D::new((bounds.size.width / 2.0) - (hotbar_width / 2.0), bounds.size.height - SLOT_SIZE - 8.0);
+                let origin = Point2D::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
 
                 let offset = f32::from(world.inventory_slot.value) * SLOT_SIZE;
 
@@ -1122,21 +1010,21 @@ impl State for GameLoop {
             });
 
             context.ui(|context, bounds| {
-                let opacity: f32 = self.animation_player.get_value_unchecked("opacity");
-                let scale: f32 = self.animation_player.get_value_unchecked("scale");
-                let scale_vertical: f32 = self.animation_player.get_value_unchecked("scale-vertical");
+                let opacity: f32 = 0.0; // self.animation_player.get_value_unchecked("opacity");
+                let scale: f32 = 0.0; // self.animation_player.get_value_unchecked("scale");
+                let scale_vertical: f32 = 0.0; // self.animation_player.get_value_unchecked("scale-vertical");
 
                 let screen_center = bounds.center();
 
-                let size = Size2D::new(bounds.size.width * 0.65, bounds.size.height.mul_add(0.4, 320.0 * scale_vertical));
+                let size = Size2D::new(bounds.size.x * 0.65, bounds.size.y.mul_add(0.4, 320.0 * scale_vertical));
 
-                let center = screen_center - (size / 2.0).to_vector();
+                let center = screen_center - (size / 2.0);
 
                 context.draw_rect(bounds, Color::BLACK.with_alpha(opacity.min(0.25)));
                 context.add_transform(Transform3D::from_scale_rotation_translation(
                     Vector3D::from_array([scale; 3]),
                     Quat::IDENTITY,
-                    screen_center.to_vector().extend(0.0) * (1.0 - scale),
+                    screen_center.extend(0.0) * (1.0 - scale),
                 ));
                 context.bounds(Rect2D::new(center, size), |context, _| {
                     context.fill(Color::from_hsl(130.0, 0.35, 0.25).with_alpha(opacity));
@@ -1149,8 +1037,8 @@ impl State for GameLoop {
 
                             context.draw_text(bounds.origin, "default_bold", "Inventory", 18.0, Color::WHITE.with_alpha(opacity), None);
 
-                            let size = bounds.size - Size2D::new(0.0, measured.height + 4.0);
-                            let origin = bounds.origin + Point2D::new(0.0, measured.height + 2.0);
+                            let size = bounds.size - Size2D::new(0.0, measured.y + 4.0);
+                            let origin = bounds.origin + Point2D::new(0.0, measured.y + 2.0);
 
                             let inner_origin = origin + Point2D::new(2.0, 2.0);
                             let inner_size = size - Size2D::new(4.0, 4.0);
@@ -1166,7 +1054,7 @@ impl State for GameLoop {
                                 for y in 0..tile_count {
                                     context.draw_rect(
                                         Rect2D::new(
-                                            inner_origin + Point2D::new((tile_gap + tile_size.width) * x as f32, (tile_gap + tile_size.height) * y as f32),
+                                            inner_origin + Point2D::new((tile_gap + tile_size.x) * x as f32, (tile_gap + tile_size.y) * y as f32),
                                             tile_size,
                                         ),
                                         Color::from_hsl(130.0, 0.25, 0.5).with_alpha(opacity),
@@ -1181,7 +1069,7 @@ impl State for GameLoop {
             });
 
             {
-                let chunk = ChunkManager::<()>::to_local(world.player.body.position.as_::<i32>());
+                let chunk = ChunkManager::<()>::to_local(world.player.body.position.as_ivec3());
 
                 let (hours, minutes) = {
                     let time = world.clock.time().as_secs();
@@ -1217,38 +1105,48 @@ Rendered vertices: {vertices}",
                     world.player.body.position,
                     chunk.x,
                     chunk.y,
-                    world.chunk_manager.get_biome(world.player.body.position.as_::<i32>()),
+                    world.chunk_manager.get_biome(world.player.body.position.as_ivec3()),
                     1.0 / delta.as_secs_f32(),
                     delta.as_secs_f32() * 1000.0,
                     world.ticks,
                     world
                         .camera
                         .looking_at
-                        .and_then(
-                            |result| world.chunk_manager.get_block(result.position).filter(|&b| b != 0).and_then(|block| self
-                                .resource_manager
-                                .get_block(block.into())
-                                .map(|block| format!(
-                                    "{} (at {}, sky light: {} for {:?})",
-                                    block.id(),
-                                    result.hit_side,
-                                    world.chunk_manager.get_sky_light(result.position + result.hit_side.as_normal()),
-                                    result.position + result.hit_side.as_normal()
-                                )))
-                        )
+                        .and_then(|result| world
+                            .chunk_manager
+                            .get_block(result.position)
+                            .filter(|&b| b.name != "game:air")
+                            .and_then(|state| self.resource_manager.get_block(&state.name).map(|block| format!(
+                                "{} ({}){}",
+                                block.id(),
+                                result.hit_side,
+                                if state.properties.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!(
+                                        ". Properties:\n{}",
+                                        state
+                                            .properties
+                                            .iter()
+                                            .map(|(name, value)| format!("  #{name} = {value}"))
+                                            .collect::<Vec<_>>()
+                                            .join("\n")
+                                    )
+                                }
+                            ))))
                         .unwrap_or_else(|| String::from("nothing")),
-                    self.debugging.item_rotation_x.to_degrees(),
-                    self.debugging.item_rotation_y.to_degrees(),
-                    self.debugging.item_rotation_z.to_degrees(),
+                    const { 200f32.to_radians() },
+                    const { 35f32.to_radians() },
+                    0.0,
                 );
 
                 let text_size = context
                     .measure_text("default", &text, 18.0, None)
                     .unwrap_or_else(|| panic!("failed to measure next text: {text}"));
 
-                let overlay_width = self.animation_player.get_value_unchecked::<_, f32>("overlay-width");
+                let overlay_width = 1.0; // self.animation_player.get_value_unchecked::<_, f32>("overlay-width");
 
-                let text_bounds = Rect2D::new(Point2D::new(12.0, 12.0), Size2D::new((522.0 + 4.0) * overlay_width, text_size.height + 4.0));
+                let text_bounds = Rect2D::new(Point2D::new(12.0, 12.0), Size2D::new((522.0 + 4.0) * overlay_width, text_size.y + 4.0));
 
                 context.bounds(text_bounds, |context, _| {
                     context.fill(Color::BLACK.with_alpha(0.25));
@@ -1265,21 +1163,24 @@ Rendered vertices: {vertices}",
             //     show_world_generation_screen(&self.animation_player, &mut context,
             // &world.chunks_progress, self.window_matrix); }
 
-            self.debugging.render_info.extend(&context.finish(display, &mut frame));
+            context.finish(display, &mut frame);
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.player.inventory.get_hotbar_items().count());
 
-            let matrix = Transform3D::from_rotation_x(Angle::from_radians(self.debugging.item_rotation_x))
-                * Transform3D::from_rotation_y(Angle::from_radians(self.debugging.item_rotation_y))
-                * Transform3D::from_rotation_z(Angle::from_radians(self.debugging.item_rotation_z));
+            let matrix = Transform3D::from_rotation_x(Angle::from_radians(const { 200f32.to_radians() }))
+                * Transform3D::from_rotation_y(Angle::from_radians(const { 35f32.to_radians() }))
+                * Transform3D::from_rotation_z(Angle::from_radians(0.0));
 
             for (i, item) in world.player.inventory.get_hotbar_items() {
                 const SIZE: f32 = SLOT_SIZE * 0.75;
                 const ORIGIN: Point3D = Point3D::new(SIZE / 2.0, SIZE / 2.0, SIZE / 2.0);
                 const HOTBAR_WIDTH: f32 = (INVENTORY_HOTBAR_SLOTS + 1) as f32 * SLOT_SIZE;
 
-                let model = self.resource_manager.models.get_unchecked(item.id);
-                let origin = Point2D::new((bounds.size.width / 2.0) - (HOTBAR_WIDTH / 2.0), bounds.size.height - SLOT_SIZE - 8.0);
+                let model = self
+                    .resource_manager
+                    .models
+                    .get_unchecked(self.resource_manager.blocks.get_model_by_name(&item.id));
+                let origin = Point2D::new((bounds.size.x / 2.0) - (HOTBAR_WIDTH / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
                 let slot_offset = (origin + Point2D::new(4.0, 4.0) + Point2D::new(i as f32 * SLOT_SIZE, 0.0)).extend(20.0);
 
                 for element in &model.elements {
@@ -1318,7 +1219,7 @@ Rendered vertices: {vertices}",
 
             context.ui(|context, bounds| {
                 let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS + 1) * SLOT_SIZE;
-                let origin = Point2D::new((bounds.size.width / 2.0) - (hotbar_width / 2.0), bounds.size.height - SLOT_SIZE - 8.0);
+                let origin = Point2D::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
 
                 for (column, item) in world.player.inventory.get_hotbar_items() {
                     let offset = (column + 1) as f32 * SLOT_SIZE;
@@ -1327,7 +1228,7 @@ Rendered vertices: {vertices}",
                     let text_size = context.measure_text("default", &text, 18.0, None).unwrap();
 
                     context.draw_text(
-                        origin.with_y(bounds.size.height - 10.0 - 18.0) + Point2D::new(offset - 3.0 - text_size.width, 0.0),
+                        origin.with_y(bounds.size.y - 10.0 - 18.0) + Point2D::new(offset - 3.0 - text_size.x, 0.0),
                         "default",
                         text,
                         18.0,
@@ -1339,28 +1240,25 @@ Rendered vertices: {vertices}",
                 const CHUNK_UI_CONTAINER_SIZE: Size2D = Size2D::new(128.0, 128.0);
                 const CHUNK_UI_COUNT: usize = 16;
                 const CHUNK_UI_SIZE: Size2D = Size2D::new(
-                    CHUNK_UI_CONTAINER_SIZE.width / CHUNK_UI_COUNT as f32,
-                    CHUNK_UI_CONTAINER_SIZE.height / CHUNK_UI_COUNT as f32,
+                    CHUNK_UI_CONTAINER_SIZE.x / CHUNK_UI_COUNT as f32,
+                    CHUNK_UI_CONTAINER_SIZE.y / CHUNK_UI_COUNT as f32,
                 );
 
                 context.clipped_bounds(
-                    Rect2D::new(
-                        Point2D::new(bounds.size.width - CHUNK_UI_CONTAINER_SIZE.width - 12.0, 12.0),
-                        CHUNK_UI_CONTAINER_SIZE,
-                    ),
+                    Rect2D::new(Point2D::new(bounds.size.x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0), CHUNK_UI_CONTAINER_SIZE),
                     |context, bounds| {
                         context.fill(Color::BLACK);
 
-                        let player_chunk = ChunkManager::<()>::to_local(world.player.body.position.as_::<i32>());
+                        let player_chunk = ChunkManager::<()>::to_local(world.player.body.position.as_ivec3());
                         let player_offset = Point2D::new(world.player.body.position.x % 16.0, world.player.body.position.z % 16.0);
-                        let origin = bounds.origin + bounds.size.to_vector() / 2.0;
+                        let origin = bounds.origin + bounds.size / 2.0;
 
                         for x in -1..(CHUNK_UI_COUNT + 1) as i32 {
                             let x = x - (CHUNK_UI_COUNT / 2) as i32;
 
                             for z in -1..(CHUNK_UI_COUNT + 1) as i32 {
                                 let z = z - (CHUNK_UI_COUNT / 2) as i32;
-                                let chunk = player_chunk + IPoint2D::new(x, z).to_vector();
+                                let chunk = player_chunk + IPoint2D::new(x, z);
 
                                 if let Some(stage) = world.chunk_manager.stages.get(&chunk) {
                                     let color = match stage {
@@ -1376,7 +1274,7 @@ Rendered vertices: {vertices}",
 
                                     context.draw_rect(
                                         Rect2D::new(
-                                            origin - player_offset.to_vector() + Vector2D::new(x as f32 * CHUNK_UI_SIZE.width, z as f32 * CHUNK_UI_SIZE.height),
+                                            origin - player_offset + Vector2D::new(x as f32 * CHUNK_UI_SIZE.x, z as f32 * CHUNK_UI_SIZE.y),
                                             CHUNK_UI_SIZE,
                                         ),
                                         color,
@@ -1390,13 +1288,13 @@ Rendered vertices: {vertices}",
                 );
             });
 
-            self.debugging.render_info.extend(&context.finish(display, &mut frame));
+            context.finish(display, &mut frame);
         } else {
             let [r, g, b] = Color::from_u32_rgb(0x1D211B).to_linear();
 
             frame.clear_color_and_depth((r, g, b, 1.0), 1.0);
 
-            let mut root = self.context.root(&self.common_renderer, window_context.window_size().as_());
+            let mut root = self.context.root(&self.common_renderer, window_context.window_size().as_vec2());
 
             if matches!(self.current_page, Page::Main) {
                 root.center(|scope| {
@@ -1428,49 +1326,49 @@ Rendered vertices: {vertices}",
                             let mut world = World::new(display, self.resource_manager.clone(), chunk_manager, WorldType::Local);
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("torch") as usize,
+                                id: "game:torch".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("cobblestone") as usize,
+                                id: "game:cobblestone".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("bricks") as usize,
+                                id: "game:bricks".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("green_glass_block") as usize,
+                                id: "game:green_glass_block".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("wood") as usize,
+                                id: "game:wood".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("stone_bricks") as usize,
+                                id: "game:stone_bricks".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 64,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("blue_rose") as usize,
+                                id: "game:blue_rose".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 16,
                             });
 
                             world.player.inventory.try_insert(Item {
-                                id: self.resource_manager.get_block_id("debug") as usize,
+                                id: "game:debug".to_owned(),
                                 ty: ItemType::Block,
                                 amount: 1,
                             });
@@ -1525,9 +1423,9 @@ Rendered vertices: {vertices}",
                             //     }
                             // });
 
-                            let size = window_context.window_size().as_::<f32>();
+                            let size = window_context.window_size().as_vec2();
 
-                            world.camera.aspect_ratio = size.width / size.height;
+                            world.camera.aspect_ratio = size.x / size.y;
 
                             // self.event_manager.trigger(Event::WorldStart(&WorldData { world: &mut world
                             // }));
@@ -1627,7 +1525,7 @@ impl MainPage {
             let size = context
                 .measure_text("default", "Meralus", 72.0, None)
                 .unwrap_or_else(|| panic!("failed to measure next text: Meralus"));
-            let offset = Point2D::new(bounds.size.width / 2.0 - size.width / 2.0, 24.0);
+            let offset = Point2D::new(bounds.size.x / 2.0 - size.x / 2.0, 24.0);
 
             context.draw_text(
                 bounds.origin + offset,
@@ -1638,17 +1536,17 @@ impl MainPage {
                 None,
             );
 
-            let origin = bounds.origin + offset + size.to_vector();
+            let origin = bounds.origin + offset + size;
             let size = context.measure_text("default", "hiii wrld!!", 36.0, None).unwrap();
 
             context.transformed(
-                Transform3D::from_translation(origin.to_vector().extend(0.0))
+                Transform3D::from_translation(origin.extend(0.0))
                     .scale(Vector3D::splat(text_scaling))
                     .rotate_z(-20f32.to_radians())
-                    .translate(-origin.to_vector().extend(0.0)),
+                    .translate(-origin.extend(0.0)),
                 |context, _| {
                     context.draw_text(
-                        origin - size.to_vector() / 2.0,
+                        origin - size / 2.0,
                         "default",
                         "hiii wrld!!",
                         36.0,
@@ -1659,7 +1557,7 @@ impl MainPage {
             );
 
             context.draw_text(
-                bounds.origin + Point2D::new(8.0, bounds.size.height - 24.0),
+                bounds.origin + Point2D::new(8.0, bounds.size.y - 24.0),
                 "default",
                 format!("developer build for {OS} (arch: {ARCH}), v{}", env!("CARGO_PKG_VERSION")),
                 18.0,
@@ -1667,8 +1565,8 @@ impl MainPage {
                 None,
             );
 
-            let button_width = (bounds.size.width * 0.4).max(192.0);
-            let mut start = bounds.origin + Point2D::new(bounds.size.width / 2.0 - button_width / 2.0, bounds.size.height / 2.0 - 68.0);
+            let button_width = (bounds.size.x * 0.4).max(192.0);
+            let mut start = bounds.origin + Point2D::new(bounds.size.x / 2.0 - button_width / 2.0, bounds.size.y / 2.0 - 68.0);
 
             for (i, button) in MenuButton::ALL.into_iter().enumerate() {
                 let animation = format!("menu-button-{i}");
@@ -1710,7 +1608,7 @@ impl MainPage {
                 let size = context.measure_text("default", button.as_str(), 36.0, None).unwrap();
 
                 context.draw_text(
-                    start + Point2D::new((bounds.size.width * 0.4) / 2.0 - size.width / 2.0, 0.0),
+                    start + Point2D::new((bounds.size.x * 0.4) / 2.0 - size.x / 2.0, 0.0),
                     "default",
                     button.as_str(),
                     36.0,
@@ -1845,12 +1743,12 @@ fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderC
     context.ui(|context, bounds| {
         context.fill(Color::from_u32_rgb(0x3C4B38).with_alpha(opacity));
 
-        let progress_bar = Size2D::new(bounds.size.width * 0.8, 48.0);
-        let stages_progress_bar = bounds.origin + (bounds.size.to_vector() / 2.0) - (progress_bar.to_vector() / 2.0);
+        let progress_bar = Size2D::new(bounds.size.x * 0.8, 48.0);
+        let stages_progress_bar = bounds.origin + (bounds.size / 2.0) - (progress_bar / 2.0);
 
         if let Some(name) = progress.info.as_ref().and_then(|info| info.current_stage_name.as_ref()) {
             context.draw_text(
-                stages_progress_bar - Point2D::new(0.0, 44.0).to_vector(),
+                stages_progress_bar - Point2D::new(0.0, 44.0),
                 "default",
                 name,
                 36.0,
@@ -1870,7 +1768,7 @@ fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderC
 
                     context.padding(2.0, |context, bounds| {
                         context.draw_rect(
-                            Rect2D::new(bounds.origin, Size2D::new(bounds.size.width * progress, bounds.size.height)),
+                            Rect2D::new(bounds.origin, Size2D::new(bounds.size.x * progress, bounds.size.y)),
                             Color::from_u32_rgb(0xA2D398).with_alpha(opacity),
                         );
                     });
@@ -1879,7 +1777,7 @@ fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderC
         });
 
         context.bounds(
-            Rect2D::new(stages_progress_bar + Point2D::new(0.0, progress_bar.height + 8.0), progress_bar),
+            Rect2D::new(stages_progress_bar + Point2D::new(0.0, progress_bar.y + 8.0), progress_bar),
             |context, _| {
                 context.fill(Color::from_u32_rgb(0xA2D398).with_alpha(opacity));
 
@@ -1896,13 +1794,13 @@ fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut RenderC
                                     Rect2D::new(
                                         bounds.origin,
                                         Size2D::new(
-                                            bounds.size.width
+                                            bounds.size.x
                                                 * if translation < 0.0 {
                                                     animation_player.get_value_unchecked("stage-previous-progress")
                                                 } else {
                                                     progress
                                                 },
-                                            bounds.size.height * (1.0 + translation),
+                                            bounds.size.y * (1.0 + translation),
                                         ),
                                     ),
                                     Color::from_u32_rgb(0xA2D398).with_alpha(opacity),
@@ -1928,12 +1826,12 @@ impl<C: ChunkCache> AabbSource for AabbProvider<'_, C> {
 
         for (_, entity) in self.entity_manager {
             if let EntityData::Model { id, .. } = &entity.data {
-                let entity_position = position.as_::<f64>();
+                let entity_position = position.as_dvec3();
 
                 if entity.body.aabb().contains(entity_position) {
                     for aabb in self.storage.entity_models.get_unchecked(*id).elements.iter().map(|element| element.cube) {
                         if aabb
-                            .extended((entity.body.position - entity.body.size.to_vector() / 2.0).as_::<f64>())
+                            .extended((entity.body.position - entity.body.size / 2.0).as_dvec3())
                             .contains(entity_position)
                         {
                             return Some(aabb);
@@ -1943,13 +1841,20 @@ impl<C: ChunkCache> AabbSource for AabbProvider<'_, C> {
             }
         }
 
-        if let Some(block) = self.chunk_manager.get_block(correct_position.as_::<i32>())
-            && self.storage.blocks.get_unchecked(block.into()).collidable()
+        if let Some(block) = self.chunk_manager.get_block(correct_position.as_ivec3())
+            && self.storage.blocks.get_unchecked(self.storage.blocks.get_by_name(&block.name)).collidable()
         {
-            let block_pos = position.as_::<f64>();
+            let block_pos = position.as_dvec3();
 
-            for aabb in self.storage.models.get_unchecked(block.into()).elements.iter().map(|element| element.cube) {
-                if aabb.contains(block_pos - correct_position.to_vector().as_::<f64>()) {
+            for aabb in self
+                .storage
+                .models
+                .get_unchecked(self.storage.blocks.get_model_by_name(&block.name))
+                .elements
+                .iter()
+                .map(|element| element.cube)
+            {
+                if aabb.contains(block_pos - correct_position.as_dvec3()) {
                     return Some(aabb);
                 }
             }
@@ -1961,8 +1866,8 @@ impl<C: ChunkCache> AabbSource for AabbProvider<'_, C> {
     fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
         self.chunk_manager
             .get_block(position)
-            .filter(|&b| b != 0 && self.storage.blocks.get_unchecked(b.into()).selectable())
-            .and_then(|block| self.storage.models.get(block.into()))
+            .filter(|&b| b.name != "game:air" && self.storage.blocks.get_unchecked(self.storage.blocks.get_by_name(&b.name)).selectable())
+            .and_then(|block| self.storage.models.get(self.storage.blocks.get_model_by_name(&block.name)))
             .map(|element| element.bounding_box)
     }
 }
@@ -1976,13 +1881,20 @@ impl<C: ChunkCache> AabbSource for LimitedAabbProvider<'_, C> {
     fn get_aabb(&self, position: Point3D) -> Option<Aabb> {
         let correct_position = position.floor();
 
-        if let Some(block) = self.chunk_manager.get_block(correct_position.as_::<i32>())
-            && self.storage.blocks.get_unchecked(block.into()).collidable()
+        if let Some(block) = self.chunk_manager.get_block(correct_position.as_ivec3())
+            && self.storage.blocks.get_unchecked(self.storage.blocks.get_by_name(&block.name)).collidable()
         {
-            let block_pos = position.as_::<f64>();
+            let block_pos = position.as_dvec3();
 
-            for aabb in self.storage.models.get_unchecked(block.into()).elements.iter().map(|element| element.cube) {
-                if aabb.contains(block_pos - correct_position.to_vector().as_::<f64>()) {
+            for aabb in self
+                .storage
+                .models
+                .get_unchecked(self.storage.blocks.get_model_by_name(&block.name))
+                .elements
+                .iter()
+                .map(|element| element.cube)
+            {
+                if aabb.contains(block_pos - correct_position.as_dvec3()) {
                     return Some(aabb);
                 }
             }
@@ -1994,12 +1906,13 @@ impl<C: ChunkCache> AabbSource for LimitedAabbProvider<'_, C> {
     fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
         self.chunk_manager
             .get_block(position)
-            .filter(|&b| b != 0 && self.storage.blocks.get_unchecked(b.into()).selectable())
-            .and_then(|block| self.storage.models.get(block.into()))
+            .filter(|&b| b.name != "game:air" && self.storage.blocks.get_unchecked(self.storage.blocks.get_by_name(&b.name)).selectable())
+            .and_then(|block| self.storage.models.get(self.storage.blocks.get_model_by_name(&block.name)))
             .map(|element| element.bounding_box)
     }
 }
 
+#[cfg(feature = "multiplayer")]
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
     tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::layer::SubscriberExt::with(
@@ -2010,7 +1923,24 @@ async fn main() {
         ),
     ));
 
-    // let args = Args::parse();
+    tracy_client::register_demangler!();
+    tracy_client::Client::start();
+
+    Application::<GameLoop>::new(()).start().expect("failed to run app");
+}
+
+#[cfg(not(feature = "multiplayer"))]
+fn main() {
+    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::layer::SubscriberExt::with(
+        tracing_subscriber::registry(),
+        tracing_subscriber::Layer::with_filter(
+            tracing_subscriber::Layer::with_filter(tracing_subscriber::fmt::layer(), tracing_subscriber::filter::LevelFilter::INFO),
+            tracing_subscriber::filter::filter_fn(|metadata| !(metadata.target() == "cranelift_jit::backend" && metadata.level() == &tracing::Level::INFO)),
+        ),
+    ));
+
+    tracy_client::register_demangler!();
+    tracy_client::Client::start();
 
     Application::<GameLoop>::new(()).start().expect("failed to run app");
 }

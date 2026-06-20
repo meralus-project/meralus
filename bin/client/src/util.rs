@@ -1,7 +1,5 @@
-use meralus_graphics::CommonVertex;
 use meralus_physics::Aabb;
-use meralus_shared::{Color, Cube3D, Point2D, Point3D, Vector3D, Vector4D};
-use meralus_world::Face;
+use meralus_shared::{Color, Face, Cube3D, Point2D, Point3D, Vector3D, Vector4D};
 
 use crate::input::Input;
 
@@ -66,18 +64,6 @@ impl AsColor for Face {
     }
 }
 
-impl AsColor for Point3D {
-    fn as_color(&self) -> Color {
-        for (pos, vertice) in Face::VERTICES.iter().enumerate() {
-            if self == vertice {
-                return Color::from_hsl(pos as f32 / 8.0, 1.0, 0.5);
-            }
-        }
-
-        Color::BLACK
-    }
-}
-
 pub const SIZE_CAP: f32 = 960.0;
 
 pub fn format_bytes(bytes: usize) -> String {
@@ -96,18 +82,18 @@ pub fn format_bytes(bytes: usize) -> String {
 
 pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
     [
-        [[0.0, 0.0, 0.0], [0.0, size.height, 0.0]],
-        [[size.width, 0.0, 0.0], [size.width, size.height, 0.0]],
-        [[0.0, 0.0, size.depth], [0.0, size.height, size.depth]],
-        [[size.width, 0.0, size.depth], [size.width, size.height, size.depth]],
-        [[0.0, 0.0, 0.0], [size.width, 0.0, 0.0]],
-        [[0.0, 0.0, 0.0], [0.0, 0.0, size.depth]],
-        [[size.width, 0.0, 0.0], [size.width, 0.0, size.depth]],
-        [[0.0, 0.0, size.depth], [size.width, 0.0, size.depth]],
-        [[0.0, size.height, 0.0], [size.width, size.height, 0.0]],
-        [[0.0, size.height, 0.0], [0.0, size.height, size.depth]],
-        [[size.width, size.height, 0.0], [size.width, size.height, size.depth]],
-        [[0.0, size.height, size.depth], [size.width, size.height, size.depth]],
+        [[0.0, 0.0, 0.0], [0.0, size.y, 0.0]],
+        [[size.x, 0.0, 0.0], [size.x, size.y, 0.0]],
+        [[0.0, 0.0, size.z], [0.0, size.y, size.z]],
+        [[size.x, 0.0, size.z], [size.x, size.y, size.z]],
+        [[0.0, 0.0, 0.0], [size.x, 0.0, 0.0]],
+        [[0.0, 0.0, 0.0], [0.0, 0.0, size.z]],
+        [[size.x, 0.0, 0.0], [size.x, 0.0, size.z]],
+        [[0.0, 0.0, size.z], [size.x, 0.0, size.z]],
+        [[0.0, size.y, 0.0], [size.x, size.y, 0.0]],
+        [[0.0, size.y, 0.0], [0.0, size.y, size.z]],
+        [[size.x, size.y, 0.0], [size.x, size.y, size.z]],
+        [[0.0, size.y, size.z], [size.x, size.y, size.z]],
     ]
     .into_iter()
     .fold(Vec::new(), |mut vertices, [start, end]| {
@@ -131,33 +117,33 @@ pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv: Point2D) ->
 }
 
 pub fn aabb_outline(Aabb { min, max }: Aabb, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
-    let size = (max - min).to_size().as_::<f32>();
+    let size = (max - min).as_vec3();
 
     [
-        [[0.0, 0.0, 0.0], [0.0, size.height, 0.0]],
-        [[size.width, 0.0, 0.0], [size.width, size.height, 0.0]],
-        [[0.0, 0.0, size.depth], [0.0, size.height, size.depth]],
-        [[size.width, 0.0, size.depth], [size.width, size.height, size.depth]],
-        [[0.0, 0.0, 0.0], [size.width, 0.0, 0.0]],
-        [[0.0, 0.0, 0.0], [0.0, 0.0, size.depth]],
-        [[size.width, 0.0, 0.0], [size.width, 0.0, size.depth]],
-        [[0.0, 0.0, size.depth], [size.width, 0.0, size.depth]],
-        [[0.0, size.height, 0.0], [size.width, size.height, 0.0]],
-        [[0.0, size.height, 0.0], [0.0, size.height, size.depth]],
-        [[size.width, size.height, 0.0], [size.width, size.height, size.depth]],
-        [[0.0, size.height, size.depth], [size.width, size.height, size.depth]],
+        [[0.0, 0.0, 0.0], [0.0, size.y, 0.0]],
+        [[size.x, 0.0, 0.0], [size.x, size.y, 0.0]],
+        [[0.0, 0.0, size.z], [0.0, size.y, size.z]],
+        [[size.x, 0.0, size.z], [size.x, size.y, size.z]],
+        [[0.0, 0.0, 0.0], [size.x, 0.0, 0.0]],
+        [[0.0, 0.0, 0.0], [0.0, 0.0, size.z]],
+        [[size.x, 0.0, 0.0], [size.x, 0.0, size.z]],
+        [[0.0, 0.0, size.z], [size.x, 0.0, size.z]],
+        [[0.0, size.y, 0.0], [size.x, size.y, 0.0]],
+        [[0.0, size.y, 0.0], [0.0, size.y, size.z]],
+        [[size.x, size.y, 0.0], [size.x, size.y, size.z]],
+        [[0.0, size.y, size.z], [size.x, size.y, size.z]],
     ]
     .into_iter()
     .fold(Vec::new(), |mut vertices, [start, end]| {
         vertices.extend([
             CommonVertex {
-                position: min.as_() + Point3D::from_array(start),
+                position: min.as_vec3() + Point3D::from_array(start),
                 color: Color::BLUE,
                 uv: white_pixel_uv,
                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),
             },
             CommonVertex {
-                position: min.as_() + Point3D::from_array(end),
+                position: min.as_vec3() + Point3D::from_array(end),
                 color: Color::BLUE,
                 uv: white_pixel_uv,
                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),

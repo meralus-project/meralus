@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-meralus-world.workspace = true
-meralus-shared.workspace = true
+meralus-shared = { workspace = true, features = ["geometry", "face"] }
 
 [lints]
 workspace = true

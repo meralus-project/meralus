@@ -6,30 +6,29 @@ use std::{
 };
 
 use ahash::{HashMap, HashSet};
-use meralus_animation::{Curve, RepeatMode, Transition};
-use meralus_engine::WindowDisplay;
-use meralus_graphics::{CommonVertex, VoxelFace, VoxelMeshBuilder, VoxelRenderer};
 #[cfg(feature = "multiplayer")]
 use meralus_network::{IncomingPacket, OutgoingPacket, Uuid};
 use meralus_physics::{PhysicsBody, PhysicsContext};
-use meralus_shared::{Angle, Color, Cube3D, IPoint2D, IPoint3D, Point2D, Point3D, Ranged, Size3D, Transform3D, USizePoint3D, Vector3D};
+use meralus_shared::{Color, Cube3D, Face, IPoint2D, IPoint3D, Point2D, Point3D, Ranged, Size3D, Transform3D, USizePoint3D, Vector3D};
 use meralus_storage::Block;
+use meralus_tween::{RepeatMode, Tween};
 use meralus_world::{
-    BfsLight, CHUNK_HEIGHT, CHUNK_HEIGHT_F32, Chunk, ChunkAccess, ChunkCache, ChunkGenerator, ChunkManager, ChunkStage, Face, LightNode, LocalChunkManager,
-    SUBCHUNK_COUNT, SUBCHUNK_SIZE, SUBCHUNK_SIZE_F32,
+    BfsLight, CHUNK_HEIGHT, CHUNK_HEIGHT_F32, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, LocalChunkManager, SUBCHUNK_COUNT,
+    SUBCHUNK_SIZE, SUBCHUNK_SIZE_F32,
 };
 use tracing::info;
+use tracy_client::{set_thread_name, span};
 
 use crate::{
-    AabbProvider, Camera, FIXED_FRAMERATE, INVENTORY_HOTBAR_SLOTS, Interval, Item, LimitedAabbProvider, PlayerController, ResourceStorage, TICK_RATE, TPS,
-    clock::Clock, cube_outline, input::Input, player::ItemType, vertex_ao,
+    AabbProvider, Camera, FIXED_FRAMERATE, GraphicsSettings, INVENTORY_HOTBAR_SLOTS, Interval, Item, LimitedAabbProvider, PlayerController, ResourceStorage,
+    TICK_RATE, TPS, clock::Clock, cube_outline, input::Input, player::ItemType,
 };
 
 const GRASS_COLOR: Color = Color::from_hsl(120.0, 0.4, 0.75);
 
 #[non_exhaustive]
 pub enum EntityData {
-    Item { item: Item, transition: Transition },
+    Item { item: Item, transition: Tween<f32> },
     Model { id: usize, rotations: Vec<Vector3D> },
 }
 
@@ -44,14 +43,14 @@ impl Entity {
             body: PhysicsBody::new(position, Size3D::new(0.3, 0.3, 0.3)),
             data: EntityData::Item {
                 item,
-                transition: Transition::new(0.0, 1.0, 2000, Curve::LINEAR, RepeatMode::Infinite),
+                transition: Tween::new(0.0, 1.0, 2000).with_repeat_mode(RepeatMode::Infinite),
             },
         }
     }
 
     pub fn model(position: Point3D, id: usize, resource_storage: &ResourceStorage) -> Self {
         Self {
-            body: PhysicsBody::new(position, resource_storage.entity_models.get_aabb(id as u8).unwrap().size().as_()),
+            body: PhysicsBody::new(position, resource_storage.entity_models.get_aabb(id as u8).unwrap().size().as_vec3()),
             data: EntityData::Model { id, rotations: Vec::new() },
         }
     }
@@ -69,15 +68,15 @@ impl Entity {
     pub fn render_to<C: ChunkCache>(&self, builder: &mut VoxelMeshBuilder, chunk_manager: &ChunkManager<C>, resource_storage: &ResourceStorage) {
         match &self.data {
             EntityData::Item { transition, item } => {
-                let animation_value = transition.get::<f32>();
-                let model = resource_storage.models.get_unchecked(item.id);
-                let mut current_block: IPoint3D = self.body.position.floor().as_();
+                let animation_value = transition.get_copy();
+                let model = resource_storage.models.get_unchecked(resource_storage.blocks.get_model_by_name(&item.id));
+                let mut current_block = self.body.position.floor().as_ivec3();
                 let light = chunk_manager.get_light_level(current_block);
-                let matrix = Transform3D::from_rotation_y(Angle::from_radians(animation_value * const { 360f32.to_radians() }));
+                let matrix = Transform3D::from_rotation_y(animation_value * const { 360f32.to_radians() });
                 let animation_value = if animation_value > 0.5 { 1.0 - animation_value } else { animation_value };
                 let position_offset = Point3D::new(0.0, const { Point3D::new(0.3, 0.3, 0.3).y / 2.0 }, 0.0);
                 let block_below = loop {
-                    if chunk_manager.get_block(current_block).is_some_and(|b| b != 0) {
+                    if chunk_manager.get_block(current_block).is_some_and(|b| b.name != "game:air") {
                         break Some(current_block);
                     } else if current_block.y <= 0 {
                         break None;
@@ -96,7 +95,7 @@ impl Entity {
 
                             builder.push_transformed(
                                 &VoxelFace {
-                                    position: block_below.as_() + (Point3D::new(0.5, 0.0, 0.5) - size.with_y(0.0) / 2.0) + (Point3D::Y * 1.05),
+                                    position: block_below.as_vec3() + (Point3D::new(0.5, 0.0, 0.5) - size.with_y(0.0) / 2.0) + (Point3D::Y * 1.05),
                                     vertices: model_face
                                         .face_data
                                         .vertices
@@ -114,7 +113,7 @@ impl Entity {
 
                         builder.push_transformed(
                             &VoxelFace {
-                                position: self.body.position - (position_offset * animation_value).to_vector(),
+                                position: self.body.position - (position_offset * animation_value),
                                 vertices: model_face
                                     .face_data
                                     .vertices
@@ -131,7 +130,7 @@ impl Entity {
             }
             EntityData::Model { id, rotations } => {
                 let model = resource_storage.entity_models.get_unchecked(*id);
-                let half_size = model.bounding_box.size().as_::<f32>() / 2.0;
+                let half_size = model.bounding_box.size().as_vec3() / 2.0;
 
                 for (i, element) in model.elements.iter().enumerate() {
                     for face_data in element.faces.as_ref() {
@@ -139,24 +138,24 @@ impl Entity {
                             let mut matrix = Transform3D::IDENTITY;
 
                             if rotation.x > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_x(Angle::from_radians(rotation.x));
+                                matrix = matrix * Transform3D::from_rotation_x(rotation.x);
                             }
 
                             if rotation.y > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_y(Angle::from_radians(rotation.y));
+                                matrix = matrix * Transform3D::from_rotation_y(rotation.y);
                             }
 
                             if rotation.z > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_z(Angle::from_radians(rotation.z));
+                                matrix = matrix * Transform3D::from_rotation_z(rotation.z);
                             }
 
-                            let center = element.cube.min.as_() + element.cube.size().to_vector().as_::<f32>() / 2.0;
+                            let center = element.cube.min.as_vec3() + element.cube.size().as_vec3() / 2.0;
 
-                            face_data.vertices.map(|v| matrix.transform_point3(v - center.to_vector()) + center)
+                            face_data.vertices.map(|v| matrix.transform_point3(v - center) + center)
                         });
 
                         builder.push(&VoxelFace {
-                            position: self.body.position - half_size.to_vector(),
+                            position: self.body.position - half_size,
                             vertices,
                             lights: [240; 4],
                             uvs: face_data.uvs,
@@ -252,37 +251,38 @@ pub struct ChunkFileCache {
 
 impl ChunkCache for ChunkFileCache {
     fn all(&self) -> impl Iterator<Item = Chunk> {
-        self.root.read_dir().into_iter().flatten().filter_map(|e| {
-            let e = e.ok()?;
-            let path = e.path();
+        // self.root.read_dir().into_iter().flatten().filter_map(|e| {
+        //     let e = e.ok()?;
+        //     let path = e.path();
 
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "cdt") {
-                let data = std::fs::read(path).ok()?;
+        //     if path.is_file() && path.extension().is_some_and(|ext| ext == "cdt") {
+        //         let data = std::fs::read(path).ok()?;
 
-                Chunk::deserialize(data).ok()
-            } else {
-                None
-            }
-        })
+        //         Chunk::deserialize(data).ok()
+        //     } else {
+        //         None
+        //     }
+        // })
+        std::iter::empty()
     }
 
     fn get(&self, origin: IPoint2D) -> Option<Chunk> {
         let path = self.root.join(format!("{}x{}.cdt", origin.x, origin.y));
 
-        if path.is_file() {
-            let data = std::fs::read(path).ok()?;
+        // if path.is_file() {
+        //     let data = std::fs::read(path).ok()?;
 
-            Chunk::deserialize(data).ok()
-        } else {
-            None
-        }
+        //     None
+        // } else {
+        None
+        // }
     }
 
     fn insert(&mut self, origin: IPoint2D, chunk: &Chunk) {
-        let path = self.root.join(format!("{}x{}.cdt", origin.x, origin.y));
-        let data = chunk.serialize();
+        // let path = self.root.join(format!("{}x{}.cdt", origin.x, origin.y));
+        // let data = chunk.serialize();
 
-        _ = std::fs::write(path, data);
+        // _ = std::fs::write(path, data);
     }
 }
 
@@ -334,6 +334,9 @@ impl JobManager {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
+            set_thread_name!("Generation");
+
+            let zone = span!("Generation");
             let instant = Instant::now();
             let generator = ChunkGenerator::new(i64::from(seed));
             let mut chunk = Chunk::new(origin);
@@ -341,6 +344,8 @@ impl JobManager {
             generator.generate_unpopulated_chunk_data(&mut chunk, resource_storage.as_ref());
 
             _ = sender.send(JobResult::Generation { chunk });
+
+            zone.emit_value(instant.elapsed().as_millis() as u64);
 
             info!(target: "client/world", origin = ?origin, "Chunk generated in {:?}", instant.elapsed());
         });
@@ -350,6 +355,9 @@ impl JobManager {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
+            set_thread_name!("Population");
+
+            let zone = span!("Population");
             let instant = Instant::now();
             let seed = i64::from(seed);
 
@@ -359,6 +367,8 @@ impl JobManager {
 
             _ = sender.send(JobResult::Population { chunk, neighbours });
 
+            zone.emit_value(instant.elapsed().as_millis() as u64);
+
             info!(target: "client/world", origin = ?origin, "Chunk populated in {:?}", instant.elapsed());
         });
     }
@@ -367,10 +377,11 @@ impl JobManager {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
-            let instant = Instant::now();
-            let mut bfs_light = BfsLight::new(&mut chunk_manager).apply_to_sky_light();
+            set_thread_name!("Lighting");
 
-            bfs_light.starting_chunk = Some(origin);
+            let zone = span!("Lighting");
+            let instant = Instant::now();
+            let mut bfs_light = BfsLight::new(&mut chunk_manager);
 
             let chunk = bfs_light.chunk_manager.get_chunk_mut(origin).unwrap();
 
@@ -382,7 +393,7 @@ impl JobManager {
                         chunk.set_sky_light(pos, 15);
 
                         if pos.y > 0 && chunk.get_block(pos - USizePoint3D::Y).is_some() {
-                            bfs_light.addition_queue.push_back(LightNode(pos, origin));
+                            bfs_light.sky_addition_queue.push_back(LightNode(pos, origin));
 
                             break;
                         }
@@ -390,29 +401,35 @@ impl JobManager {
                 }
             }
 
-            bfs_light.calculate(resource_storage.as_ref());
+            bfs_light.calculate_sky_light(resource_storage.as_ref());
 
             let (chunk, neighbours) = chunk_manager.into_inner();
 
             _ = sender.send(JobResult::Lightning { chunk, neighbours });
 
+            zone.emit_value(instant.elapsed().as_millis() as u64);
+
             info!(target: "client/world", origin = ?origin, "Chunk lighted in {:?}", instant.elapsed());
         });
     }
 
-    fn spawn_meshing_job(&self, origin: IPoint2D, chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>) {
+    fn spawn_meshing_job(&self, origin: IPoint2D, chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>, settings: GraphicsSettings) {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
+            set_thread_name!("Meshing");
+
+            let zone = span!("Meshing");
+
             let instant = Instant::now();
-            let snapshot = WorldSnapshot::new(&chunk_manager, resource_storage);
+            let snapshot = WorldSnapshot::new(&chunk_manager, resource_storage, settings);
             let mesh = (0..SUBCHUNK_COUNT)
                 .rev()
                 .map(|subchunk_idx| {
                     if snapshot.chunk_manager.get_chunk(origin).unwrap().subchunks[subchunk_idx]
-                        .blocks
+                        .palette
                         .iter()
-                        .any(|block| block != &0)
+                        .any(|block| block.name != "game:air")
                     {
                         snapshot.compute_subchunk_mesh(origin, subchunk_idx)
                     } else {
@@ -422,6 +439,8 @@ impl JobManager {
                 .collect();
 
             _ = sender.send(JobResult::Meshing { origin, mesh });
+
+            zone.emit_value(instant.elapsed().as_millis() as u64);
 
             info!(target: "client/world", origin = ?origin, "Chunk meshed in {:?}", instant.elapsed());
         });
@@ -509,27 +528,19 @@ impl World {
     pub fn destroy_block_local(&mut self, origin: IPoint2D, local: USizePoint3D) {
         let position = Chunk::to_world_pos(origin, local);
 
-        if let Some(block_id) = self.chunk_manager.get_block(position)
-            && block_id != 0
-            && let Some(block) = self.resource_storage.get_block(block_id.into())
+        if let Some(state) = self.chunk_manager.get_block(position)
+            && state.name != "game:air"
+            && let Some(block) = self.resource_storage.get_block(&state.name)
         {
             if block.droppable() {
-                self.entities.spawn_item(position.as_() + Point3D::new(0.35, 0.0, 0.35), Item {
-                    id: block_id.into(),
+                self.entities.spawn_item(position.as_vec3() + Point3D::new(0.35, 0.0, 0.35), Item {
+                    id: state.name.clone(),
                     ty: ItemType::Block,
                     amount: 1,
                 });
             }
 
-            for chunk in self.chunk_manager.remove_block(position, self.resource_storage.as_ref()) {
-                if let Some(chunk) = self.chunk_manager.get_chunk_mut(chunk) {
-                    chunk.dirty = true;
-                }
-            }
-
-            if let Some(chunk) = self.chunk_manager.get_chunk_mut(origin) {
-                chunk.dirty = true;
-            }
+            self.chunk_manager.remove_block(position, self.resource_storage.as_ref());
         }
     }
 
@@ -649,7 +660,7 @@ impl World {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, settings: GraphicsSettings) {
         for result in self.job_manager.receiver.try_iter() {
             match result {
                 JobResult::Generation { chunk } => {
@@ -743,7 +754,8 @@ impl World {
                     let chunk_manager = self.chunk_manager.local_of(origin).unwrap();
 
                     self.job_manager.jobs.insert(origin);
-                    self.job_manager.spawn_meshing_job(origin, chunk_manager, self.resource_storage.clone());
+                    self.job_manager
+                        .spawn_meshing_job(origin, chunk_manager, self.resource_storage.clone(), settings);
 
                     queue.push((origin, ChunkStage::MeshingInProgress));
                 }
@@ -755,7 +767,8 @@ impl World {
                     let chunk_manager = self.chunk_manager.local_of(origin).unwrap();
 
                     self.job_manager.jobs.insert(origin);
-                    self.job_manager.spawn_meshing_job(origin, chunk_manager, self.resource_storage.clone());
+                    self.job_manager
+                        .spawn_meshing_job(origin, chunk_manager, self.resource_storage.clone(), settings);
 
                     queue.push((origin, ChunkStage::MeshingInProgress));
                 }
@@ -774,7 +787,7 @@ impl World {
         }
 
         if self.job_manager.jobs.is_empty() {
-            let origin = ChunkManager::<()>::to_local(self.player.body.position.as_());
+            let origin = ChunkManager::<()>::to_local(self.player.body.position.as_ivec3());
             let mut chunks = (-10..10)
                 .flat_map(|x| (-10..10).map(move |z| origin + IPoint2D::new(x, z)))
                 .filter(|&origin| self.chunk_manager.get_chunk(origin).is_none())
@@ -783,9 +796,9 @@ impl World {
             if !chunks.is_empty() {
                 chunks.sort_unstable_by(|a, b| {
                     origin
-                        .as_::<f32>()
-                        .distance_squared(a.as_::<f32>())
-                        .total_cmp(&origin.as_::<f32>().distance_squared(b.as_::<f32>()))
+                        .as_vec2()
+                        .distance_squared(a.as_vec2())
+                        .total_cmp(&origin.as_vec2().distance_squared(b.as_vec2()))
                 });
 
                 info!(
@@ -806,7 +819,7 @@ impl World {
 
     pub fn chunk_borders(&self, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
         self.chunk_manager.chunks().fold(Vec::new(), |mut lines, chunk| {
-            let origin = chunk.origin.as_::<f32>() * SUBCHUNK_SIZE_F32;
+            let origin = chunk.origin.as_vec2() * SUBCHUNK_SIZE_F32;
 
             lines.extend(cube_outline(
                 Cube3D::new(
@@ -824,22 +837,16 @@ impl World {
 struct WorldSnapshot<'a, C: ChunkAccess> {
     chunk_manager: &'a C,
     resource_storage: Arc<ResourceStorage>,
+    calc_light_fn: fn(&C, &ResourceStorage, IPoint3D, IPoint3D, [[IPoint3D; 3]; 4], bool) -> ([f32; 4], [u8; 4]),
 }
 
 impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
-    const fn new(chunk_manager: &'a C, resource_storage: Arc<ResourceStorage>) -> Self {
+    const fn new(chunk_manager: &'a C, resource_storage: Arc<ResourceStorage>, settings: GraphicsSettings) -> Self {
         Self {
             chunk_manager,
             resource_storage,
+            calc_light_fn: settings.light_style.get_light_fn::<C>(),
         }
-    }
-
-    fn does_block_have_ao(&self, position: IPoint3D) -> bool {
-        self.chunk_manager
-            .get_block(position)
-            .filter(|&b| b != 0)
-            .map(|block| self.resource_storage.models.get_unchecked(block.into()))
-            .is_some_and(|block| block.ambient_occlusion)
     }
 
     #[allow(clippy::too_many_lines)]
@@ -862,59 +869,49 @@ impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
         let subchunk = &chunk.subchunks[subchunk_idx];
 
         for (local_position, block_id) in subchunk.iter(subchunk_idx) {
-            if let Some((block_id, model)) = block_id.map(|block_id| (block_id, self.resource_storage.models.get_unchecked(block_id.into()))) {
-                let world_position: IPoint3D = chunk.to_world(local_position);
-                let neighbours: [Option<u8>; 6] =
-                    Face::NORMALS.map(|face: IPoint3D| self.chunk_manager.get_block(world_position + face).filter(|b: &u8| *b != 0));
+            if let Some((state, model)) = block_id.map(|state| {
+                (
+                    state,
+                    self.resource_storage
+                        .models
+                        .get_unchecked(self.resource_storage.blocks.get_model_by_name(&state.name)),
+                )
+            }) {
+                let world_position = chunk.to_world(local_position);
+                let neighbours = Face::NORMALS.map(|face| self.chunk_manager.get_block(world_position + face).filter(|b| b.name != "game:air"));
 
                 let (cull_if_same, tint_color): (bool, Option<Color>) = self
                     .resource_storage
-                    .get_block(block_id.into())
+                    .get_block(&state.name)
                     .map_or((false, None), |block: &dyn Block| (block.cull_if_same(), block.tint_color()));
 
                 for element in &model.elements {
                     for model_face in &element.faces {
                         let culled = model_face.cull_face.as_ref().is_some_and(|(cull_face_normal, _, _, opposite_face)| {
                             neighbours[*cull_face_normal]
-                                .map(|neighbour| (neighbour, self.resource_storage.models.get_unchecked(neighbour.into())))
-                                .is_some_and(|(neighbour, model)| model.is_opaque(*opposite_face) || (cull_if_same && neighbour == block_id))
+                                .map(|neighbour| {
+                                    (
+                                        neighbour,
+                                        self.resource_storage
+                                            .models
+                                            .get_unchecked(self.resource_storage.blocks.get_model_by_name(&neighbour.name)),
+                                    )
+                                })
+                                .is_some_and(|(neighbour, model)| model.is_opaque(*opposite_face) || (cull_if_same && neighbour.name == state.name))
                         });
 
                         if !culled {
                             // let mut lights = [1.0; 4];
-                            let mut aos: [f32; 4] = [1.0; 4];
                             let light_source: IPoint3D = world_position + model_face.face_data.normal;
-                            let mut lights: [u8; 4] = [0; 4];
 
-                            for (([side1, side2, corner], ao), light) in model_face.face_data.corners.into_iter().zip(&mut aos).zip(&mut lights) {
-                                if model.ambient_occlusion {
-                                    let side1_block: IPoint3D = world_position + side1;
-                                    let side2_block: IPoint3D = world_position + side2;
-                                    let corner_block: IPoint3D = world_position + corner;
-
-                                    let init_light: u8 = self.chunk_manager.get_block_light(light_source);
-                                    let side1_light: u8 = self.chunk_manager.get_block_light(side1_block);
-                                    let side2_light: u8 = self.chunk_manager.get_block_light(side2_block);
-                                    let corner_light: u8 = self.chunk_manager.get_block_light(corner_block);
-                                    let block_light = (init_light + side1_light + side2_light + corner_light) / 4;
-
-                                    let init_light: u8 = self.chunk_manager.get_sky_light(light_source);
-                                    let side1_light: u8 = self.chunk_manager.get_sky_light(side1_block);
-                                    let side2_light: u8 = self.chunk_manager.get_sky_light(side2_block);
-                                    let corner_light: u8 = self.chunk_manager.get_sky_light(corner_block);
-                                    let sky_light = (init_light + side1_light + side2_light + corner_light) / 4;
-
-                                    *light = (sky_light << 4) | (block_light & 0xF);
-
-                                    *ao = vertex_ao(
-                                        self.does_block_have_ao(side1_block),
-                                        self.does_block_have_ao(side2_block),
-                                        self.does_block_have_ao(corner_block),
-                                    );
-                                } else {
-                                    *light = self.chunk_manager.get_light_level(light_source);
-                                }
-                            }
+                            let (aos, mut lights) = (self.calc_light_fn)(
+                                self.chunk_manager,
+                                self.resource_storage.as_ref(),
+                                world_position,
+                                light_source,
+                                model_face.face_data.corners,
+                                model.ambient_occlusion,
+                            );
 
                             let mut vertices: [Point3D; 4] = model_face.face_data.vertices;
                             let mut uvs: [Point2D; 4] = model_face.face_data.uvs;
@@ -938,7 +935,8 @@ impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
                                 position: world_position.as_(),
                                 lights,
                                 uvs,
-                                color: if model_face.tint { tint_color.unwrap_or(Color::WHITE) } else { Color::WHITE },
+                                color: (if model_face.tint { tint_color.unwrap_or(Color::WHITE) } else { Color::WHITE })
+                                    .multiply_rgb(model_face.face_data.face.get_light_level()),
                             });
                         }
                     }

@@ -1,8 +1,9 @@
 use std::{fs, path::Path};
 
+use meralus_io::{EntityElementData, EntityModel, TexturePath, TextureRef};
 use meralus_physics::Aabb;
-use meralus_shared::{DPoint3D, Point2D, Vector2D};
-use meralus_world::{EntityElementData, EntityModel, Face, TexturePath, TextureRef, vec_to_boxed_array};
+use meralus_shared::{DPoint3D, Face, Point2D, Vector2D};
+use meralus_world::new_boxed_array;
 use tracing::info;
 
 use crate::{FaceData, FaceUV, LoadingError, Mappings, ModelLoadingError};
@@ -76,18 +77,18 @@ impl EntityModelStorage {
                 let EntityElementData::Cube { start, end, mut faces } = element.data;
                 let min = start / 48.0;
                 let max = end / 48.0;
-                let cube = Aabb::new(min.as_(), max.as_());
+                let cube = Aabb::new(min.as_dvec3(), max.as_dvec3());
 
                 if let Some(bounding_box) = &mut bounding_box {
-                    bounding_box.min = bounding_box.min.min(min.as_());
-                    bounding_box.max = bounding_box.max.max(max.as_());
+                    bounding_box.min = bounding_box.min.min(min.as_dvec3());
+                    bounding_box.max = bounding_box.max.max(max.as_dvec3());
                 } else {
-                    bounding_box.replace(Aabb::new(min.as_(), max.as_()));
+                    bounding_box.replace(Aabb::new(min.as_dvec3(), max.as_dvec3()));
                 }
 
                 BakedEntityModelElement {
                     cube,
-                    faces: vec_to_boxed_array(
+                    faces: new_boxed_array(
                         Face::ALL
                             .into_iter()
                             .map(|face| {
@@ -105,7 +106,7 @@ impl EntityModelStorage {
 
                                 FaceData::new(face, cube, uv, None)
                             })
-                            .collect::<Vec<_>>(),
+                            .collect(),
                     ),
                 }
             })

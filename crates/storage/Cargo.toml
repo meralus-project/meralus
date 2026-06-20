@@ -6,7 +6,13 @@ edition = "2024"
 [dependencies]
 ahash.workspace = true
 meralus-physics.workspace = true
-meralus-shared.workspace = true
+meralus-shared = { workspace = true, features = [
+    "geometry",
+    "color",
+    "face",
+    "serde",
+] }
+meralus-io.workspace = true
 meralus-world.workspace = true
 meck.workspace = true
 image.workspace = true

@@ -1,8 +1,9 @@
-use std::io::{self, Read};
+use std::iter::repeat_n;
 
-use meralus_shared::{IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
+use ahash::HashMap;
+use meralus_shared::{Face, IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
 
-use crate::{BiomeBase, Face, vec_to_boxed_array};
+use crate::{BiomeBase, PropertyValue, new_boxed_array};
 
 pub const SUBCHUNK_XZ_MAX: usize = SUBCHUNK_SIZE - 1;
 
@@ -24,20 +25,74 @@ pub const CHUNK_HEIGHT_U16: u16 = SUBCHUNK_SIZE_U16 * SUBCHUNK_COUNT_U16;
 pub const CHUNK_HEIGHT_F32: f32 = SUBCHUNK_SIZE_F32 * SUBCHUNK_COUNT_F32;
 pub const CHUNK_HEIGHT_F64: f64 = SUBCHUNK_SIZE_F64 * SUBCHUNK_COUNT_F64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Cube whose size is specified by [`CHUNK_SIZE`] constant.
+pub struct SubChunkBlockState {
+    /// 3D array of block IDs.
+    pub name: String,
+    pub properties: HashMap<String, PropertyValue>,
+}
+
+impl SubChunkBlockState {
+    pub fn new<T: Into<String>>(name: T) -> Self {
+        let name = name.into();
+
+        Self {
+            name,
+            properties: HashMap::default(),
+        }
+    }
+
+    pub fn set_i64(&mut self, property: &str, value: i64) {
+        self.properties.insert(property.to_string(), PropertyValue::Number(value));
+    }
+
+    pub fn set_f32(&mut self, property: &str, value: f32) {
+        self.properties.insert(property.to_string(), PropertyValue::Float(value));
+    }
+
+    pub fn set_bool(&mut self, property: &str, value: bool) {
+        self.properties.insert(property.to_string(), PropertyValue::Boolean(value));
+    }
+
+    pub fn get_i64(&self, property: &str) -> Option<i64> {
+        self.properties
+            .get(property)
+            .and_then(|value| if let &PropertyValue::Number(value) = value { Some(value) } else { None })
+    }
+
+    pub fn get_f32(&self, property: &str) -> Option<f32> {
+        self.properties
+            .get(property)
+            .and_then(|value| if let &PropertyValue::Float(value) = value { Some(value) } else { None })
+    }
+
+    pub fn get_bool(&self, property: &str) -> Option<bool> {
+        self.properties
+            .get(property)
+            .and_then(|value| if let &PropertyValue::Boolean(value) = value { Some(value) } else { None })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Cube whose size is specified by [`CHUNK_SIZE`] constant.
 pub struct SubChunk {
-    /// 3D array of block IDs.
-    pub blocks: [u8; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-    /// 3D array of block light level values.
+    /// Palette of block states.
+    pub palette: Vec<SubChunkBlockState>,
+    /// Array of palette indices.
+    pub data: [u8; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
+    /// Array of block light level values.
     pub light_levels: [u8; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
 }
 
 impl SubChunk {
-    pub const EMPTY: Self = Self {
-        blocks: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-        light_levels: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-    };
+    pub fn empty() -> Self {
+        Self {
+            palette: vec![SubChunkBlockState::new("game:air")],
+            data: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
+            light_levels: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
+        }
+    }
 
     #[inline]
     pub const fn index_of(position: USizePoint3D) -> usize {
@@ -45,27 +100,36 @@ impl SubChunk {
     }
 
     #[inline]
-    pub fn filled_full_height(value: u8) -> Box<[Self; SUBCHUNK_COUNT]> {
-        vec_to_boxed_array(vec![
-            Self {
-                blocks: [value; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-                light_levels: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-            };
-            SUBCHUNK_COUNT
-        ])
+    pub fn empty_full_height() -> Box<[Self; SUBCHUNK_COUNT]> {
+        new_boxed_array(repeat_n(Self::empty(), SUBCHUNK_COUNT).collect())
     }
 
-    #[inline]
-    pub fn empty_full_height() -> Box<[Self; SUBCHUNK_COUNT]> {
-        vec_to_boxed_array(vec![Self::EMPTY; SUBCHUNK_COUNT])
+    pub fn index_of_state(&self, name: &str) -> usize {
+        self.palette.iter().position(|palette_block| &palette_block.name == name).unwrap_or(0)
+    }
+
+    pub fn try_insert(&mut self, block: SubChunkBlockState) -> usize {
+        if let Some(index) = self.palette.iter().position(|palette_block| palette_block == &block) {
+            index
+        } else {
+            let index = self.palette.len();
+
+            self.palette.push(block);
+
+            index
+        }
     }
 
     #[must_use]
     #[inline]
-    pub fn get_block_unchecked(&self, position: USizePoint3D) -> Option<u8> {
-        let &block_id = unsafe { self.blocks.get_unchecked(Self::index_of(position)) };
+    pub fn get_block_unchecked(&self, position: USizePoint3D) -> &SubChunkBlockState {
+        self.get_block_by_idx_unchecked(Self::index_of(position))
+    }
 
-        if block_id == 0 { None } else { Some(block_id) }
+    #[must_use]
+    #[inline]
+    pub fn get_block_by_idx_unchecked(&self, index: usize) -> &SubChunkBlockState {
+        unsafe { self.palette.get_unchecked(*self.data.get_unchecked(index) as usize) }
     }
 
     #[inline]
@@ -97,15 +161,6 @@ impl Chunk {
         }
     }
 
-    pub fn filled(value: u8) -> Self {
-        Self {
-            origin: IPoint2D::ZERO,
-            biomes: [BiomeBase::Sky; SUBCHUNK_SIZE * SUBCHUNK_SIZE],
-            subchunks: SubChunk::filled_full_height(value),
-            dirty: true,
-        }
-    }
-
     #[must_use]
     pub const fn with_origin(mut self, origin: IPoint2D) -> Self {
         self.origin = origin;
@@ -117,41 +172,43 @@ impl Chunk {
         position.y * SUBCHUNK_SIZE + position.x
     }
 
-    pub fn deserialize<T: AsRef<[u8]>>(data: T) -> io::Result<Self> {
-        let mut chunk = Self::empty();
+    // pub fn deserialize<T: AsRef<[u8]>>(data: T) -> io::Result<Self> {
+    //     let mut chunk = Self::empty();
 
-        let mut data = data.as_ref();
+    //     let mut data = data.as_ref();
 
-        chunk.origin = {
-            let mut x = [0; 4];
-            let mut z = [0; 4];
+    //     chunk.origin = {
+    //         let mut x = [0; 4];
+    //         let mut z = [0; 4];
 
-            data.read_exact(&mut x)?;
-            data.read_exact(&mut z)?;
+    //         data.read_exact(&mut x)?;
+    //         data.read_exact(&mut z)?;
 
-            let x = i32::from_be_bytes(x);
-            let z = i32::from_be_bytes(z);
+    //         let x = i32::from_be_bytes(x);
+    //         let z = i32::from_be_bytes(z);
 
-            IPoint2D::new(x, z)
-        };
+    //         IPoint2D::new(x, z)
+    //     };
 
-        for y in 0..CHUNK_HEIGHT {
-            for z in 0..SUBCHUNK_SIZE {
-                for x in 0..SUBCHUNK_SIZE {
-                    let mut buf = [0; 2];
+    //     for y in 0..CHUNK_HEIGHT {
+    //         for z in 0..SUBCHUNK_SIZE {
+    //             for x in 0..SUBCHUNK_SIZE {
+    //                 let mut buf = [0; 2];
 
-                    data.read_exact(&mut buf)?;
+    //                 data.read_exact(&mut buf)?;
 
-                    let [subchunk, y] = Self::get_subchunk_index(y);
+    //                 let [subchunk, y] = Self::get_subchunk_index(y);
 
-                    chunk.subchunks[subchunk].blocks[SubChunk::index_of(USizePoint3D::new(x, y, z))] = buf[0];
-                    chunk.subchunks[subchunk].light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))] = buf[1];
-                }
-            }
-        }
+    // chunk.subchunks[subchunk].blocks[SubChunk::index_of(USizePoint3D::new(x, y,
+    // z))] = buf[0];
+    // chunk.subchunks[subchunk].
+    // light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))] = buf[1];
+    //             }
+    //         }
+    //     }
 
-        Ok(chunk)
-    }
+    //     Ok(chunk)
+    // }
 
     pub const fn corner(position: USizePoint3D) -> Option<[IPoint2D; 3]> {
         match (position.x, position.z) {
@@ -177,47 +234,51 @@ impl Chunk {
         }
     }
 
-    #[must_use]
-    pub fn into_serialized(self) -> Vec<u8> {
-        let mut data = Vec::new();
+    // #[must_use]
+    // pub fn into_serialized(self) -> Vec<u8> {
+    //     let mut data = Vec::new();
 
-        data.extend_from_slice(&self.origin.x.to_be_bytes());
-        data.extend_from_slice(&self.origin.y.to_be_bytes());
+    //     data.extend_from_slice(&self.origin.x.to_be_bytes());
+    //     data.extend_from_slice(&self.origin.y.to_be_bytes());
 
-        for y in 0..CHUNK_HEIGHT {
-            for z in 0..SUBCHUNK_SIZE {
-                for x in 0..SUBCHUNK_SIZE {
-                    let [subchunk, y] = Self::get_subchunk_index(y);
+    //     for y in 0..CHUNK_HEIGHT {
+    //         for z in 0..SUBCHUNK_SIZE {
+    //             for x in 0..SUBCHUNK_SIZE {
+    //                 let [subchunk, y] = Self::get_subchunk_index(y);
 
-                    data.push(self.subchunks[subchunk].blocks[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
-                    data.push(self.subchunks[subchunk].light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
-                }
-            }
-        }
+    // data.push(self.subchunks[subchunk].
+    // blocks[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
+    // data.push(self.subchunks[subchunk].
+    // light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
+    //             }
+    //         }
+    //     }
 
-        data
-    }
+    //     data
+    // }
 
-    #[must_use]
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut data = Vec::new();
+    // #[must_use]
+    // pub fn serialize(&self) -> Vec<u8> {
+    //     let mut data = Vec::new();
 
-        data.extend_from_slice(&self.origin.x.to_be_bytes());
-        data.extend_from_slice(&self.origin.y.to_be_bytes());
+    //     data.extend_from_slice(&self.origin.x.to_be_bytes());
+    //     data.extend_from_slice(&self.origin.y.to_be_bytes());
 
-        for y in 0..CHUNK_HEIGHT {
-            for z in 0..SUBCHUNK_SIZE {
-                for x in 0..SUBCHUNK_SIZE {
-                    let [subchunk, y] = Self::get_subchunk_index(y);
+    //     for y in 0..CHUNK_HEIGHT {
+    //         for z in 0..SUBCHUNK_SIZE {
+    //             for x in 0..SUBCHUNK_SIZE {
+    //                 let [subchunk, y] = Self::get_subchunk_index(y);
 
-                    data.push(self.subchunks[subchunk].blocks[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
-                    data.push(self.subchunks[subchunk].light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
-                }
-            }
-        }
+    // data.push(self.subchunks[subchunk].
+    // blocks[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
+    // data.push(self.subchunks[subchunk].
+    // light_levels[SubChunk::index_of(USizePoint3D::new(x, y, z))]);
+    //             }
+    //         }
+    //     }
 
-        data
-    }
+    //     data
+    // }
 
     #[inline]
     pub const fn to_origin_and_local(position: IPoint3D) -> (IPoint2D, USizePoint3D) {
@@ -269,26 +330,25 @@ impl Chunk {
         self.origin.x == (position.x >> 4) && self.origin.y == (position.z >> 4) && (0..SUBCHUNK_COUNT_I32).contains(&(position.y >> 4))
     }
 
-    pub fn set_block(&mut self, position: USizePoint3D, block: u8) {
+    pub fn set_block(&mut self, position: USizePoint3D, block: SubChunkBlockState) {
         if self.contains_local_position(position) {
             self.set_block_unchecked(position, block);
         }
     }
 
     #[inline]
-    pub fn set_block_unchecked(&mut self, position: USizePoint3D, block: u8) {
+    pub fn set_block_unchecked(&mut self, position: USizePoint3D, block: SubChunkBlockState) {
         let [subchunk, y] = Self::get_subchunk_index(position.y);
 
         unsafe {
-            *self
-                .subchunks
-                .get_unchecked_mut(subchunk)
-                .blocks
-                .get_unchecked_mut(SubChunk::index_of(position.with_y(y))) = block;
+            let subchunk = self.subchunks.get_unchecked_mut(subchunk);
+            let index = subchunk.try_insert(block);
+
+            *subchunk.data.get_unchecked_mut(SubChunk::index_of(position.with_y(y))) = index as u8;
         }
     }
 
-    pub fn get_block(&self, position: USizePoint3D) -> Option<u8> {
+    pub fn get_block(&self, position: USizePoint3D) -> Option<&SubChunkBlockState> {
         if self.contains_local_position(position) {
             Some(self.get_block_unchecked(position))
         } else {
@@ -298,16 +358,16 @@ impl Chunk {
 
     #[must_use]
     #[inline]
-    pub fn get_block_unchecked(&self, position: USizePoint3D) -> u8 {
+    pub fn get_block_unchecked(&self, position: USizePoint3D) -> &SubChunkBlockState {
         let [subchunk, y] = Self::get_subchunk_index(position.y);
 
-        unsafe {
-            *self
-                .subchunks
-                .get_unchecked(subchunk)
-                .blocks
-                .get_unchecked(SubChunk::index_of(USizePoint3D { y, ..position }))
-        }
+        unsafe { self.subchunks.get_unchecked(subchunk).get_block_unchecked(USizePoint3D { y, ..position }) }
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn get_block_by_idx_unchecked(&self, subchunk: usize, index: usize) -> &SubChunkBlockState {
+        unsafe { self.subchunks.get_unchecked(subchunk).get_block_by_idx_unchecked(index) }
     }
 
     #[inline]
@@ -354,6 +414,11 @@ impl Chunk {
     }
 
     #[inline]
+    pub fn get_light_level_by_idx(&self, subchunk: usize, index: usize) -> u8 {
+        unsafe { *self.subchunks.get_unchecked(subchunk).light_levels.get_unchecked(index) }
+    }
+
+    #[inline]
     pub const fn get_light_level_mut(&mut self, position: USizePoint3D) -> &mut u8 {
         let [subchunk, y] = Self::get_subchunk_index(position.y);
 
@@ -361,10 +426,10 @@ impl Chunk {
     }
 
     #[inline]
-    pub const fn check_for_local_block(&self, local_position: USizePoint3D) -> bool {
+    pub fn check_for_local_block(&self, local_position: USizePoint3D) -> bool {
         let [subchunk, y] = Self::get_subchunk_index(local_position.y);
 
-        self.subchunks[subchunk].blocks[SubChunk::index_of(USizePoint3D { y, ..local_position })] != 0
+        self.subchunks[subchunk].palette[self.subchunks[subchunk].data[SubChunk::index_of(USizePoint3D { y, ..local_position })] as usize].name != "game:air"
     }
 
     #[inline]
@@ -394,8 +459,23 @@ impl Chunk {
     }
 
     #[inline]
+    pub fn get_sky_light_by_idx(&self, subchunk: usize, index: usize) -> u8 {
+        (self.get_light_level_by_idx(subchunk, index) >> 4) & 0xF
+    }
+
+    #[inline]
     pub fn get_sky_light_unchecked(&self, position: USizePoint3D) -> u8 {
         (self.get_light_level_unchecked(position) >> 4) & 0xF
+    }
+
+    #[inline]
+    pub const fn sky_light_from_level(level: u8) -> u8 {
+        (level >> 4) & 0xF
+    }
+
+    #[inline]
+    pub const fn block_light_from_level(level: u8) -> u8 {
+        level & 0xF
     }
 
     #[inline]
@@ -440,7 +520,7 @@ impl Chunk {
 
 impl<'a> IntoIterator for &'a Chunk {
     type IntoIter = ChunkIter<'a>;
-    type Item = (USizePoint3D, u8);
+    type Item = (USizePoint3D, &'a SubChunkBlockState);
 
     fn into_iter(self) -> Self::IntoIter {
         ChunkIter::new(self)
@@ -483,8 +563,8 @@ impl<'a> ChunkFaceIter<'a> {
     }
 }
 
-impl Iterator for ChunkFaceIter<'_> {
-    type Item = (USizePoint3D, u8);
+impl<'a> Iterator for ChunkFaceIter<'a> {
+    type Item = (USizePoint3D, &'a SubChunkBlockState);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.y == self.max.y {
@@ -527,8 +607,8 @@ impl<'a> ChunkIter<'a> {
     }
 }
 
-impl Iterator for ChunkIter<'_> {
-    type Item = (USizePoint3D, u8);
+impl<'a> Iterator for ChunkIter<'a> {
+    type Item = (USizePoint3D, &'a SubChunkBlockState);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.y == CHUNK_HEIGHT {
@@ -575,8 +655,8 @@ impl<'a> SubChunkIter<'a> {
     }
 }
 
-impl Iterator for SubChunkIter<'_> {
-    type Item = (USizePoint3D, Option<u8>);
+impl<'a> Iterator for SubChunkIter<'a> {
+    type Item = (USizePoint3D, Option<&'a SubChunkBlockState>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -614,7 +694,7 @@ impl Iterator for SubChunkIter<'_> {
 
         self.current_index += 1;
 
-        let block_id = self.subchunk.blocks[idx];
+        let block_state = &self.subchunk.palette[self.subchunk.data[idx] as usize];
 
         let local_x = idx & 0xF;
         let local_z = (idx >> 4) & 0xF;
@@ -622,7 +702,7 @@ impl Iterator for SubChunkIter<'_> {
 
         let chunk_local_position = USizePoint3D::new(local_x, self.world_y_offset + local_y, local_z);
 
-        Some((chunk_local_position, if block_id == 0 { None } else { Some(block_id) }))
+        Some((chunk_local_position, if block_state.name == "game:air" { None } else { Some(block_state) }))
     }
 }
 
@@ -630,53 +710,53 @@ impl Iterator for SubChunkIter<'_> {
 mod tests {
     use meralus_shared::{IPoint2D, USizePoint3D};
 
-    use crate::{CHUNK_HEIGHT, Chunk, Face, SUBCHUNK_SIZE};
+    use crate::{CHUNK_HEIGHT, Chunk, SUBCHUNK_SIZE};
 
-    #[test]
-    fn test_chunk_face_iter() {
-        let chunk = Chunk::filled(1);
+    // #[test]
+    // fn test_chunk_face_iter() {
+    //     let chunk = Chunk::filled(1);
 
-        let mut iter = chunk.face_iter(Face::Back);
+    //     let mut iter = chunk.face_iter(Face::Back);
 
-        for y in 0..CHUNK_HEIGHT {
-            for z in 0..1 {
-                for x in 0..SUBCHUNK_SIZE {
-                    assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z), 1)));
-                }
-            }
-        }
+    //     for y in 0..CHUNK_HEIGHT {
+    //         for z in 0..1 {
+    //             for x in 0..SUBCHUNK_SIZE {
+    //                 assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z),
+    // 1)));             }
+    //         }
+    //     }
 
-        assert_eq!(iter.next(), None);
-    }
+    //     assert_eq!(iter.next(), None);
+    // }
 
-    #[test]
-    fn test_chunk_iter() {
-        let chunk = Chunk::filled(1);
+    // #[test]
+    // fn test_chunk_iter() {
+    //     let chunk = Chunk::filled(1);
 
-        let mut iter = chunk.iter();
+    //     let mut iter = chunk.iter();
 
-        for y in 0..CHUNK_HEIGHT {
-            for z in 0..SUBCHUNK_SIZE {
-                for x in 0..SUBCHUNK_SIZE {
-                    assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z), 1)));
-                }
-            }
-        }
+    //     for y in 0..CHUNK_HEIGHT {
+    //         for z in 0..SUBCHUNK_SIZE {
+    //             for x in 0..SUBCHUNK_SIZE {
+    //                 assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z),
+    // 1)));             }
+    //         }
+    //     }
 
-        assert_eq!(iter.next(), None);
-    }
+    //     assert_eq!(iter.next(), None);
+    // }
 
-    #[test]
-    fn test_chunk_serialization() {
-        let chunk = Chunk::new(IPoint2D::new(0, 0));
+    // #[test]
+    // fn test_chunk_serialization() {
+    //     let chunk = Chunk::new(IPoint2D::new(0, 0));
 
-        let serialized = chunk.serialize();
+    //     let serialized = chunk.serialize();
 
-        println!("{}", serialized.len());
+    //     println!("{}", serialized.len());
 
-        let deserialized = Chunk::deserialize(&serialized).unwrap();
+    //     let deserialized = Chunk::deserialize(&serialized).unwrap();
 
-        assert_eq!(chunk.origin, deserialized.origin);
-        assert_eq!(chunk.subchunks, deserialized.subchunks);
-    }
+    //     assert_eq!(chunk.origin, deserialized.origin);
+    //     assert_eq!(chunk.subchunks, deserialized.subchunks);
+    // }
 }

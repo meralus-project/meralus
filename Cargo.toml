@@ -1,21 +1,22 @@
 [workspace]
-members = ["bin/client", "bin/server", "crates/*", "support-crates/*"]
+members = ["bin/*", "crates/*", "support-crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
 meralus-addons = { path = "./crates/addons" }
-meralus-animation = { path = "./crates/animation" }
+meralus-tween = { path = "./crates/tween" }
 meralus-engine = { path = "./crates/engine" }
-meralus-graphics = { path = "./crates/graphics" }
 meralus-network = { path = "./crates/network" }
 meralus-physics = { path = "./crates/physics" }
 meralus-shared = { path = "./crates/shared" }
+meralus-io = { path = "./crates/io" }
 meralus-storage = { path = "./crates/storage" }
 meralus-world = { path = "./crates/world" }
+meralus-worldgen = { path = "./crates/worldgen" }
 meck = { path = "./crates/meck" }
+horns = { path = "./support-crates/horns" }
 
 ahash = "0.8.12"
-glium = "0.36.0"
 image = { version = "0.25.9", default-features = false }
 tokio = "1.50.0"
 serde = { version = "1.0.228", features = ["derive"] }

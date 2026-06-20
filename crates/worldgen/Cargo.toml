@@ -1,0 +1,12 @@
+[package]
+name = "meralus-worldgen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ahash.workspace = true
+meralus-shared = { workspace = true, features = ["geometry", "random"] }
+meralus-world.workspace = true
+
+[lints]
+workspace = true

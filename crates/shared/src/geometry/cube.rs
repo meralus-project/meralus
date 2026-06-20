@@ -29,7 +29,7 @@ impl fmt::Display for Cube3D {
         write!(
             f,
             "{}x{}x{} at {}x{}x{}",
-            self.size.width, self.size.height, self.size.depth, self.origin.x, self.origin.y, self.origin.z
+            self.size.x, self.size.y, self.size.z, self.origin.x, self.origin.y, self.origin.z
         )
     }
 }

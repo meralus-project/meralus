@@ -12,16 +12,16 @@ pub enum ItemType {
     Block,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Item {
-    pub id: usize,
+    pub id: String,
     pub ty: ItemType,
     pub amount: usize,
 }
 
 #[derive(Default)]
 pub struct Inventory {
-    item_to_slots: HashMap<(usize, ItemType), Vec<(usize, usize)>>,
+    item_to_slots: HashMap<(String, ItemType), Vec<(usize, usize)>>,
     filled_slots: HashMap<(usize, usize), Item>,
 }
 
@@ -44,7 +44,7 @@ impl Inventory {
         (0..Self::MAX_SLOT_COLUMNS).filter_map(|column| self.get_hotbar_item(column).map(|item| (column, item)))
     }
 
-    pub fn take_hotbar_item(&mut self, column: usize) -> Option<(usize, ItemType)> {
+    pub fn take_hotbar_item(&mut self, column: usize) -> Option<(String, ItemType)> {
         self.take_item(Self::HOTBAR_ROW, column)
     }
 
@@ -52,7 +52,7 @@ impl Inventory {
         self.get_item(Self::HOTBAR_ROW, column)
     }
 
-    pub fn take_item(&mut self, row: usize, column: usize) -> Option<(usize, ItemType)> {
+    pub fn take_item(&mut self, row: usize, column: usize) -> Option<(String, ItemType)> {
         let mut remove_item = false;
 
         let item = self.filled_slots.get_mut(&(row, column)).map(|item| {
@@ -62,7 +62,7 @@ impl Inventory {
 
             item.amount -= 1;
 
-            (item.id, item.ty)
+            (item.id.clone(), item.ty)
         });
 
         if remove_item {
@@ -77,7 +77,7 @@ impl Inventory {
     }
 
     pub fn try_insert(&mut self, item: Item) {
-        if let Some(slot) = self.item_to_slots.get(&(item.id, item.ty)).and_then(|slots| slots.last())
+        if let Some(slot) = self.item_to_slots.get(&(item.id.clone(), item.ty)).and_then(|slots| slots.last())
             && let Some(slot) = self.filled_slots.get_mut(slot).filter(|slot| slot.amount < Self::MAX_ITEM_AMOUNT)
         {
             slot.amount += 1;
@@ -109,7 +109,7 @@ impl Inventory {
             }
 
             if let Some(slot) = slot {
-                self.filled_slots.insert(slot, item);
+                self.filled_slots.insert(slot, item.clone());
                 self.item_to_slots
                     .entry((item.id, item.ty))
                     .and_modify(|slots| slots.push(slot))
@@ -161,9 +161,9 @@ impl PlayerController {
     pub const PLAYER_SIZE: DSize3D = DSize3D::new(0.35, 1.625, 0.35);
 
     pub fn calc_player_aabb(position: Point3D) -> Aabb {
-        let position = position.as_();
+        let position = position.as_dvec3();
 
-        Aabb::new(position - Self::PLAYER_HALF_SIZE.to_vector(), position + Self::PLAYER_HALF_SIZE.to_vector())
+        Aabb::new(position - Self::PLAYER_HALF_SIZE, position + Self::PLAYER_HALF_SIZE)
     }
 
     pub fn player_aabb(&self) -> Aabb {
@@ -171,7 +171,7 @@ impl PlayerController {
     }
 
     pub fn camera_position(&self) -> Point3D {
-        self.body.position + Point3D::Y * (Self::PLAYER_HALF_SIZE.height as f32 - 0.15) + self.bob_offset + Self::CAMERA_OFFSET
+        self.body.position + Point3D::Y * (Self::PLAYER_HALF_SIZE.y as f32 - 0.15) + self.bob_offset + Self::CAMERA_OFFSET
     }
 
     pub fn get_vector_for_rotation(&self) -> DVector3D {

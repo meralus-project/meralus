@@ -1,0 +1,9 @@
+[package]
+name = "meralus-tween"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indexmap = "2.9.0"
+ahash = "0.8.12"
+meralus-shared = { workspace = true, features = ["lerp"] }

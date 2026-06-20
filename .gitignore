@@ -1,7 +1,3 @@
 target/*
-mollie/target/*
-mollie/mollie-web
-mollie/mollie-webclient
-external/*
 worlds/*
 .vscode

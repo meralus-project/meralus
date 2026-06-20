@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
-use meralus_shared::{DPoint3D, DVector3D, IPoint3D};
-use meralus_world::Face;
+use meralus_shared::{DPoint3D, DVector3D, IPoint3D, Face};
 
 use crate::{Aabb, AabbSource, PhysicsContext};
 
@@ -43,8 +42,8 @@ pub enum HitType {
 }
 
 fn raycast_into(position: IPoint3D, start: DPoint3D, end: DPoint3D, aabb: Aabb) -> Option<RayCastResult> {
-    aabb.calculate_intercept(start - position.to_vector().as_(), end - position.to_vector().as_())
-        .map(|raytraceresult| RayCastResult::new3(raytraceresult.hit_vec + position.as_(), raytraceresult.hit_side, position))
+    aabb.calculate_intercept(start - position.as_dvec3(), end - position.as_dvec3())
+        .map(|raytraceresult| RayCastResult::new3(raytraceresult.hit_vec + position.as_dvec3(), raytraceresult.hit_side, position))
 }
 
 impl<T: AabbSource> PhysicsContext<T> {
@@ -54,8 +53,8 @@ impl<T: AabbSource> PhysicsContext<T> {
         }
 
         let mut start_dvec3 = origin;
-        let mut start = origin.floor().as_::<i32>();
-        let end = target.floor().as_::<i32>();
+        let mut start = origin.floor().as_ivec3();
+        let end = target.floor().as_ivec3();
 
         let mut position = start;
 
@@ -157,7 +156,7 @@ impl<T: AabbSource> PhysicsContext<T> {
                     Face::Bottom | Face::Left | Face::Front => DVector3D::ZERO,
                 };
 
-            start = start_dvec3.as_();
+            start = start_dvec3.as_ivec3();
 
             position = start;
 

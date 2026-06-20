@@ -1,5 +1,4 @@
-use meralus_shared::{Cube3D, DPoint3D, DSize3D};
-use meralus_world::Face;
+use meralus_shared::{Cube3D, DPoint3D, DSize3D, Face};
 
 use crate::raycast::RayCastResult;
 
@@ -69,7 +68,7 @@ impl Aabb {
     }
 
     pub fn size(&self) -> DSize3D {
-        (self.max - self.min).to_size()
+        (self.max - self.min)
     }
 
     #[must_use]
@@ -181,11 +180,11 @@ impl Aabb {
 
 impl From<Cube3D> for Aabb {
     fn from(value: Cube3D) -> Self {
-        let half_size = value.size.to_vector() / 2.0;
+        let half_size = value.size / 2.0;
 
         Self {
-            min: (value.origin - half_size).as_::<f64>(),
-            max: (value.origin + half_size).as_::<f64>(),
+            min: (value.origin - half_size).as_dvec3(),
+            max: (value.origin + half_size).as_dvec3(),
         }
     }
 }

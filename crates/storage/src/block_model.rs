@@ -1,11 +1,74 @@
 use std::path::Path;
 
 use ahash::HashMap;
+use meralus_io::{BlockFace, Faces, JsonError, TexturePath, TextureRef};
 use meralus_physics::Aabb;
-use meralus_shared::{Angle, DPoint3D, IPoint3D, Point2D, Point3D, Transform3D, Vector2D, Vector3D};
-use meralus_world::{Axis, BlockFace, Face, Faces, JsonError, TexturePath, TextureRef};
+use meralus_shared::{Axis, DPoint3D, Face, IPoint3D, Point2D, Point3D, Transform3D, Vector2D, Vector3D};
 
 use crate::{LoadingError, LoadingResult, Mappings, block::BlockStorage, texture::TextureStorage};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Corner {
+    LeftTop,
+    RightTop,
+    LeftBottom,
+    RightBottom,
+}
+
+impl Corner {
+    #[inline]
+    pub const fn index(&self) -> usize {
+        match self {
+            Self::LeftTop => 0,
+            Self::RightTop => 1,
+            Self::LeftBottom => 2,
+            Self::RightBottom => 3,
+        }
+    }
+
+    #[inline]
+    pub const fn from_array([x, y]: [f32; 2]) -> Self {
+        let [x, y] = [x > 0.0, y > 0.0];
+
+        match [x, y] {
+            [true, true] => Self::RightTop,
+            [true, false] => Self::RightBottom,
+            [false, true] => Self::LeftTop,
+            [false, false] => Self::LeftBottom,
+        }
+    }
+
+    #[inline]
+    pub const fn from_vec(face: Face, vec: Point3D) -> Self {
+        Self::from_array(match face.as_axis() {
+            Axis::X => [vec.y, vec.z], // only yz
+            Axis::Y => [vec.x, vec.z], // only xz
+            Axis::Z => [vec.x, vec.y], // only xy
+        })
+    }
+
+    // const NEIGHBOURS: [[i32; 2]; 8] = [
+    //     [-1, -1], // LEFT BOTTOM
+    //     [-1, 0],  // LEFT
+    //     [-1, 1],  // LEFT TOP
+    //     [0, -1],  // BOTTOM
+    //     [0, 1],   // TOP
+    //     [1, -1],  // RIGHT BOTTOM
+    //     [1, 0],   // RIGHT
+    //     [1, 1],   // RIGHT TOP
+    // ];
+
+    pub const fn get_neighbours(self, face: Face) -> [IPoint3D; 3] {
+        let neighbours = face.get_neighbours();
+
+        match self {
+            Self::LeftTop => [neighbours[1], neighbours[4], neighbours[2]],
+            Self::RightTop => [neighbours[6], neighbours[4], neighbours[7]],
+            Self::LeftBottom => [neighbours[1], neighbours[3], neighbours[0]],
+            Self::RightBottom => [neighbours[6], neighbours[3], neighbours[5]],
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FaceUV {
@@ -22,17 +85,29 @@ pub struct FaceData {
     pub uvs: [Point2D; 4],
 }
 
+#[inline]
+const fn as_vertex_corners(face: Face) -> [Corner; 4] {
+    let vertices = face.as_vertices();
+
+    [
+        Corner::from_vec(face, vertices[0]),
+        Corner::from_vec(face, vertices[1]),
+        Corner::from_vec(face, vertices[2]),
+        Corner::from_vec(face, vertices[3]),
+    ]
+}
+
 impl FaceData {
     pub fn new(face: Face, aabb: Aabb, uv: FaceUV, rotation: Option<&(Transform3D, Point3D, Point3D)>) -> Self {
         let mut vertices = face.as_vertices();
 
-        let aabb_size = aabb.size().as_::<f32>();
+        let aabb_size = aabb.size().as_vec3();
 
         for vertex in &mut vertices {
-            let vert = aabb.min.as_() + Point3D::new(vertex.x * aabb_size.width, vertex.y * aabb_size.height, vertex.z * aabb_size.depth);
+            let vert = aabb.min.as_vec3() + *vertex * aabb_size;
 
             *vertex = if let Some((matrix, origin, scale)) = rotation {
-                let point = matrix.transform_point3(vert - origin.to_vector());
+                let point = matrix.transform_point3(vert - origin);
 
                 Point3D::new(point.x * scale.x, point.y * scale.y, point.z * scale.z) + origin
             } else {
@@ -55,7 +130,7 @@ impl FaceData {
             face,
             normal: face.as_normal(),
             vertices,
-            corners: face.as_vertex_corners().map(|corner| corner.get_neighbours(face)),
+            corners: as_vertex_corners(face).map(|corner| corner.get_neighbours(face)),
             uvs: [Point2D::X, Point2D::ZERO, Point2D::ONE, Point2D::Y].map(|face_uv| {
                 let face_uv = Point2D::new(face_uv.x * uv.scale.x, face_uv.y * uv.scale.y);
 
@@ -173,7 +248,7 @@ impl BakedBlockModelStorage {
     /// An error will be returned if the passed path does not contain a filename
     /// or an error occurred while loading the block model (see
     /// [`BlockManager::load`]).
-    pub fn load<P: AsRef<Path>>(&mut self, textures: &mut TextureStorage, root: &Mappings, path: P) -> LoadingResult<&BakedBlockModel> {
+    pub fn load<P: AsRef<Path>>(&mut self, textures: &mut TextureStorage, root: &Mappings, path: P) -> LoadingResult<usize> {
         let path = path.as_ref();
 
         // println!(
@@ -190,7 +265,7 @@ impl BakedBlockModelStorage {
             .elements
             .into_iter()
             .map(|element| {
-                let cube = Aabb::new(element.start.as_(), element.end.as_());
+                let cube = Aabb::new(element.start.as_dvec3(), element.end.as_dvec3());
 
                 if element.rotation.is_none() {
                     if let Some(bounding_box) = &mut bounding_box {
@@ -205,9 +280,9 @@ impl BakedBlockModelStorage {
                     let angle = rotation.angle.to_radians();
                     let scale = Point3D::ONE;
                     let matrix = match rotation.axis {
-                        Axis::X => Transform3D::from_rotation_x(Angle::from_radians(angle)),
-                        Axis::Y => Transform3D::from_rotation_y(Angle::from_radians(angle)),
-                        Axis::Z => Transform3D::from_rotation_z(Angle::from_radians(angle)),
+                        Axis::X => Transform3D::from_rotation_x(angle),
+                        Axis::Y => Transform3D::from_rotation_y(angle),
+                        Axis::Z => Transform3D::from_rotation_z(angle),
                     };
 
                     (matrix, rotation.origin, scale)
@@ -237,7 +312,9 @@ impl BakedBlockModelStorage {
 
         let is_opaque = elements
             .iter()
-            .any(|element| (element.cube.size().to_vector().as_() - Vector3D::ONE).abs().to_array() < ERROR);
+            .any(|element| (element.cube.size().as_vec3() - Vector3D::ONE).abs().to_array() < ERROR);
+
+        let index = self.models.len();
 
         self.models.push(BakedBlockModel {
             name: name.to_string(),
@@ -247,6 +324,6 @@ impl BakedBlockModelStorage {
             is_opaque,
         });
 
-        self.models.last().ok_or(LoadingError::Model(ModelLoadingError::NotFound))
+        Ok(index)
     }
 }

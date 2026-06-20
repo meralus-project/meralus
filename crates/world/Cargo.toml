@@ -5,10 +5,13 @@ edition = "2024"
 
 [dependencies]
 ahash.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-meralus-shared.workspace = true
+meralus-shared = { workspace = true, features = ["face"] }
+serde = { workspace = true, optional = true }
 tracing = "0.1.44"
+
+[features]
+default = []
+serde = ["dep:serde"]
 
 [lints]
 workspace = true

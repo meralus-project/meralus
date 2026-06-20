@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use ahash::HashMap;
 use meralus_shared::Color;
-use meralus_world::{BlockModel, Property, TexturePath, TextureRef};
+use meralus_io::{BlockModel, TexturePath, TextureRef};
 
 use crate::{LoadingError, LoadingResult, Mappings, ModelLoadingError, texture::TextureStorage};
 
@@ -40,10 +40,6 @@ pub trait Block: Send + Sync {
     fn selectable(&self) -> bool {
         true
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        Vec::new()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +54,6 @@ pub struct BlockData {
     pub tint_color: Option<Color>,
     pub collidable: bool,
     pub selectable: bool,
-    pub properties: Vec<Property>,
 }
 
 impl Block for BlockData {
@@ -97,14 +92,10 @@ impl Block for BlockData {
     fn selectable(&self) -> bool {
         self.selectable
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        self.properties.clone()
-    }
 }
 
 pub struct BlockStorage {
-    id_to_block: HashMap<&'static str, usize>,
+    id_to_block: HashMap<String, (usize, usize)>,
     blocks: Vec<Box<dyn Block>>,
 }
 
@@ -115,6 +106,7 @@ impl Default for BlockStorage {
 }
 
 impl BlockStorage {
+    #[inline]
     pub fn new() -> Self {
         Self {
             id_to_block: HashMap::default(),
@@ -122,20 +114,29 @@ impl BlockStorage {
         }
     }
 
+    #[inline]
     pub fn get(&self, id: usize) -> Option<&dyn Block> {
-        self.blocks.get(id).map(|block| block.as_ref())
+        self.blocks.get(id).map(AsRef::as_ref)
     }
 
+    #[inline]
     pub fn get_unchecked(&self, id: usize) -> &dyn Block {
         unsafe { self.blocks.get_unchecked(id).as_ref() }
     }
 
+    #[inline]
     pub fn get_by_name(&self, name: &str) -> usize {
-        self.id_to_block[&name]
+        self.id_to_block.get(name).copied().unwrap_or((0, 0)).0
     }
 
-    pub fn register<T: Block + 'static>(&mut self, block: T) {
-        self.id_to_block.insert(block.id(), self.blocks.len());
+    #[inline]
+    pub fn get_model_by_name(&self, name: &str) -> usize {
+        self.id_to_block.get(name).copied().unwrap_or((0, 0)).0
+    }
+
+    #[inline]
+    pub fn register<T: Block + 'static>(&mut self, name: String, block: T, model: usize) {
+        self.id_to_block.insert(name, (self.blocks.len(), model));
         self.blocks.push(Box::new(block));
     }
 
@@ -144,7 +145,7 @@ impl BlockStorage {
         let data = fs::read(&path).map_err(|_| LoadingError::Model(ModelLoadingError::NotFound))?;
         let block = BlockModel::from_slice(&data).map_err(|err| LoadingError::Model(ModelLoadingError::ParsingFailed(err)))?;
 
-        let block = if let Some(parent) = block.parent.as_ref()
+        if let Some(parent) = block.parent.as_ref()
             && let Some(mapping) = root.get(&parent.0)
         {
             let mut parent_block = Self::load_block(root, mapping.join("models").join(&parent.1))?;
@@ -153,12 +154,10 @@ impl BlockStorage {
             parent_block.textures.extend(block.textures);
             parent_block.elements.extend(block.elements);
 
-            parent_block
+            Ok(parent_block)
         } else {
-            block
-        };
-
-        Ok(block)
+            Ok(block)
+        }
     }
 
     /// # Errors

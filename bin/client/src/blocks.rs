@@ -1,5 +1,4 @@
 use meralus_shared::Color;
-use meralus_world::Property;
 
 use crate::Block;
 
@@ -99,6 +98,14 @@ impl Block for WoodBlock {
     }
 }
 
+pub struct OakLogBlock;
+
+impl Block for OakLogBlock {
+    fn id(&self) -> &'static str {
+        "oak_log"
+    }
+}
+
 pub struct OakLeavesBlock;
 
 impl Block for OakLeavesBlock {
@@ -194,10 +201,6 @@ impl Block for TechTestBlock {
     fn id(&self) -> &'static str {
         "tech_test"
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
-    }
 }
 
 #[allow(dead_code)]
@@ -218,10 +221,6 @@ impl Block for RoseBlock {
 
     fn cull_if_same(&self) -> bool {
         false
-    }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
     }
 }
 
@@ -244,10 +243,6 @@ impl Block for BlueRoseBlock {
     fn cull_if_same(&self) -> bool {
         false
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
-    }
 }
 
 #[allow(dead_code)]
@@ -256,10 +251,6 @@ pub struct CobbleStoneBlock;
 impl Block for CobbleStoneBlock {
     fn id(&self) -> &'static str {
         "cobblestone"
-    }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
     }
 }
 
@@ -270,10 +261,6 @@ impl Block for BricksBlock {
     fn id(&self) -> &'static str {
         "bricks"
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
-    }
 }
 
 #[allow(dead_code)]
@@ -283,10 +270,6 @@ impl Block for StoneBricksBlock {
     fn id(&self) -> &'static str {
         "stone_bricks"
     }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
-    }
 }
 
 #[allow(dead_code)]
@@ -295,9 +278,5 @@ pub struct DebugBlock;
 impl Block for DebugBlock {
     fn id(&self) -> &'static str {
         "debug"
-    }
-
-    fn get_properties(&self) -> Vec<Property> {
-        vec![]
     }
 }

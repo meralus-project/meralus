@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-glamour = "0.18.0"
+glam = { version = "0.30.10" }
 image = { workspace = true, default-features = false }
 
 [lints]

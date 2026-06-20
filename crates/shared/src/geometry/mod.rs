@@ -1,43 +1,40 @@
+mod box2d;
 mod cube;
+mod rect;
 mod round_rect;
 mod thickness;
 
-pub use glamour::{Point2, Size2};
+pub use self::{box2d::Box2D, cube::Cube3D, rect::Rect, round_rect::RRect2D, thickness::Thickness};
 
-pub use self::{cube::Cube3D, round_rect::RRect2D, thickness::Thickness};
+pub type ISize2D = glam::IVec2;
+pub type ISize3D = glam::IVec3;
+pub type IPoint2D = glam::IVec2;
+pub type IPoint3D = glam::IVec3;
 
-pub type ISize2D = glamour::Size2<i32>;
-pub type ISize3D = glamour::Size3<i32>;
-pub type IPoint2D = glamour::Point2<i32>;
-pub type IPoint3D = glamour::Point3<i32>;
-
-pub type USize2D = glamour::Size2<u32>;
-pub type USize3D = glamour::Size3<u32>;
-pub type UPoint2D = glamour::Point2<u32>;
-pub type UPoint3D = glamour::Point3<u32>;
+pub type USize2D = glam::UVec2;
+pub type USize3D = glam::UVec3;
+pub type UPoint2D = glam::UVec2;
+pub type UPoint3D = glam::UVec3;
 
 pub type USizePoint2D = glam::USizeVec2;
 pub type USizePoint3D = glam::USizeVec3;
 
-pub type DSize3D = glamour::Size3<f64>;
-pub type DPoint2D = glamour::Point2<f64>;
-pub type DPoint3D = glamour::Point3<f64>;
-pub type DVector2D = glamour::Vector2<f64>;
-pub type DVector3D = glamour::Vector3<f64>;
+pub type DSize3D = glam::DVec3;
+pub type DPoint2D = glam::DVec2;
+pub type DPoint3D = glam::DVec3;
+pub type DVector2D = glam::DVec2;
+pub type DVector3D = glam::DVec3;
 
-pub type Size2D = glamour::Size2;
-pub type Size3D = glamour::Size3;
-pub type Point2D = glamour::Point2;
-pub type Point3D = glamour::Point3;
-pub type Vector2D = glamour::Vector2;
-pub type Vector3D = glamour::Vector3;
-pub type Vector4D = glamour::Vector4;
-pub type Rect2D = glamour::Rect;
-pub type Box2D = glamour::Box2;
-pub type Transform2D = glamour::Matrix3<f32>;
-pub type Transform3D = glamour::Matrix4<f32>;
+pub type Size2D = glam::Vec2;
+pub type Size3D = glam::Vec3;
+pub type Point2D = glam::Vec2;
+pub type Point3D = glam::Vec3;
+pub type Vector2D = glam::Vec2;
+pub type Vector3D = glam::Vec3;
+pub type Vector4D = glam::Vec4;
+pub type Transform2D = glam::Mat3;
+pub type Transform3D = glam::Mat4;
 pub type Quat = glam::Quat;
-pub type Angle = glamour::Angle;
 
 pub trait MatrixExt<T> {
     #[must_use]
@@ -62,14 +59,14 @@ impl MatrixExt<Vector3D> for Transform3D {
     }
 
     fn rotate_x(self, angle: f32) -> Self {
-        self * Self::from_rotation_x(Angle::from_radians(angle))
+        self * Self::from_rotation_x(angle)
     }
 
     fn rotate_y(self, angle: f32) -> Self {
-        self * Self::from_rotation_y(Angle::from_radians(angle))
+        self * Self::from_rotation_y(angle)
     }
 
     fn rotate_z(self, angle: f32) -> Self {
-        self * Self::from_rotation_z(Angle::from_radians(angle))
+        self * Self::from_rotation_z(angle)
     }
 }
