@@ -86,12 +86,15 @@ impl MeasureStrategy for RowStrategy {
 
 pub enum Arrangement {
     Start,
+    Center,
     End,
+    Stretch,
 }
 
 pub struct ColumnStrategy {
     spacing: f32,
-    arrangement: Arrangement,
+    v_arrangement: Arrangement,
+    h_arrangement: Arrangement,
 }
 
 impl ArrangeStrategy for ColumnStrategy {
@@ -108,7 +111,7 @@ impl ArrangeStrategy for ColumnStrategy {
             }
         }
 
-        if matches!(self.arrangement, Arrangement::End) {
+        if matches!(self.v_arrangement, Arrangement::End) {
             let offset = Point2D::Y * (context.layout_node(widget).size.y - offset.y);
 
             for w in widget.into_iter(context.all_children(widget)) {
@@ -116,6 +119,37 @@ impl ArrangeStrategy for ColumnStrategy {
                     context.translate(w, offset);
                 }
             }
+        }
+
+        match self.h_arrangement {
+            Arrangement::End => {
+                let offset = Point2D::X * (context.layout_node(widget).size.x - offset.x);
+
+                for w in widget.into_iter(context.all_children(widget)) {
+                    if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
+                        context.translate(w, offset - context.layout_node(w).size.with_y(0.0));
+                    }
+                }
+            }
+            Arrangement::Center => {
+                let parent_size = context.layout_node(widget).size.with_y(0.0);
+
+                for w in widget.into_iter(context.all_children(widget)) {
+                    if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
+                        context.translate(w, (parent_size - context.layout_node(w).size.with_y(0.0)) / 2.0);
+                    }
+                }
+            }
+            Arrangement::Stretch => {
+                let parent_size = context.layout_node(widget).size.x;
+
+                for w in widget.into_iter(context.all_children(widget)) {
+                    if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
+                        context.layout_node_mut(w).size.x = parent_size;
+                    }
+                }
+            }
+            Arrangement::Start => (),
         }
     }
 }
@@ -405,8 +439,12 @@ impl UiSubcontext<'_, RowStrategy, RowStrategy> {
 }
 
 impl UiSubcontext<'_, ColumnStrategy, ColumnStrategy> {
-    pub const fn set_arrangement(&mut self, arrangement: Arrangement) {
-        self.arrange_strategy.arrangement = arrangement;
+    pub const fn set_v_arrangement(&mut self, arrangement: Arrangement) {
+        self.arrange_strategy.v_arrangement = arrangement;
+    }
+
+    pub const fn set_h_arrangement(&mut self, arrangement: Arrangement) {
+        self.arrange_strategy.h_arrangement = arrangement;
     }
 
     pub const fn set_spacing(&mut self, pixels: f32) {
@@ -545,11 +583,13 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.scope(
             ColumnStrategy {
                 spacing: 0.0,
-                arrangement: Arrangement::Start,
+                v_arrangement: Arrangement::Start,
+                h_arrangement: Arrangement::Start,
             },
             ColumnStrategy {
                 spacing: 0.0,
-                arrangement: Arrangement::Start,
+                v_arrangement: Arrangement::Start,
+                h_arrangement: Arrangement::Start,
             },
             ui,
         );

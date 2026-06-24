@@ -30,7 +30,7 @@ use horns::{MagnifyFilter, MinifyFilter, RenderBackend, Texture2d};
 use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use meralus_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext};
 use meralus_physics::{Aabb, AabbSource, PhysicsContext};
-use meralus_shared::{Color, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, USizePoint3D, Vector2D, Vector3D};
+use meralus_shared::{AsValue, Color, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, USizePoint3D, Vector2D, Vector3D};
 use meralus_storage::{Block, ResourceStorage, TextureStorage};
 use meralus_tween::{Animation, Tween};
 use meralus_world::{BfsLight, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SubChunkBlockState};
@@ -45,12 +45,11 @@ use crate::{
     camera::Camera,
     input::Input,
     player::{Item, ItemType, PlayerController},
-    // posteffects::{ParticleSystem, WorldScene, kawase::DualKawase},
     progress::{Progress, ProgressInfo, ProgressSender},
     render::{
         chunk::{VoxelFace, VoxelMeshBuilder},
         common::{CommonRenderer, CommonVertex},
-        context::{ArrangeStrategy, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, WidgetState},
+        context::{ArrangeStrategy, Arrangement, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, WidgetState},
     },
     scenes::{Screen, loading_overlay::LoadingOverlay},
     util::{cube_outline, get_movement_direction, get_rotation_directions, vertex_ao},
@@ -518,7 +517,7 @@ impl State for GameLoop {
             context: UiContext::new(),
             // particles: ParticleSystem::new(backend),
             overlay: LoadingOverlay {
-                progress: Tween::new(0.0, 1.0, 1000),
+                progress: Tween::new(0.0, 1.0, 200),
             },
         }
     }
@@ -1243,7 +1242,7 @@ Rendered vertices: {vertices}",
 
             context.finish(backend, &mut frame, window_context.window_size());
         } else {
-            frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).to_linear_rgba(), 1.0);
+            frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).as_value(), 1.0);
 
             let mut root = self.context.root(&self.common_renderer, window_context.window_size().as_vec2());
 
@@ -1252,7 +1251,12 @@ Rendered vertices: {vertices}",
                     scope.abs_pos(0.0, 24.0);
                     scope.part_of_parent_width(1.0);
 
-                    scope.text("MERALUS", 72.0, "default", Color::from_hsl(110.0, 0.4, 0.7));
+                    scope.column(|scope| {
+                        scope.set_h_arrangement(Arrangement::End);
+
+                        scope.text("MERALUS", 72.0, "default", Color::from_hsl(110.0, 0.4, 0.7));
+                        scope.text("deltarune today!", 18.0, "default", Color::from_hsl(110.0, 0.3, 0.6));
+                    });
                 });
 
                 root.center(|scope| {
@@ -1261,12 +1265,21 @@ Rendered vertices: {vertices}",
                         fn menu_button<A: ArrangeStrategy, M: MeasureStrategy>(scope: &mut UiSubcontext<'_, A, M>, name: &str) -> WidgetState {
                             scope.button(|scope| {
                                 // scope.part_of_parent_width(0.75);
-                                scope.set_background_color(Color::RED);
+                                scope.set_background_color(Color::from_hsl(110.0, 0.4, 0.7));
 
-                                scope.text(name, 20.0, "default", Color::BLACK);
+                                scope.column(|scope| {
+                                    scope.row(|scope| {
+                                        scope.add_space(const { Point2D::new(12.0, 0.0) });
+                                        scope.text(name, 18.0, "default", Color::from_hsl(110.0, 0.25, 0.1));
+                                        scope.add_space(const { Point2D::new(12.0, 0.0) });
+                                    });
+
+                                    scope.add_space(const { Point2D::new(0.0, 6.0) });
+                                });
                             })
                         }
 
+                        scope.set_h_arrangement(Arrangement::Center);
                         scope.set_spacing(8.0);
 
                         if menu_button(scope, "Play").clicked {

@@ -101,10 +101,6 @@ impl Progress {
                         for (mipmap, image) in resource_manager.get_mipmaps().iter().enumerate() {
                             let texture = texture.writable_mipmap(mipmap);
 
-                            println!("Writing mipmap {mipmap}...");
-
-                            _ = image.save(format!("mip-{mipmap}.png"));
-
                             texture.write(0, 0, image.width(), image.height(), image.as_raw());
                         }
 
