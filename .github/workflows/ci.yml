@@ -61,6 +61,22 @@ jobs:
         with:
           name: meralus-client-win
           path: tmp/**/*
+  debug-build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install target
+        run: rustup target add x86_64-pc-windows-msvc
+      - name: Build
+        run: cargo build --profile debug --bin meralus-client --target x86_64-pc-windows-msvc
+      - name: Compress
+        run: mkdir tmp && cp -r resources tmp && cp target/x86_64-pc-windows-msvc/debug/meralus-client.exe tmp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meralus-client-win-debug
+          path: tmp/**/*
   dev-build-macos:
     runs-on: macos-latest
     steps:
