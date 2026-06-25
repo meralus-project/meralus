@@ -94,7 +94,7 @@ pub struct DrawParams {
 impl RenderPass {
     pub fn clear_color_and_depth(&self, color: [f32; 4], depth: f32) {
         unsafe {
-            self.gl.clear_depth(depth as f64);
+            self.gl.clear_depth(f64::from(depth));
             self.gl.clear_depth_f32(depth);
             self.gl.clear_color(color[0], color[1], color[2], color[3]);
             self.gl.depth_mask(true);
@@ -104,7 +104,7 @@ impl RenderPass {
 
     pub fn clear_depth(&self, depth: f32) {
         unsafe {
-            self.gl.clear_depth(depth as f64);
+            self.gl.clear_depth(f64::from(depth));
             self.gl.clear_depth_f32(depth);
             self.gl.depth_mask(true);
             self.gl.clear(glow::DEPTH_BUFFER_BIT);
@@ -233,7 +233,7 @@ impl RenderPass {
         &mut self,
         program: &Program,
         vertex_buffer: &VertexBuffer<V, S>,
-        element_type: ElementType,
+        element_type: &ElementType,
         count: usize,
         params: DrawParams,
     ) {
@@ -265,7 +265,7 @@ impl RenderPass {
     }
 
     #[inline]
-    pub fn draw_arrays<V: Vertex, S: Shader>(&mut self, program: &Program, vertex_buffer: &VertexBuffer<V, S>, element_type: ElementType, params: DrawParams) {
+    pub fn draw_arrays<V: Vertex, S: Shader>(&mut self, program: &Program, vertex_buffer: &VertexBuffer<V, S>, element_type: &ElementType, params: DrawParams) {
         self.draw_arrays_slice(program, vertex_buffer, element_type, vertex_buffer.len, params);
     }
 

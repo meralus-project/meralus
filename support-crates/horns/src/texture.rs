@@ -160,6 +160,7 @@ impl MagnifyFilter {
     }
 }
 
+#[allow(dead_code)]
 pub struct SampledTexture2d<'a> {
     pub(crate) texture: &'a Texture2d,
     minify_filter: MinifyFilter,

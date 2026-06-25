@@ -15,8 +15,7 @@ use mollie::{
 use serde::Deserialize;
 use tracing::info;
 
-// type Program = fn(*mut RenderContext, *const GameMetadata);
-
+#[allow(dead_code)]
 fn add_builtins(context: &mut TypedASTContext) -> TypeRef {
     let color_ty = AdtBuilder::new_struct(&mut context.type_context, "Color")
         .field::<u8>("red")
@@ -47,161 +46,6 @@ fn add_builtins(context: &mut TypedASTContext) -> TypeRef {
         .func("draw_rect", "DrawContext_draw_rect", [draw_ctx_ty, f32, f32, f32, f32, color_ty], void)
         .finish();
 
-    // func_compiler.compiler.var_ty(
-    //     "println",
-    //     TypeVariant::function([TypeVariant::one_of([TypeVariant::int64(),
-    // TypeVariant::usize()])], TypeVariant::void()), );
-
-    // func_compiler
-    //     .compiler
-    //     .var_ty("println_str", TypeVariant::function([TypeVariant::string()],
-    // TypeVariant::void())); func_compiler
-    //     .compiler
-    //     .var_ty("println_bool",
-    // TypeVariant::function([TypeVariant::boolean()], TypeVariant::void()));
-    // func_compiler
-    //     .compiler
-    //     .var_ty("println_addr", TypeVariant::function([TypeVariant::any()],
-    // TypeVariant::void())); func_compiler
-    //     .compiler
-    //     .var_ty("get_type_idx", TypeVariant::function([TypeVariant::any()],
-    // TypeVariant::usize())); func_compiler
-    //     .compiler
-    //     .var_ty("get_size", TypeVariant::function([TypeVariant::any()],
-    // TypeVariant::usize()));
-
-    // let draw_ctx_ty = TypeVariant::structure::<String, Type, _>([]);
-    // let metadata_ty =
-    // TypeVariant::structure_ir(func_compiler.compiler.jit.module.isa(), [
-    //     ("window_width", TypeVariant::float()),
-    //     ("window_height", TypeVariant::float()),
-    // ]);
-
-    // let color_ty =
-    // TypeVariant::structure_ir(func_compiler.compiler.jit.module.isa(), [
-    //     ("red", TypeVariant::uint8()),
-    //     ("green", TypeVariant::uint8()),
-    //     ("blue", TypeVariant::uint8()),
-    // ]);
-
-    // let object_fit_ty = TypeVariant::enumeration(["Stretch", "Cover"]);
-
-    // let corner_radius_ty =
-    // TypeVariant::structure_ir(func_compiler.compiler.jit.module.isa(), [
-    //     ("top_left", TypeVariant::float()),
-    //     ("top_right", TypeVariant::float()),
-    //     ("bottom_left", TypeVariant::float()),
-    //     ("bottom_right", TypeVariant::float()),
-    // ]);
-
-    // let draw_ctx_type_idx = func_compiler.compiler.add_type("DrawContext",
-    // draw_ctx_ty.clone());
-
-    // func_compiler.compiler.add_type("Color", color_ty.clone());
-    // func_compiler.compiler.add_type("CornerRadius",
-    // corner_radius_ty.clone()); func_compiler.compiler.add_type("
-    // ObjectFit", object_fit_ty.clone());
-
-    // let metadata_ty_idx = func_compiler.compiler.add_type("GameMetadata",
-    // metadata_ty.clone());
-
-    // func_compiler.compiler.var("metadata", metadata_ty_idx);
-    // func_compiler.compiler.var("context", draw_ctx_type_idx);
-
-    // let draw_rect = func_compiler
-    //     .add_native_fn(
-    //         "DrawContext_draw_rect",
-    //         Some(draw_ctx_ty.clone()),
-    //         [
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             color_ty.clone(),
-    //         ],
-    //         TypeVariant::void(),
-    //     )
-    //     .unwrap_or_else(|e| panic!("failed to add DrawContext_draw_rect:
-    // {e}"));
-
-    // let draw_round_rect = func_compiler
-    //     .add_native_fn(
-    //         "DrawContext_draw_rrect",
-    //         Some(draw_ctx_ty.clone()),
-    //         [
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             corner_radius_ty.clone(),
-    //             color_ty.clone(),
-    //         ],
-    //         TypeVariant::void(),
-    //     )
-    //     .unwrap_or_else(|e| panic!("failed to add DrawContext_draw_rrect:
-    // {e}"));
-
-    // let draw_image = func_compiler
-    //     .add_native_fn(
-    //         "DrawContext_draw_image",
-    //         Some(draw_ctx_ty.clone()),
-    //         [
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::string(),
-    //             object_fit_ty,
-    //         ],
-    //         TypeVariant::void(),
-    //     )
-    //     .unwrap_or_else(|e| panic!("failed to add DrawContext_draw_image:
-    // {e}"));
-
-    // let draw_round_image = func_compiler
-    //     .add_native_fn(
-    //         "DrawContext_draw_round_image",
-    //         Some(draw_ctx_ty.clone()),
-    //         [
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             corner_radius_ty,
-    //             TypeVariant::string(),
-    //         ],
-    //         TypeVariant::void(),
-    //     )
-    //     .unwrap_or_else(|e| panic!("failed to add
-    // DrawContext_draw_round_image: {e}"));
-
-    // let draw_text = func_compiler
-    //     .add_native_fn(
-    //         "DrawContext_draw_text",
-    //         Some(draw_ctx_ty),
-    //         [
-    //             TypeVariant::float(),
-    //             TypeVariant::float(),
-    //             TypeVariant::string(),
-    //             TypeVariant::string(),
-    //             TypeVariant::float(),
-    //             color_ty,
-    //         ],
-    //         TypeVariant::void(),
-    //     )
-    //     .unwrap_or_else(|e| panic!("failed to add DrawContext_draw_text:
-    // {e}"));
-
-    // func_compiler
-    //     .create_fallback_vtable(draw_ctx_type_idx, [
-    //         ("draw_rect", draw_rect),
-    //         ("draw_rrect", draw_round_rect),
-    //         ("draw_image", draw_image),
-    //         ("draw_round_image", draw_round_image),
-    //         ("draw_text", draw_text),
-    //     ])
-    //     .unwrap_or_else(|e| panic!("failed to create fallback vtable for
-    // DrawContext: {e}"));
     draw_ctx_ty
 }
 
@@ -255,6 +99,7 @@ struct DataContext<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
 struct BlockData {
     id: &'static str,
     cull_if_same: bool,
@@ -300,6 +145,7 @@ impl meralus_storage::Block for BlockData {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 impl DataContext<'_> {
     fn register_block(&mut self, data: GcPtr<BlockData>) {
         // println!("[{}] Registering {}", "INFO/BlockLoader  ".bright_green(),
@@ -330,71 +176,6 @@ impl DataContext<'_> {
     }
 }
 
-// let world_data_ty = func_compiler
-// .checker
-// .register_adt(AdtBuilder::new_struct("WorldData").non_gc_collectable().
-// finish());
-//
-// let event_mgr_ty = func_compiler
-// .checker
-// .register_adt(AdtBuilder::new_struct("EventManager").non_gc_collectable().
-// finish());
-//
-// let (event_mgr_info, _) = func_compiler.checker.instantiate_adt(event_mgr_ty,
-// &[]);
-//
-// let (world_data_info, _) =
-// func_compiler.checker.instantiate_adt(world_data_ty, &[]);
-//
-// let (block_ty_info, _) = func_compiler.checker.instantiate_adt(block_ty,
-// &[]);
-// let println_str_info = func_compiler.checker.solver.add_info(
-// TypeInfo::Func(
-// Box::new([FuncArg::Regular(func_compiler.checker.core_types.string)]),
-// func_compiler.checker.core_types.void,
-// ),
-// None,
-// );
-//
-// func_compiler.checker.solver.add_var("data", data_ctx_info);
-// func_compiler.checker.solver.add_var("events", event_mgr_info);
-// func_compiler.checker.solver.add_var("println_str", println_str_info);
-//
-
-// let tick_func_info = func_compiler
-// .checker
-// .solver
-// .add_info(TypeInfo::Func(Box::new([]),
-// func_compiler.checker.core_types.void), None);
-//
-// let world_start_func_info = func_compiler.checker.solver.add_info(
-// TypeInfo::Func(Box::new([FuncArg::Regular(world_data_info)]),
-// func_compiler.checker.core_types.void), None,
-// );
-//
-// VTableBuilder::new(FieldType::Adt(world_data_ty, AdtKind::Struct,
-// Box::new([]))) .func(
-// "send_chat_message",
-// "WorldData_send_chat_message",
-// [world_data_info, func_compiler.checker.core_types.string],
-// func_compiler.checker.core_types.void,
-// )
-// .finish(&mut func_compiler.checker);
-//
-// VTableBuilder::new(FieldType::Adt(event_mgr_ty, AdtKind::Struct,
-// Box::new([]))) .func(
-// "on_tick",
-// "EventManager_on_tick",
-// [event_mgr_info, tick_func_info],
-// func_compiler.checker.core_types.void,
-// )
-// .func(
-// "on_world_start",
-// "EventManager_on_world_start",
-// [event_mgr_info, world_start_func_info],
-// func_compiler.checker.core_types.void,
-// )
-// .finish(&mut func_compiler.checker);
 pub type Mappings = HashMap<String, PathBuf>;
 
 pub struct AddonManager {
@@ -402,6 +183,7 @@ pub struct AddonManager {
     compiler: Compiler<FileModuleLoader>,
 }
 
+#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::result_large_err)]
 impl AddonManager {
     pub fn new<P: AsRef<Path>>(folder: P) -> ModuleResult<Self> {
         Ok(Self {
@@ -439,7 +221,7 @@ impl AddonManager {
         let data_ctx_ty = func_compiler.type_context.type_context.inst_adt(data_ctx_ty, &[]);
         let void = func_compiler.type_context.type_context.core_types.void;
 
-        VTableBuilder::new(&mut func_compiler.type_context, data_ctx_ty)
+        VTableBuilder::new(func_compiler.type_context, data_ctx_ty)
             .func("register_block", "DataContext_register_block", [data_ctx_ty, block_ty], void)
             .finish();
 

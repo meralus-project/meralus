@@ -15,9 +15,7 @@ use lyon_tessellation::{
     },
 };
 use meck::TextureViewAtlas;
-use meralus_shared::{
-    AsValue, Color, ConvertTo, IntConversionError, Point2D, Point3D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D, Vector4D,
-};
+use meralus_shared::{AsValue, Color, ConvertTo, Point2D, Point3D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D, Vector4D};
 use swash::{CacheKey, FontRef, shape::ShapeContext};
 
 use crate::render::{RawRenderBuffer, context::RenderInfo};
@@ -206,6 +204,7 @@ impl CommonTessellator {
         self.builder.set_vertex_offsset(offset);
     }
 
+    #[allow(dead_code)]
     pub fn transformed_tessellate_with_color<F: FnOnce(&mut NoAttributes<Transformed<FillBuilder, Transform>>)>(
         &mut self,
         color: Color,
@@ -237,7 +236,7 @@ impl CommonTessellator {
 }
 
 #[derive(Debug)]
-
+#[allow(dead_code)]
 enum Op {
     Circle { origin: Point2D, radius: f32 },
     Rect(Rect),
@@ -254,6 +253,7 @@ pub struct Path {
     ops: Vec<Op>,
 }
 
+#[allow(dead_code)]
 impl Path {
     pub fn add_circle(&mut self, origin: Point2D, radius: f32) -> &mut Self {
         self.ops.push(Op::Circle { origin, radius });
@@ -300,6 +300,7 @@ impl Path {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
+#[allow(dead_code)]
 pub enum ObjectFit {
     Stretch,
     Cover,
@@ -403,6 +404,7 @@ impl CommonRenderer {
         })
     }
 
+    #[allow(dead_code)]
     pub fn fonts(&self) -> &[OwnedFont] {
         &self.fonts
     }
@@ -434,7 +436,6 @@ impl CommonRenderer {
     /// # Errors
     ///
     /// Returns [`TextureCreationError`] if texture creation on GPU failed.
-
     pub fn add_font<T: Into<String>>(&mut self, name: T, data: &[u8]) {
         // if let Ok(font) = Font::from_bytes(data, FontSettings::default()) {
         use swash::FontRef;
@@ -641,6 +642,7 @@ impl CommonRenderer {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn draw_circle(&mut self, origin: Point2D, radius: f32, color: Color) -> Result<(), TessellationError> {
         self.draw_shape(|builder| builder.add_circle(bytemuck::cast(origin), radius, Winding::Positive), color)
     }
@@ -785,6 +787,7 @@ impl CommonRenderer {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn draw_path(&mut self, path: Path, color: Color) -> Result<(), TessellationError> {
         self.draw_shape(
             |builder| {
@@ -843,15 +846,7 @@ impl CommonRenderer {
         Ok(())
     }
 
-    pub fn draw_text<F: AsRef<str>, T: AsRef<str>>(
-        &mut self,
-        origin: Point2D,
-        font: F,
-        text: T,
-        color: Color,
-        font_size: f32,
-        _max_width: Option<f32>,
-    ) -> Result<(), IntConversionError> {
+    pub fn draw_text<F: AsRef<str>, T: AsRef<str>>(&mut self, origin: Point2D, font: F, text: T, color: Color, font_size: f32, _max_width: Option<f32>) {
         use swash::{FontRef, scale::ScaleContext};
 
         self.tessellator.set_vertex_offsset(self.buffers.vertices.len() as u32);
@@ -939,8 +934,6 @@ impl CommonRenderer {
 
             self.buffers.indices.extend(buffers.indices);
         }
-
-        Ok(())
     }
 
     // #[must_use = "RenderInfo itself needs to be extended into other"]
@@ -974,7 +967,7 @@ impl CommonRenderer {
     // }
 
     #[must_use = "RenderInfo itself needs to be extended into other"]
-    pub fn render(&mut self, pass: &mut RenderPass, _backend: &RenderBackend, matrix: Option<Transform3D>, size: USize2D) -> Result<RenderInfo, Error> {
+    pub fn render(&mut self, pass: &mut RenderPass, _backend: &RenderBackend, matrix: Option<Transform3D>, size: USize2D) -> RenderInfo {
         let matrix = matrix.or(self.matrix).unwrap_or(self.window_matrix);
 
         let vertices = self.buffers.vertices.len();
@@ -1003,6 +996,6 @@ impl CommonRenderer {
         pass.draw_elements_slice(&self.vbo, &self.ibo, count, 0);
         pass.reset_params();
 
-        Ok(RenderInfo { draw_calls: 1, vertices })
+        RenderInfo { draw_calls: 1, vertices }
     }
 }

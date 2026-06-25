@@ -1,19 +1,21 @@
+#![allow(clippy::cast_precision_loss)]
+
 pub struct Random(i64);
 
 impl Random {
     #[inline]
     pub const fn new(seed: i64) -> Self {
-        Self((seed ^ 0x5DEECE66Di64) & ((1i64 << 48) - 1))
+        Self((seed ^ 0x0005_DEEC_E66D_i64) & ((1i64 << 48) - 1))
     }
 
     #[inline]
     pub const fn set_seed(&mut self, seed: i64) {
-        self.0 = (seed ^ 0x5DEECE66Di64) & ((1i64 << 48) - 1);
+        self.0 = (seed ^ 0x0005_DEEC_E66D_i64) & ((1i64 << 48) - 1);
     }
 
     #[inline]
     const fn next(&mut self, bits: i64) -> i32 {
-        self.0 = (self.0.wrapping_mul(0x5DEECE66Di64).wrapping_add(0xBi64)) & ((1i64 << 48) - 1);
+        self.0 = (self.0.wrapping_mul(0x0005_DEEC_E66D_i64).wrapping_add(0xBi64)) & ((1i64 << 48) - 1);
 
         ((self.0 as u64) >> (48 - bits)) as i32
     }

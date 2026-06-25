@@ -12,7 +12,7 @@ bson = "2.15.0"
 futures = { version = "0.3.32", features = ["std"] }
 uuid = { version = "1.21.0", features = ["v4"] }
 serde.workspace = true
-meralus-shared.workspace = true
+meralus-shared = { workspace = true, features = ["geometry"] }
 
 [lints]
 workspace = true

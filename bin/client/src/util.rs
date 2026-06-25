@@ -80,6 +80,7 @@ pub fn format_bytes(bytes: usize) -> String {
     format!("{value:.2}GB")
 }
 
+#[allow(dead_code)]
 pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
     [
         [[0.0, 0.0, 0.0], [0.0, size.y, 0.0]],
@@ -118,6 +119,7 @@ pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv: Point2D) ->
     })
 }
 
+#[allow(dead_code)]
 pub fn aabb_outline(Aabb { min, max }: Aabb, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
     let size = (max - min).as_vec3();
 

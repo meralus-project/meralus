@@ -222,7 +222,7 @@ impl ChunkGenerator {
     }
 
     pub fn generate_unpopulated_chunk_data<T: BlockSource>(&self, chunk: &mut Chunk, block_source: &T) {
-        let mut random = Random::new(i64::from(chunk.origin.x) * 341873128712 + i64::from(chunk.origin.y) * 132897987541);
+        let mut random = Random::new(i64::from(chunk.origin.x) * 341_873_128_712 + i64::from(chunk.origin.y) * 132_897_987_541);
 
         let biome_noise_cache = self.biome_generator.get_biome_noise(chunk.origin * 16, IPoint2D::splat(16));
 
@@ -356,7 +356,7 @@ impl ChunkGenerator {
         noise
     }
 
-    pub fn populate<C: ChunkAccess, T: BlockSource>(&self, chunk_manager: &mut C, block_source: &T, world_seed: i64, chunk: IPoint2D) {
+    pub fn populate<C: ChunkAccess, T: BlockSource>(&self, chunk_manager: &mut C, _block_source: &T, world_seed: i64, chunk: IPoint2D) {
         let origin = chunk * SUBCHUNK_SIZE_I32;
         let biomebase = self.biome_generator.get_biome_noise(origin + SUBCHUNK_SIZE_I32, IPoint2D::ONE).biomes[0];
         let mut random = Random::new(world_seed);
@@ -371,13 +371,15 @@ impl ChunkGenerator {
             let l1 = random.next_i32(128);
             let i2 = origin.y + random.next_i32(16) + 8;
 
-            LakesGenerator::new(block_source.get_block_id("water")).populate(chunk_manager, &mut random, IPoint3D::new(k1, l1, i2));
+            LakesGenerator.populate(chunk_manager, &mut random, IPoint3D::new(k1, l1, i2));
         }
 
         let d0 = 0.5;
         let k1 = ((random.next_f64().mul_add(
             4.0,
-            self.tree_count_noise.generate_noise_for_coords(origin.x as f64 * d0, origin.y as f64 * d0) / 8.0,
+            self.tree_count_noise
+                .generate_noise_for_coords(f64::from(origin.x) * d0, f64::from(origin.y) * d0)
+                / 8.0,
         ) + 4.0)
             / 3.0) as i32;
         let mut tree_count = 0;

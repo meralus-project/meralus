@@ -5,25 +5,22 @@ mod entity;
 mod texture;
 
 use std::{
-    fs::{self, DirEntry},
+    fs,
     ops::Not,
     path::{Path, PathBuf, absolute},
 };
 
 use ahash::HashMap;
-// use glam::{IPoint3D, Vec2, Vec3};
 use image::RgbaImage;
 use meralus_shared::{Point2D, Vector2D};
 use meralus_world::BlockSource;
 
-// use owo_colors::OwoColorize;
 pub use self::{
     block::{Block, BlockData, BlockStorage},
     block_model::*,
     entity::EntityModelStorage,
     texture::{TextureLoadingError, TextureStorage},
 };
-// use crate::world::{EntityData, EntityManager};
 
 pub type LoadingResult<T> = Result<T, LoadingError>;
 
@@ -53,6 +50,7 @@ pub struct ResourceStorage {
     pub mappings: Mappings,
 }
 
+#[allow(clippy::missing_panics_doc)]
 impl ResourceStorage {
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
@@ -91,21 +89,6 @@ impl ResourceStorage {
         }
 
         entity_id
-    }
-
-    pub fn load_buitlin_blocks(&mut self) {
-        if let Some(path) = self.mappings.get("game")
-            && let Ok(root) = path.join("models").read_dir()
-            && let Ok(mut root) = root.collect::<Result<Vec<_>, _>>()
-        {
-            root.sort_by_key(DirEntry::file_name);
-
-            for entry in root {
-                if entry.metadata().is_ok_and(|metadata| metadata.is_file()) && !entry.file_name().to_string_lossy().starts_with("cuboid") {
-                    self.models.load(&mut self.textures, &self.mappings, entry.path()).unwrap();
-                }
-            }
-        }
     }
 
     pub fn generate_mipmaps(&mut self, level: usize) {
@@ -214,6 +197,7 @@ impl ResourceStorage {
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 impl BlockSource for ResourceStorage {
     fn get_block_id(&self, name: &str) -> u8 {
         self.blocks.get_by_name(name) as u8

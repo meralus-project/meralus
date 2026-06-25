@@ -6,9 +6,7 @@ use meralus_shared::{DPoint3D, Face, Point2D, Vector2D};
 use meralus_world::new_boxed_array;
 use tracing::info;
 
-use crate::{FaceData, FaceUV, LoadingError, Mappings, ModelLoadingError};
-// use owo_colors::OwoColorize;
-use crate::{LoadingResult, texture::TextureStorage};
+use crate::{FaceData, FaceUV, LoadingError, LoadingResult, Mappings, ModelLoadingError, texture::TextureStorage};
 
 #[derive(Debug)]
 pub struct BakedEntityModelElement {
@@ -46,6 +44,7 @@ impl EntityModelStorage {
     /// An error will be returned if the passed path does not contain a filename
     /// or an error occurred while loading the block model (see
     /// [`BlockManager::load`]).
+    #[allow(clippy::missing_panics_doc)]
     pub fn load<P: AsRef<Path>>(&mut self, textures: &mut TextureStorage, root: &Mappings, path: P) -> LoadingResult<&BakedEntityModel> {
         let path = path.as_ref();
 

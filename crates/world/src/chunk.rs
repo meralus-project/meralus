@@ -105,7 +105,7 @@ impl SubChunk {
     }
 
     pub fn index_of_state(&self, name: &str) -> usize {
-        self.palette.iter().position(|palette_block| &palette_block.name == name).unwrap_or(0)
+        self.palette.iter().position(|palette_block| palette_block.name == name).unwrap_or(0)
     }
 
     pub fn try_insert(&mut self, block: SubChunkBlockState) -> usize {
@@ -704,59 +704,4 @@ impl<'a> Iterator for SubChunkIter<'a> {
 
         Some((chunk_local_position, if block_state.name == "game:air" { None } else { Some(block_state) }))
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use meralus_shared::{IPoint2D, USizePoint3D};
-
-    use crate::{CHUNK_HEIGHT, Chunk, SUBCHUNK_SIZE};
-
-    // #[test]
-    // fn test_chunk_face_iter() {
-    //     let chunk = Chunk::filled(1);
-
-    //     let mut iter = chunk.face_iter(Face::Back);
-
-    //     for y in 0..CHUNK_HEIGHT {
-    //         for z in 0..1 {
-    //             for x in 0..SUBCHUNK_SIZE {
-    //                 assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z),
-    // 1)));             }
-    //         }
-    //     }
-
-    //     assert_eq!(iter.next(), None);
-    // }
-
-    // #[test]
-    // fn test_chunk_iter() {
-    //     let chunk = Chunk::filled(1);
-
-    //     let mut iter = chunk.iter();
-
-    //     for y in 0..CHUNK_HEIGHT {
-    //         for z in 0..SUBCHUNK_SIZE {
-    //             for x in 0..SUBCHUNK_SIZE {
-    //                 assert_eq!(iter.next(), Some((USizePoint3D::new(x, y, z),
-    // 1)));             }
-    //         }
-    //     }
-
-    //     assert_eq!(iter.next(), None);
-    // }
-
-    // #[test]
-    // fn test_chunk_serialization() {
-    //     let chunk = Chunk::new(IPoint2D::new(0, 0));
-
-    //     let serialized = chunk.serialize();
-
-    //     println!("{}", serialized.len());
-
-    //     let deserialized = Chunk::deserialize(&serialized).unwrap();
-
-    //     assert_eq!(chunk.origin, deserialized.origin);
-    //     assert_eq!(chunk.subchunks, deserialized.subchunks);
-    // }
 }

@@ -35,11 +35,11 @@ impl<'a, C: ChunkAccess> BfsLight<'a, C> {
         if let Some(&props) = cache.get(name) {
             return props;
         }
- 
+
         let props = (block_source.blocks_light(name), block_source.light_consumption(name));
- 
+
         cache.insert(name.to_string(), props);
- 
+
         props
     }
 
@@ -183,59 +183,4 @@ impl<'a, C: ChunkAccess> BfsLight<'a, C> {
             }
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use meralus_shared::{IPoint2D, IPoint3D, USizePoint3D};
-
-    use crate::{BfsLight, BlockSource, ChunkAccess, ChunkManager};
-
-    struct TestBlockSource {
-        ids: Vec<&'static str>,
-    }
-
-    // impl BlockSource for TestBlockSource {
-    //     fn get_block_id(&self, name: &str) -> u8 {
-    //         self.ids.iter().position(|id| *id == name).unwrap_or_default() as
-    // u8     }
-
-    //     fn blocks_light(&self, _: u8) -> bool {
-    //         true
-    //     }
-
-    //     fn light_consumption(&self, _: u8) -> u8 {
-    //         0
-    //     }
-    // }
-
-    // #[test]
-    // fn test_sunlight() {
-    //     let mut chunk_manager = ChunkManager::from_range((), 0..1, &(0..1));
-    //     let source = TestBlockSource {
-    //         ids: vec!["air", "stone", "dirt", "grass_block", "sand"],
-    //     };
-
-    //     let chunk = chunk_manager.get_chunk_mut(IPoint2D::ZERO).unwrap();
-
-    //     for y in 0..240 {
-    //         for z in 0..16 {
-    //             for x in 0..16 {
-    //                 chunk.set_block_unchecked(USizePoint3D::new(x, y, z), 1);
-    //             }
-    //         }
-    //     }
-
-    //     let mut light = BfsLight::new(&mut chunk_manager);
-
-    //     for x in 0..16 {
-    //         for z in 0..16 {
-    //             light.chunk_manager.set_sky_light(IPoint3D::new(x as i32,
-    // 255, z as i32), 15);
-    // light.add_sky_custom(crate::LightNode(USizePoint3D::new(x, 255, z),
-    // IPoint2D::ZERO), 15);         }
-    //     }
-
-    //     light.calculate_block_light(&source);
-    // }
 }

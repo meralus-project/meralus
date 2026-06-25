@@ -1,15 +1,9 @@
 use meralus_shared::{IPoint3D, Random};
 use meralus_world::{ChunkAccess, SubChunkBlockState};
 
-pub struct LakesGenerator {
-    water: u8,
-}
+pub struct LakesGenerator;
 
 impl LakesGenerator {
-    pub const fn new(water: u8) -> Self {
-        Self { water }
-    }
-
     pub fn populate<C: ChunkAccess>(&self, chunk_manager: &mut C, random: &mut Random, mut center: IPoint3D) -> bool {
         center.x -= 8;
         center.z -= 8;

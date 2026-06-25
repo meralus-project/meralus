@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-const REAL_DAY_DURATION: Duration = Duration::from_secs(24 * 60 * 60);
+const REAL_DAY_DURATION: Duration = Duration::from_hours(24);
 
 /// Duration of day + night in ticks
 const DAYNIGHT_DURATION: u32 = 200; // 24_000;

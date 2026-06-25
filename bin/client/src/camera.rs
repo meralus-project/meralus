@@ -1,5 +1,5 @@
 use meralus_physics::{AabbSource, PhysicsContext, RayCastResult};
-use meralus_shared::{FrustumCulling, Point3D, Quat, Transform3D, Vector3D};
+use meralus_shared::{FrustumCulling, Point3D, Transform3D, Vector3D};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {

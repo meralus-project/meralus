@@ -24,35 +24,6 @@ impl AsValue<[f32; 3]> for Color {
     }
 }
 
-// impl AsValue<Vec4> for Color {
-//     fn as_value(&self) -> Vec4 {
-//         Vec4::from_array(self.as_value())
-//     }
-// }
-
-// impl AsValue<Vec3> for Color {
-//     fn as_value(&self) -> Vec3 {
-//         Vec3::from_array(self.as_value())
-//     }
-// }
-
-// impl From<Vec4> for Color {
-//     fn from(value: Vec4) -> Self {
-//         Self([
-//             (255.0 * value.x) as u8,
-//             (255.0 * value.y) as u8,
-//             (255.0 * value.z) as u8,
-//             (255.0 * value.w) as u8,
-//         ])
-//     }
-// }
-
-// impl From<Vec3> for Color {
-//     fn from(value: Vec3) -> Self {
-//         Self([(255.0 * value.x) as u8, (255.0 * value.y) as u8, (255.0 *
-// value.z) as u8, 255])     }
-// }
-
 impl AsValue<[u8; 4]> for Color {
     fn as_value(&self) -> [u8; 4] {
         self.0

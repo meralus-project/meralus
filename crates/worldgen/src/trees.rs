@@ -30,6 +30,7 @@ impl LeafDistanceCalculator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.updates.clear();
     }
@@ -192,6 +193,7 @@ impl TreesGenerator {
     }
 }
 
+#[allow(dead_code)]
 pub struct BigTreeGenerator {
     random: Random,
     pos: IPoint3D,

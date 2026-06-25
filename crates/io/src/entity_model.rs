@@ -41,6 +41,7 @@ pub struct EntityModel {
 }
 
 impl EntityModel {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from_slice(data: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(data)
     }

@@ -101,6 +101,7 @@ pub struct BlockModel {
 }
 
 impl BlockModel {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from_slice(data: &[u8]) -> Result<Self, serde_json::Error> {
         serde_json::from_slice(data)
     }

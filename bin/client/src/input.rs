@@ -52,7 +52,6 @@ pub struct MouseController {
     pressed_once: HashSet<MouseButton>,
     pressed: HashSet<MouseButton>,
     released: HashSet<MouseButton>,
-    pub entered: HashSet<usize>,
 }
 
 impl MouseController {

@@ -7,6 +7,7 @@ use super::{InStream, IncomingPacket, OutSink, OutgoingPacket, wrap_stream};
 
 pub struct Client(pub InStream<OutgoingPacket>, pub OutSink<IncomingPacket>);
 
+#[allow(clippy::missing_errors_doc)]
 impl Client {
     pub fn new(stream: TcpStream) -> Self {
         let (in_stream, out_stream) = wrap_stream(stream);

@@ -297,7 +297,7 @@
 //                 state.write().await.player_channels.remove(&uuid);
 
 //                 for player in state.read().await.player_channels.values() {
-//                     player.send(OutgoingPacket::PlayerDisonnected { uuid
+//                     player.send(OutgoingPacket::PlayerDisconnected { uuid
 // }).await.unwrap();                 }
 //             }
 //         });
@@ -342,4 +342,4 @@
 //     }
 // }
 
-fn main() {}
+const fn main() {}

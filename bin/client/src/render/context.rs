@@ -1,14 +1,10 @@
 use std::mem::replace;
 
-use ahash::{HashMap, HashMapExt};
-use horns::{RenderBackend, RenderPass, Texture2d};
+use horns::{RenderBackend, RenderPass};
 use lyon_tessellation::{FillBuilder, TessellationError, path::builder::NoAttributes};
-use meralus_shared::{Color, Point2D, Point3D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D};
+use meralus_shared::{Color, Point2D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D};
 
-use crate::render::{
-    RawRenderBuffer,
-    common::{CommonRenderer, CommonVertex, ObjectFit, Path},
-};
+use crate::render::common::{CommonRenderer, ObjectFit, Path};
 
 #[derive(Debug, Clone, Copy)]
 pub struct RenderInfo {
@@ -85,6 +81,7 @@ impl MeasureStrategy for RowStrategy {
     }
 }
 
+#[allow(dead_code)]
 pub enum Arrangement {
     Start,
     Center,
@@ -188,6 +185,7 @@ impl MeasureStrategy for NoopStrategy {
     }
 }
 
+#[allow(dead_code)]
 pub struct FillStrategy;
 
 impl MeasureStrategy for FillStrategy {
@@ -232,6 +230,7 @@ impl WidgetId {
 #[derive(Debug)]
 pub enum Shape {
     Noop,
+    #[allow(dead_code)]
     RRect(Thickness, Color),
     Rect(Color),
     Text(String, f32, &'static str, Color),
@@ -243,12 +242,13 @@ impl Shape {
             Self::Noop => (),
             &Self::RRect(rounding, color) => _ = renderer.draw_round_rect(node.origin, node.size, rounding, color),
             &Self::Rect(color) => _ = renderer.draw_rect(node.origin, node.size, color),
-            Self::Text(text, font_size, font, color) => _ = renderer.draw_text(node.origin, font, text, *color, *font_size, Some(node.size.x)),
+            Self::Text(text, font_size, font, color) => renderer.draw_text(node.origin, font, text, *color, *font_size, Some(node.size.x)),
         }
     }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct WidgetState {
     pub clicked: bool,
     pub pointer_entered: bool,
@@ -433,6 +433,7 @@ pub struct UiSubcontext<'a, A: ArrangeStrategy, M: MeasureStrategy> {
 }
 
 impl UiSubcontext<'_, RowStrategy, RowStrategy> {
+    #[allow(dead_code)]
     pub const fn set_spacing(&mut self, pixels: f32) {
         self.arrange_strategy.spacing = pixels;
         self.measure_strategy.spacing = pixels;
@@ -489,6 +490,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.set_width(size.x * ratio);
     }
 
+    #[allow(dead_code)]
     pub fn part_of_parent_height(&mut self, ratio: f32) {
         let size = self.parent_size();
 
@@ -542,6 +544,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.context.widgets[self.id.0].shape = Shape::Rect(color);
     }
 
+    #[allow(dead_code)]
     pub fn set_rounding(&mut self, thickness: Thickness, color: Color) {
         self.context.widgets[self.id.0].shape = Shape::RRect(thickness, color);
     }
@@ -615,6 +618,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.sized_child(size, Shape::Text(text, font_size, font, color));
     }
 
+    #[allow(dead_code)]
     pub fn rrect(&mut self, size: Size2D, rounding: Thickness, color: Color) {
         self.sized_child(size, Shape::RRect(rounding, color));
     }
@@ -630,15 +634,12 @@ pub struct RenderContext<'a> {
     common_renderer: &'a mut CommonRenderer,
     window_size: Size2D,
     clip: Option<Rect>,
-    layers: HashMap<usize, (Texture2d, RawRenderBuffer<CommonVertex, u32>)>,
-    current_layer: Option<usize>,
 
     pub bounds: Rect,
 }
 
 #[derive(Clone, Copy)]
 #[repr(C)]
-
 pub struct NativeColor {
     pub red: u8,
     pub green: u8,
@@ -647,7 +648,7 @@ pub struct NativeColor {
 
 #[derive(Clone, Copy)]
 #[repr(C)]
-
+#[allow(dead_code)]
 pub struct NativeCornerRadius {
     pub top_left: f32,
     pub top_right: f32,
@@ -662,11 +663,10 @@ impl<'a> RenderContext<'a> {
             bounds: Rect::new(Point2D::ZERO, size.as_vec2()),
             clip: None,
             common_renderer,
-            layers: HashMap::new(),
-            current_layer: None,
         }
     }
 
+    #[allow(dead_code)]
     pub const fn get_bounds(&self) -> Rect {
         self.bounds
     }
@@ -675,14 +675,13 @@ impl<'a> RenderContext<'a> {
         self.common_renderer.measure(font, text, size, max_width)
     }
 
+    #[allow(dead_code)]
     pub fn tessellate_with_color<F: FnOnce(&mut NoAttributes<FillBuilder>)>(&mut self, color: Color, tessellate: F) -> Result<(), TessellationError> {
         self.common_renderer.draw_shape(tessellate, color)
     }
 
     pub fn draw_text<F: Into<String>, T: Into<String>>(&mut self, position: Point2D, font: F, text: T, font_size: f32, color: Color, max_width: Option<f32>) {
-        self.common_renderer
-            .draw_text(position, font.into(), text.into(), color, font_size, max_width)
-            .unwrap();
+        self.common_renderer.draw_text(position, font.into(), text.into(), color, font_size, max_width);
     }
 
     pub const fn add_transform(&mut self, transform: Transform3D) {
@@ -693,18 +692,20 @@ impl<'a> RenderContext<'a> {
         self.common_renderer.set_transform(None);
     }
 
+    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
     pub fn draw_text_native(&mut self, x: f32, y: f32, font: &&str, text: &&str, font_size: f32, color: &NativeColor) {
         self.common_renderer
-            .draw_text(Point2D::new(x, y), font, text, Color::rgb(color.red, color.green, color.blue), font_size, None)
-            .unwrap_or_else(|e| panic!("(native) failed to draw text with next params {x}x{y}, {font}-{font_size}, {text}: {e}"));
+            .draw_text(Point2D::new(x, y), font, text, Color::rgb(color.red, color.green, color.blue), font_size, None);
     }
 
+    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
     pub fn draw_image_native(&mut self, x: f32, y: f32, w: f32, h: f32, path: &&str, object_fit: &ObjectFit) {
         self.common_renderer
             .draw_image(Point2D::new(x, y), Size2D::new(w, h), path, *object_fit)
             .unwrap_or_else(|e| panic!("(native) failed to draw image with next params {x}x{y}, {w}x{h}, {path}: {e}"));
     }
 
+    #[allow(dead_code)]
     pub fn draw_round_image_native(&mut self, x: f32, y: f32, w: f32, h: f32, corner_radius: &NativeCornerRadius, path: &&str) {
         self.common_renderer
             .draw_round_image(
@@ -721,6 +722,7 @@ impl<'a> RenderContext<'a> {
             .unwrap_or_else(|e| panic!("(native) failed to draw rounded image with next params {x}x{y}, {w}x{h}, {path}: {e}"));
     }
 
+    #[allow(dead_code)]
     pub fn draw_image<P: AsRef<std::path::Path>>(&mut self, rectangle: Rect, path: P) {
         let path = path.as_ref();
 
@@ -738,6 +740,7 @@ impl<'a> RenderContext<'a> {
             });
     }
 
+    #[allow(dead_code)]
     pub fn draw_round_image<P: AsRef<std::path::Path>>(&mut self, rectangle: RRect, path: P) {
         let path = path.as_ref();
 
@@ -755,6 +758,7 @@ impl<'a> RenderContext<'a> {
             });
     }
 
+    #[allow(dead_code)]
     pub fn draw_image_path<P: AsRef<std::path::Path>>(&mut self, path: Path, image_path: P) {
         let image_path = image_path.as_ref();
 
@@ -763,6 +767,7 @@ impl<'a> RenderContext<'a> {
             .unwrap_or_else(|e| panic!("(native) failed to draw image path with next params {}: {e}", image_path.display()));
     }
 
+    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
     pub fn draw_rrect_native(&mut self, x: f32, y: f32, w: f32, h: f32, corner_radius: &NativeCornerRadius, color: &NativeColor) {
         self.common_renderer
             .draw_round_rect(
@@ -779,6 +784,7 @@ impl<'a> RenderContext<'a> {
             .unwrap();
     }
 
+    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
     pub fn draw_rect_native(&mut self, x: f32, y: f32, w: f32, h: f32, color: &NativeColor) {
         self.common_renderer
             .draw_rect(Point2D::new(x, y), Size2D::new(w, h), Color::rgb(color.red, color.green, color.blue))
@@ -786,142 +792,25 @@ impl<'a> RenderContext<'a> {
     }
 
     pub fn draw_rect(&mut self, rectangle: Rect, color: Color) {
-        // if let Some(_transform) = self.matrix {
-        //     // let (scale, _, translation) =
-        //     // transform.to_scale_rotation_translation();
-
-        //     // self.common_renderer
-        //     //     .transformed_tessellate_with_color(
-        //     //         color,
-        //     //         Transform::scale(scale.x,
-        //     // scale.y).then_translate(Vector::new(translation.x,
-        //     // translation.y)),         |builder| {
-        //     //
-        //     // builder.add_rectangle(&bytemuck::cast(rectangle.to_box2()),
-        //     // Winding::Positive);         },
-        //     //     )
-        //     //     .unwrap();
-        // } else {
         self.common_renderer.draw_rect(rectangle.origin, rectangle.size, color).unwrap();
-        // }
     }
 
+    #[allow(dead_code)]
     pub fn draw_rounded_rect(&mut self, rectangle: RRect, color: Color) {
-        // if let Some(_transform) = self.matrix {
-        //     // let (scale, _, translation) =
-        //     // transform.to_scale_rotation_translation();
-
-        //     // self.tessellator
-        //     //     .transformed_tessellate_with_color(
-        //     //         color,
-        //     //         Transform::scale(scale.x,
-        //     // scale.y).then_translate(Vector::new(translation.x,
-        //     // translation.y)),         |builder| {
-        //     //             builder.add_rounded_rectangle(
-        //     //                 &bytemuck::cast(rectangle.as_box()),
-        //     //                 &BorderRadii {
-        //     //                     top_left: rectangle.corner_radius.left(),
-        //     //                     top_right: rectangle.corner_radius.top(),
-        //     //                     bottom_left: rectangle.corner_radius.right(),
-        //     //                     bottom_right:
-        //     // rectangle.corner_radius.bottom(),                 },
-        //     //                 Winding::Positive,
-        //     //             );
-        //     //         },
-        //     //     )
-        //     //     .unwrap();
-        // } else {
         self.common_renderer
             .draw_round_rect(rectangle.origin, rectangle.size, rectangle.corner_radius, color)
             .unwrap();
-        // }
     }
-
-    pub fn new_layer(&mut self, backend: &RenderBackend) {
-        let layer_idx = self.layers.len();
-
-        self.layers.insert(
-            layer_idx,
-            (
-                backend.create_empty_texture2d(self.window_size.x as u32, self.window_size.y as u32).unwrap(),
-                std::mem::take(&mut self.common_renderer.buffers),
-            ),
-        );
-
-        self.current_layer = Some(layer_idx);
-    }
-
-    // pub fn end_render_layer<S: Surface>(&mut self, backend: &RenderBackend,
-    // surface: &mut S, color: Color, matrix: Option<Transform3D>) ->
-    // Option<RenderInfo> {     if let Some(layer_idx) = self.current_layer.take()
-    // {         let layer = self.layers.remove(&layer_idx);
-
-    //         if layer_idx > 0 {
-    //             self.current_layer = Some(layer_idx - 1);
-    //         }
-
-    //         if let Some((layer, buffers)) = layer {
-    //             let mut buffer = SimpleFrameBuffer::new(display,
-    // &layer).unwrap();             let window_matrix =
-    // Transform3D::orthographic_rh_gl(0.0, self.window_size.x,
-    // self.window_size.y, 0.0, -1.0, 1.0);             let _info =
-    // self.common_renderer.render(&mut buffer, display,
-    // Some(window_matrix)).unwrap();
-
-    //             let vertices = TEXT_BASE_VERTICES.map(|(position, uv)|
-    // CommonVertex {                 position: (Point2D::ZERO +
-    // Point2D::new(position.x * self.window_size.x, position.y *
-    // self.window_size.y)).extend(position.z),                 color,
-    //                 uv,
-    //             });
-
-    //             let indices: [u32; 6] = [0, 1, 2, 3, 2, 1];
-
-    //             let vertex_buffer = VertexBuffer::new(display,
-    // &vertices).unwrap();             let index_buffer =
-    // IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices).unwrap();
-    //             let matrix = matrix.unwrap_or_else(|| {
-    //                 let (width, height) = surface.get_dimensions();
-
-    //                 Transform3D::orthographic_rh_gl(0.0, width as f32, height as
-    // f32, 0.0, -1.0, 1.0)             });
-
-    //             let uniforms = uniform! {
-    //                 atlas: layer
-    //                     .sampled()
-    //                     .minify_filter(MinifySamplerFilter::Nearest)
-    //                     .magnify_filter(MagnifySamplerFilter::Nearest),
-    //                 matrix: matrix.to_cols_array_2d(),
-    //             };
-
-    //             let vertices = vertex_buffer.len();
-
-    //             surface
-    //                 .draw(&vertex_buffer, &index_buffer,
-    // &self.common_renderer.shader, &uniforms, &DrawParameters {
-    // blend: BLENDING,                     ..DrawParameters::default()
-    //                 })
-    //                 .unwrap();
-
-    //             self.common_renderer.buffers = buffers;
-
-    //             Some(RenderInfo { draw_calls: 1, vertices })
-    //         } else {
-    //             None
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // }
 
     pub fn finish(self, backend: &RenderBackend, pass: &mut RenderPass, size: USize2D) -> RenderInfo {
-        self.common_renderer.render(pass, backend, None, size).unwrap()
+        self.common_renderer.render(pass, backend, None, size)
     }
 
     pub fn ui<F: FnOnce(&mut RenderContext, Rect)>(&mut self, func: F) {
         func(self, self.bounds);
     }
 
+    #[allow(dead_code)]
     pub fn transformed<F: FnOnce(&mut RenderContext, Rect)>(&mut self, transform: Transform3D, func: F) {
         self.add_transform(transform);
 
@@ -999,10 +888,3 @@ impl<'a> RenderContext<'a> {
         self.bounds.size += Size2D::ONE * value * 2.0;
     }
 }
-
-const TEXT_BASE_VERTICES: [(Point3D, Point2D); 4] = [
-    (Point3D::new(0.0, 1.0, 0.0), Point2D::new(0.0, 1.0)),
-    (Point3D::new(0.0, 0.0, 0.0), Point2D::new(0.0, 0.0)),
-    (Point3D::new(1.0, 1.0, 0.0), Point2D::new(1.0, 1.0)),
-    (Point3D::new(1.0, 0.0, 0.0), Point2D::new(1.0, 0.0)),
-];

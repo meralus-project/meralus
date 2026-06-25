@@ -12,6 +12,7 @@ pub trait Screen {
     fn draw(&self, context: &mut UiSubcontext<'_, RowStrategy, RowStrategy>);
 }
 
+#[allow(dead_code)]
 pub struct ScreenManager {
     screens: Vec<Box<dyn Screen>>,
 }

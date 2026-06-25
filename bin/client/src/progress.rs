@@ -11,6 +11,7 @@ pub enum ProgressChange {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ProgressInfo {
     pub total_stages: usize,
     pub current_stage: usize,

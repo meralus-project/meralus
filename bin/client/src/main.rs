@@ -31,9 +31,7 @@ use horns::{MagnifyFilter, MinifyFilter, RenderBackend, Texture2d};
 use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use meralus_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext};
 use meralus_physics::{Aabb, AabbSource, PhysicsContext};
-use meralus_shared::{
-    AsValue, Color, Face, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, USizePoint3D, Vector2D, Vector3D,
-};
+use meralus_shared::{AsValue, Color, Face, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, Vector2D, Vector3D};
 use meralus_storage::{Block, ResourceStorage, TextureStorage};
 use meralus_tween::{Animation, Tween};
 use meralus_world::{BfsLight, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SUBCHUNK_COUNT, SubChunkBlockState};
@@ -76,15 +74,6 @@ pub(crate) fn get_sky_color((after_day, progress): (bool, f32), weather: f32) ->
         night_color.lerp(&day_color, progress)
     }
 }
-
-// #[derive(Parser, Debug)]
-// #[command(version, about, long_about = None)]
-// struct Args {
-//     #[arg(long, requires = "net")]
-//     host: Option<SocketAddrV4>,
-//     #[arg(short, long, group = "net")]
-//     nickname: Option<String>,
-// }
 
 const GRASS_COLOR: Color = Color::from_hsl(120.0, 0.4, 0.75);
 
@@ -147,6 +136,7 @@ impl Interval {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum LightStyle {
     Smooth,
     BlockyWithAO,
@@ -166,6 +156,7 @@ impl LightStyle {
         }
     }
 
+    #[inline]
     fn smooth_light<T: ChunkAccess>(
         chunks: &T,
         resource_storage: &ResourceStorage,
@@ -215,6 +206,7 @@ impl LightStyle {
         (aos, lights)
     }
 
+    #[inline]
     fn blocky_with_ao<T: ChunkAccess>(
         chunks: &T,
         resource_storage: &ResourceStorage,
@@ -248,6 +240,7 @@ impl LightStyle {
         (aos, [light; 4])
     }
 
+    #[inline]
     fn blocky<T: ChunkAccess>(chunks: &T, _: &ResourceStorage, _: IPoint3D, light_source: IPoint3D, _: [[IPoint3D; 3]; 4], _: bool) -> ([f32; 4], [u8; 4]) {
         let light = chunks.get_light_level(light_source);
 
@@ -255,6 +248,7 @@ impl LightStyle {
     }
 
     #[inline]
+    #[allow(clippy::type_complexity)]
     pub const fn get_light_fn<T: ChunkAccess>(self) -> fn(&T, &ResourceStorage, IPoint3D, IPoint3D, [[IPoint3D; 3]; 4], bool) -> ([f32; 4], [u8; 4]) {
         match self {
             Self::Smooth => Self::smooth_light::<T>,
@@ -265,6 +259,7 @@ impl LightStyle {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct GraphicsSettings {
     light_style: LightStyle,
     render_distance: usize,
@@ -279,22 +274,14 @@ impl Default for GraphicsSettings {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Settings {
     graphics: GraphicsSettings,
     debugging: Debugging,
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            graphics: GraphicsSettings::default(),
-            debugging: Debugging::default(),
-        }
-    }
-}
-
 struct GameLoop {
+    #[allow(dead_code)]
     audio_manager: AudioManager,
     input: Input,
     common_renderer: CommonRenderer,
@@ -341,7 +328,7 @@ fn register_block<T: Block + 'static>(
 impl State for GameLoop {
     type Args = ();
 
-    fn new(window: WindowContext, backend: &RenderBackend, _: Self::Args) -> Self {
+    fn new(window: WindowContext, backend: &RenderBackend, (): Self::Args) -> Self {
         let (tx, rx) = mpsc::channel();
         let (action_sender, action_receiver) = mpsc::channel();
 
@@ -483,7 +470,7 @@ impl State for GameLoop {
         }
     }
 
-    fn handle_window_resize(&mut self, _facade: &RenderBackend, size: USize2D, scale_factor: f64) {
+    fn handle_window_resize(&mut self, _facade: &RenderBackend, size: USize2D, _scale_factor: f64) {
         // self.scene.resize(facade, size.to_array()).unwrap();
         // self.kawase.resize(facade, size.to_array()).unwrap();
 
@@ -742,13 +729,13 @@ impl State for GameLoop {
         self.settings.debugging.fps_stat.push_back(delta);
         self.settings.debugging.fps_max = self.settings.debugging.fps_max.max(delta);
 
-        let mut info = self.settings.debugging.render_info.take();
+        let info = self.settings.debugging.render_info.take();
 
         let (width, height) = window_context.window_size().into();
         let mut frame = backend.begin_pass();
 
         if let Some(world) = self.world.as_mut() {
-            let mut buffer = &mut frame; // self.scene.buffer(backend);
+            let buffer = &mut frame; // self.scene.buffer(backend);
 
             let progress = world.clock.get_progress();
 
@@ -769,7 +756,7 @@ impl State for GameLoop {
             self.settings
                 .debugging
                 .render_info
-                .extend(&self.common_renderer.render(buffer, backend, None, window_context.window_size()).unwrap());
+                .extend(&self.common_renderer.render(buffer, backend, None, window_context.window_size()));
 
             let rendered_subchunks = world.chunk_renderer.render(
                 buffer,
@@ -791,7 +778,7 @@ impl State for GameLoop {
             self.settings.debugging.render_info.extend(&builder.render(
                 backend,
                 &world.chunk_renderer,
-                &mut buffer,
+                buffer,
                 world.camera.matrix(),
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
@@ -976,8 +963,6 @@ impl State for GameLoop {
             });
 
             {
-                let chunk = ChunkManager::<()>::to_local(world.player.body.position.as_ivec3());
-
                 let (hours, minutes) = {
                     let time = world.clock.time().as_secs();
                     let seconds = time % 60;
@@ -1102,6 +1087,13 @@ Rendered subchunks: {} / {total_subchunks}",
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
 
             context.ui(|context, bounds| {
+                const CHUNK_UI_CONTAINER_SIZE: Size2D = Size2D::new(128.0, 128.0);
+                const CHUNK_UI_COUNT: usize = 16;
+                const CHUNK_UI_SIZE: Size2D = Size2D::new(
+                    CHUNK_UI_CONTAINER_SIZE.x / CHUNK_UI_COUNT as f32,
+                    CHUNK_UI_CONTAINER_SIZE.y / CHUNK_UI_COUNT as f32,
+                );
+
                 let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS + 1) * SLOT_SIZE;
                 let origin = Point2D::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
 
@@ -1120,13 +1112,6 @@ Rendered subchunks: {} / {total_subchunks}",
                         None,
                     );
                 }
-
-                const CHUNK_UI_CONTAINER_SIZE: Size2D = Size2D::new(128.0, 128.0);
-                const CHUNK_UI_COUNT: usize = 16;
-                const CHUNK_UI_SIZE: Size2D = Size2D::new(
-                    CHUNK_UI_CONTAINER_SIZE.x / CHUNK_UI_COUNT as f32,
-                    CHUNK_UI_CONTAINER_SIZE.y / CHUNK_UI_COUNT as f32,
-                );
 
                 let container_origin = Point2D::new(bounds.size.x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0);
 
@@ -1436,53 +1421,12 @@ Rendered subchunks: {} / {total_subchunks}",
 
                             world.entities.spawn_model(Point3D::new(0.0, 128.0, 0.0), 0);
                             world.entities.spawn_model(Point3D::new(32.0, 128.0, 0.0), 1);
-                            // let action_sender = self.action_sender.clone();
-
                             world.seed = 128;
-                            // world.start_world_generation(128);
-
-                            // let Client(mut receiver, mut sender) =
-                            //     Client::new(TcpStream::from_std(std::net::TcpStream::connect(self.args.
-                            // host.unwrap()).unwrap()).unwrap());
-
-                            // println!("connected");
-
-                            // tokio::spawn(async move {
-                            //     loop {
-                            //         if let Some(Ok(packet)) = receiver.next().await {
-                            //             match packet {
-                            //                 meralus_shared::OutgoingPacket::RemoveBlock(IPoint2D,
-                            // usize_Point3D) => {                     println!("received
-                            // block removal");
-
-                            //                     action_sender.send(Action::RemoveBlock(IPoint2D,
-                            // usize_Point3D)).unwrap();                 }
-                            //                 packet => world_network_sender.send(packet).unwrap(),
-                            //             }
-                            //         }
-                            //     }
-                            // });
-
-                            // let nickname = self.args.nickname.clone().unwrap();
-
-                            // tokio::spawn(async move {
-                            //     sender.send(IncomingPacket::PlayerConnected(nickname)).await.unwrap();
-
-                            //     println!("sent nickname");
-
-                            //     loop {
-                            //         if let Ok(packet) = network_receiver.recv() {
-                            //             sender.send(packet).await.unwrap();
-                            //         }
-                            //     }
-                            // });
 
                             let size = window_context.window_size().as_vec2();
 
                             world.camera.aspect_ratio = size.x / size.y;
 
-                            // self.event_manager.trigger(Event::WorldStart(&WorldData { world: &mut world
-                            // }));
                             self.world.replace(world);
                         }
 
@@ -1506,7 +1450,7 @@ Rendered subchunks: {} / {total_subchunks}",
             }
 
             self.context.paint_root(&mut self.common_renderer);
-            self.common_renderer.render(&mut frame, backend, None, window_context.window_size()).unwrap();
+            _ = self.common_renderer.render(&mut frame, backend, None, window_context.window_size());
         }
 
         self.input.mouse.clear();
@@ -1520,377 +1464,6 @@ enum Page {
     Options,
     Main,
 }
-
-// impl Page {
-//     fn render(
-//         &self,
-//         window_context: WindowContext,
-//         display: &WindowDisplay,
-//         frame: &mut glium::Frame,
-//         common_renderer: &mut CommonRenderer,
-//         animation_player: &mut AnimationPlayer,
-//         debugging: &mut Debugging,
-//         input: &mut Input,
-//         progress: &Progress,
-//     ) -> Option<Self> {
-//         let mut context = RenderContext::new(display, common_renderer);
-
-//         let page = match self {
-//             Self::Options => OptionsPage::render(window_context, &mut
-// context, animation_player, input),             Self::Main =>
-// MainPage::render(window_context, &mut context, animation_player, input),
-//         };
-
-//         if animation_player.get_value::<_, f32>("progress-opacity") >
-// Some(0.0) {             show_loading_screen(animation_player, &mut context,
-// progress);         }
-
-//         debugging.render_info.extend(&context.finish(display, frame));
-
-//         page
-//     }
-// }
-
-// struct WorldCreationPage;
-
-// impl WorldCreationPage {
-//     const fn render(_window_context: WindowContext, _context: &mut
-// RenderContext, _animation_player: &mut AnimationPlayer, _input: &Input) ->
-// Option<Page> {         None
-//     }
-// }
-
-// struct OptionsPage;
-
-// impl OptionsPage {
-//     fn render(_: WindowContext, _: &mut RenderContext, _: &mut
-// AnimationPlayer, _: &Input) -> Option<Page> {         None
-//     }
-// }
-
-// struct MainPage;
-
-// impl MainPage {
-//     fn render(window_context: WindowContext, context: &mut RenderContext,
-// animation_player: &mut AnimationPlayer, input: &mut Input) -> Option<Page> {
-//         let mut page = None;
-
-//         context.ui(|context, bounds| {
-//             let text_scaling: f32 =
-// animation_player.get_value_unchecked("text-scaling");             let
-// text_opacity = 1.0 - animation_player.get_value::<_,
-// f32>("progress-opacity").unwrap_or(0.0);
-
-//             let size = context
-//                 .measure_text("default", "Meralus", 72.0, None)
-//                 .unwrap_or_else(|| panic!("failed to measure next text:
-// Meralus"));             let offset = Point2D::new(bounds.size.x / 2.0 -
-// size.x / 2.0, 24.0);
-
-//             context.draw_text(
-//                 bounds.origin + offset,
-//                 "default",
-//                 "Meralus",
-//                 72.0,
-//                 Color::from_hsl(110.0, 0.4, 0.7).with_alpha(text_opacity),
-//                 None,
-//             );
-
-//             let origin = bounds.origin + offset + size;
-//             let size = context.measure_text("default", "hiii wrld!!", 36.0,
-// None).unwrap();
-
-//             context.transformed(
-//                 Transform3D::from_translation(origin.extend(0.0))
-//                     .scale(Vector3D::splat(text_scaling))
-//                     .rotate_z(-20f32.to_radians())
-//                     .translate(-origin.extend(0.0)),
-//                 |context, _| {
-//                     context.draw_text(
-//                         origin - size / 2.0,
-//                         "default",
-//                         "hiii wrld!!",
-//                         36.0,
-//                         Color::from_hsl(200.0, 0.8,
-// 0.6).with_alpha(text_opacity),                         None,
-//                     );
-//                 },
-//             );
-
-//             context.draw_text(
-//                 bounds.origin + Point2D::new(8.0, bounds.size.y - 24.0),
-//                 "default",
-//                 format!("developer build for {OS} (arch: {ARCH}), v{}",
-// env!("CARGO_PKG_VERSION")),                 18.0,
-//                 Color::from_hsl(110.0, 0.6, 0.6).with_alpha(text_opacity),
-//                 None,
-//             );
-
-//             let button_width = (bounds.size.x * 0.4).max(192.0);
-//             let mut start = bounds.origin + Point2D::new(bounds.size.x / 2.0
-// - button_width / 2.0, bounds.size.y / 2.0 - 68.0);
-
-//             for (i, button) in MenuButton::ALL.into_iter().enumerate() {
-//                 let animation = format!("menu-button-{i}");
-
-//                 if !animation_player.contains(&animation) {
-//                     animation_player.add(&animation, || {
-//                         Transition::new(
-//                             Color::from_u32_rgb(0x3C4B38),
-//                             Color::from_u32_rgb(0x3C4B38),
-//                             200,
-//                             Curve::LINEAR,
-//                             RepeatMode::Once,
-//                         )
-//                     });
-//                 }
-
-//                 let box_bounds = RRect::new(start, Size2D::new(button_width,
-// 40.0), Thickness::all(8.0));
-
-//                 if box_bounds.contains(input.mouse.position) {
-//                     if input.mouse.entered.insert(i) {
-//
-// animation_player.get_mut(&animation).unwrap().
-// to(Color::from_u32_rgb(0x5E7558));
-// animation_player.play(&animation);                     }
-//                 } else if input.mouse.entered.remove(&i) {
-//
-// animation_player.get_mut(&animation).unwrap().
-// to(Color::from_u32_rgb(0x3C4B38));
-// animation_player.play(&animation);                 }
-
-//                 if input.mouse.is_pressed_once(MouseButton::Left) &&
-// box_bounds.contains(input.mouse.position) {                     match button
-// {                         MenuButton::Play => page = Some(Page::Options),
-//                         MenuButton::Options => page = Some(Page::Options),
-//                         MenuButton::Exit => window_context.close_window(),
-//                     }
-//                 }
-
-//                 context.draw_rounded_rect(box_bounds,
-// animation_player.get_value_unchecked(&animation));
-
-//                 let size = context.measure_text("default", button.as_str(),
-// 36.0, None).unwrap();
-
-//                 context.draw_text(
-//                     start + Point2D::new((bounds.size.x * 0.4) / 2.0 - size.x
-// / 2.0, 0.0),                     "default",
-//                     button.as_str(),
-//                     36.0,
-//                     Color::from_u32_rgb(0xD6E8CE),
-//                     None,
-//                 );
-
-//                 start.y += 48.0;
-//             }
-//         });
-
-//         // {
-//         //     let progress: f32 =
-// animation_player.get_value_unchecked("text-scaling");         //     let
-// origin = Point2D::new(48.0, 48.0);         //     let width = 64.0;
-//         //     let height = 48.0;
-//         //     let pixel_size = 4.0;
-//         //     let real_width = width * progress * pixel_size;
-//         //     let real_width = real_width - (real_width % pixel_size);
-
-//         //     for w in 0..49u16 {
-//         //         context.draw_rect(
-//         //             Rect::new(origin + Point2D::new(0.0, f32::from(w) *
-//         // pixel_size), Size2D::new(width * pixel_size, 1.0)),
-//         // Color::BLUE,         );
-//         //     }
-
-//         //     for h in 0..65u16 {
-//         //         context.draw_rect(
-//         //             Rect::new(origin + Point2D::new(f32::from(h) *
-// pixel_size,         // 0.0), Size2D::new(1.0, height * pixel_size)),
-//         // Color::BLUE,         );
-//         //     }
-
-//         //     // LEFT
-//         //     context.draw_rect(Rect::new(origin, Size2D::new(pixel_size,
-// height *         // pixel_size)), Color::RED);     // TOP
-//         //     context.draw_rect(Rect::new(origin, Size2D::new(real_width,
-//         // pixel_size)), Color::RED);     // RIGHT
-//         //     context.draw_rect(
-//         //         Rect::new(origin + Point2D::new(real_width, 0.0),
-//         // Size2D::new(pixel_size, (height + 1.0) * pixel_size)),
-//         //         Color::RED,
-//         //     );
-//         //     // BOTTOM
-//         //     context.draw_rect(
-//         //         Rect::new(origin + Point2D::new(0.0, height * pixel_size),
-//         // Size2D::new(real_width, pixel_size)),         Color::RED,
-//         //     );
-//         // }
-
-//         {
-//             let p: f32 =
-// animation_player.get_value_unchecked("text-scaling");             let xm =
-// 32.0;             let ym = 32.0;
-//             let pixel_size = 1.0;
-//             let r = 32.0 * p * pixel_size;
-//             let mut r = r - (r % pixel_size);
-
-//             let mut x = -r;
-//             let mut y = 0.0;
-//             let mut err = 2.0 - 2.0 * r;
-//             let pixel_size = 4.0;
-
-//             loop {
-//                 context.draw_rect(
-//                     Rect::new(Point2D::new((xm - x) * pixel_size, (ym + y) *
-// pixel_size), Size2D::splat(pixel_size)),                     Color::RED,
-//                 );
-//                 context.draw_rect(
-//                     Rect::new(Point2D::new((xm - y) * pixel_size, (ym - x) *
-// pixel_size), Size2D::splat(pixel_size)),                     Color::RED,
-//                 );
-//                 context.draw_rect(
-//                     Rect::new(Point2D::new((xm + x) * pixel_size, (ym - y) *
-// pixel_size), Size2D::splat(pixel_size)),                     Color::RED,
-//                 );
-//                 context.draw_rect(
-//                     Rect::new(Point2D::new((xm + y) * pixel_size, (ym + x) *
-// pixel_size), Size2D::splat(pixel_size)),                     Color::RED,
-//                 );
-
-//                 r = err;
-
-//                 if r <= y {
-//                     y += 1.0;
-//                     err += y * 2.0 + 1.0;
-//                 }
-
-//                 if r > x || err > y {
-//                     x += 1.0;
-//                     err += x * 2.0 + 1.0;
-//                 }
-
-//                 if x >= 0.0 {
-//                     break;
-//                 }
-//             }
-//         }
-
-//         page
-//     }
-// }
-
-// enum MenuButton {
-//     Play,
-//     Options,
-//     Exit,
-// }
-
-// impl MenuButton {
-//     pub const ALL: [Self; 3] = [Self::Play, Self::Options, Self::Exit];
-
-//     pub const fn as_str(&self) -> &'static str {
-//         match self {
-//             Self::Play => "Play",
-//             Self::Options => "Options",
-//             Self::Exit => "Exit",
-//         }
-//     }
-// }
-
-// impl fmt::Display for MenuButton {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.write_str(self.as_str())
-//     }
-// }
-
-// fn show_loading_screen(animation_player: &AnimationPlayer, context: &mut
-// RenderContext, progress: &Progress) {     let opacity =
-// animation_player.get_value_unchecked("progress-opacity");
-
-//     context.ui(|context, bounds| {
-//         context.fill(Color::from_u32_rgb(0x3C4B38).with_alpha(opacity));
-
-//         let progress_bar = Size2D::new(bounds.size.x * 0.8, 48.0);
-//         let stages_progress_bar = bounds.origin + (bounds.size / 2.0) -
-// (progress_bar / 2.0);
-
-//         if let Some(name) = progress.info.as_ref().and_then(|info|
-// info.current_stage_name.as_ref()) {             context.draw_text(
-//                 stages_progress_bar - Point2D::new(0.0, 44.0),
-//                 "default",
-//                 name,
-//                 36.0,
-//                 Color::from_u32_rgb(0xA2D398).with_alpha(opacity),
-//                 None,
-//             );
-//         }
-
-//         context.bounds(Rect::new(stages_progress_bar, progress_bar),
-// |context, _| {
-// context.fill(Color::from_u32_rgb(0xA2D398).with_alpha(opacity));
-
-//             context.padding(2.0, |context, _| {
-//
-// context.fill(Color::from_u32_rgb(0x3C4B38).with_alpha(opacity));
-
-//                 if progress.info.is_some() {
-//                     let progress: f32 =
-// animation_player.get_value_unchecked("stage-progress");
-
-//                     context.padding(2.0, |context, bounds| {
-//                         context.draw_rect(
-//                             Rect::new(bounds.origin,
-// Size2D::new(bounds.size.x * progress, bounds.size.y)),
-// Color::from_u32_rgb(0xA2D398).with_alpha(opacity),                         );
-//                     });
-//                 }
-//             });
-//         });
-
-//         context.bounds(
-//             Rect::new(stages_progress_bar + Point2D::new(0.0, progress_bar.y
-// + 8.0), progress_bar),             |context, _| {
-//
-// context.fill(Color::from_u32_rgb(0xA2D398).with_alpha(opacity));
-
-//                 context.padding(2.0, |context, _| {
-//
-// context.fill(Color::from_u32_rgb(0x3C4B38).with_alpha(opacity));
-
-//                     if progress.info.is_some() {
-//                         let progress: f32 =
-// animation_player.get_value_unchecked("stage-substage-progress");
-// let translation: f32 =
-// animation_player.get_value_unchecked("stage-substage-translation");
-
-//                         context.padding(2.0, |context, bounds| {
-//                             context.clipped(bounds, |context, bounds| {
-//                                 context.draw_rect(
-//                                     Rect::new(
-//                                         bounds.origin,
-//                                         Size2D::new(
-//                                             bounds.size.x
-//                                                 * if translation < 0.0 {
-//                                                   animation_player.
-//                                                   get_value_unchecked("
-//                                                   stage-previous-progress")
-//                                                 } else {
-//                                                     progress
-//                                                 },
-//                                             bounds.size.y * (1.0 +
-// translation),                                         ),
-//                                     ),
-//
-// Color::from_u32_rgb(0xA2D398).with_alpha(opacity),
-// );                             });
-//                         });
-//                     }
-//                 });
-//             },
-//         );
-//     });
-// }
 
 pub struct AabbProvider<'a, C: ChunkCache> {
     pub chunk_manager: &'a ChunkManager<C>,

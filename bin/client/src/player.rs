@@ -150,6 +150,7 @@ impl Default for PlayerController {
     }
 }
 
+#[allow(dead_code)]
 impl PlayerController {
     pub const AFFECTED_BY_PHYSICS: bool = true;
     pub const CAMERA_OFFSET: Point3D = if Self::IS_THIRD_PERSON { Point3D::new(-2.0, 0.5, 0.0) } else { Point3D::ZERO };
@@ -184,8 +185,8 @@ impl PlayerController {
     }
 
     pub fn handle_mouse(&mut self, delta: Vector2D) -> (f32, f32) {
-        self.yaw += delta.x * Self::MOUSE_SENSE * Self::LOOK_SPEED;
-        self.pitch += delta.y * Self::MOUSE_SENSE * -Self::LOOK_SPEED;
+        self.yaw = (delta.x * Self::MOUSE_SENSE).mul_add(Self::LOOK_SPEED, self.yaw);
+        self.pitch = (delta.y * Self::MOUSE_SENSE).mul_add(-Self::LOOK_SPEED, self.pitch);
         self.pitch = self.pitch.clamp(-1.5, 1.5);
 
         (self.yaw, self.pitch)
@@ -218,7 +219,7 @@ impl PlayerController {
             self.bob_time = 0.0;
             self.bob_offset = self.bob_offset.lerp(Point3D::ZERO, (delta * 16.0).min(1.0));
         } else {
-            self.bob_time += BOB_SPEED * delta;
+            self.bob_time = BOB_SPEED.mul_add(delta, self.bob_time);
             self.bob_offset = Point3D::new(
                 BOB_AMP * (self.bob_time * BOB_FREQ).sin(),
                 BOB_AMP * (self.bob_time * BOB_FREQ * 2.0).sin(),
@@ -261,8 +262,8 @@ impl PlayerController {
                 self.body.velocity.y = 8.0;
             }
         } else {
-            self.body.velocity.x += velocity.x * delta;
-            self.body.velocity.z += velocity.z * delta;
+            self.body.velocity.x = velocity.x.mul_add(delta, self.body.velocity.x);
+            self.body.velocity.z = velocity.z.mul_add(delta, self.body.velocity.z);
         }
     }
 }

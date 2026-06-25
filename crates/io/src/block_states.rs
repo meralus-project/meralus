@@ -3,13 +3,14 @@ use std::{collections::hash_map::Entry, fmt};
 use ahash::HashMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlockStates {
     pub model: String,
     pub variants: Vec<BlockState>,
 }
 
 impl BlockStates {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from_slice(bytes: &[u8], registry: &PropertyRegistry) -> Result<Self, serde_json::Error> {
         let value = serde_json::from_slice(bytes)?;
 
@@ -61,19 +62,20 @@ pub enum PropertyType {
     Boolean,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd)]
 pub struct Property {
     pub name: &'static str,
     pub value: PropertyValue,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlockState {
     pub when: HashMap<String, PropertyValue>,
     pub model: String,
 }
 
 impl BlockState {
+    #[allow(clippy::missing_errors_doc)]
     pub fn from_slice(bytes: &[u8], registry: &PropertyRegistry) -> Result<Self, serde_json::Error> {
         let value = serde_json::from_slice(bytes)?;
 
@@ -101,6 +103,7 @@ pub struct NumericProperty<'a, T> {
     max: &'a mut T,
 }
 
+#[allow(clippy::return_self_not_must_use)]
 impl<T> NumericProperty<'_, T> {
     pub fn with_range(self, min: T, max: T) -> Self {
         self.with_min(min).with_max(max)

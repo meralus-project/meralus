@@ -1,8 +1,8 @@
 use std::{borrow::Borrow, hash::Hash};
 
 use horns::{
-    BackfaceCullingMode, Blend, BlendingFactor, Depth, DepthTest, DrawParams, ElementType, IndexBuffer, Program, RenderBackend, RenderPass, SampledTexture2d,
-    VertexBuffer, create_shader, impl_vertex,
+    BackfaceCullingMode, Blend, BlendingFactor, Depth, DepthTest, DrawParams, ElementType, Program, RenderBackend, RenderPass, SampledTexture2d, create_shader,
+    impl_vertex,
 };
 use indexmap::IndexMap;
 use meralus_shared::{AsValue, Color, FromValue, Frustum, FrustumCulling, IPoint2D, Point2D, Point3D, Transform3D};
@@ -24,6 +24,7 @@ pub struct VoxelFace {
     pub color: Color,
 }
 
+#[allow(dead_code)]
 impl VoxelFace {
     fn cmp(&self, camera_pos: Point3D, other: &Self) -> std::cmp::Ordering {
         camera_pos
@@ -104,7 +105,7 @@ impl VoxelMeshBuilder {
     pub fn push_transformed(&mut self, voxel: &VoxelFace, matrix: &Transform3D, origin: Point3D) {
         self.vertices.extend((0..4).map(|i| VoxelVertex {
             position: voxel.position + matrix.transform_point3(voxel.vertices[i] - origin) + origin,
-            light: voxel.lights[i] as u32,
+            light: voxel.lights[i].into(),
             uv: voxel.uvs[i],
             color: voxel.color.as_value(),
         }));
@@ -116,7 +117,7 @@ impl VoxelMeshBuilder {
     pub fn push(&mut self, voxel: &VoxelFace) {
         self.vertices.extend((0..4).map(|i| VoxelVertex {
             position: voxel.position + voxel.vertices[i],
-            light: voxel.lights[i] as u32,
+            light: voxel.lights[i].into(),
             uv: voxel.uvs[i],
             color: voxel.color.as_value(),
         }));
@@ -260,6 +261,7 @@ impl ChunkRenderer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_with_params<T: Frustum>(
         &mut self,
         pass: &mut RenderPass,
@@ -289,7 +291,7 @@ impl ChunkRenderer {
 
         pass.apply_params(params);
 
-        for (&key, subchunk) in self.subchunks.iter() {
+        for (&key, subchunk) in &self.subchunks {
             if Self::is_subchunk_visible(frustum, key) && !subchunk.solid.indices.is_empty() {
                 pass.draw_elements(&subchunk.solid.vertices, &subchunk.solid.indices);
 
@@ -298,7 +300,7 @@ impl ChunkRenderer {
             }
         }
 
-        for (&key, subchunk) in self.subchunks.iter() {
+        for (&key, subchunk) in &self.subchunks {
             if Self::is_subchunk_visible(frustum, key) && !subchunk.translucent.indices.is_empty() {
                 pass.draw_elements(&subchunk.translucent.vertices, &subchunk.translucent.indices);
 

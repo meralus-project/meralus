@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc, clippy::cast_sign_loss)]
+
 use std::{num::NonZeroU32, rc::Rc};
 
 use glow::HasContext;

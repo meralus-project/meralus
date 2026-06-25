@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 mod biome;
 mod chunk;
 mod lakes;

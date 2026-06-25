@@ -69,6 +69,7 @@ pub struct ProgramBinder<'a> {
 }
 
 impl ProgramBinder<'_> {
+    #[allow(clippy::return_self_not_must_use)]
     pub fn with_uniform<'a, N: AsRef<str>, V: Into<UniformValue<'a>>>(mut self, name: N, value: V) -> Self {
         if let Some(location) = self.program.uniforms.get(name.as_ref()) {
             let location = Some(location);

@@ -147,15 +147,15 @@ impl Entity {
                             let mut matrix = Transform3D::IDENTITY;
 
                             if rotation.x > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_x(rotation.x);
+                                matrix *= Transform3D::from_rotation_x(rotation.x);
                             }
 
                             if rotation.y > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_y(rotation.y);
+                                matrix *= Transform3D::from_rotation_y(rotation.y);
                             }
 
                             if rotation.z > 0.0 {
-                                matrix = matrix * Transform3D::from_rotation_z(rotation.z);
+                                matrix *= Transform3D::from_rotation_z(rotation.z);
                             }
 
                             let center = element.cube.min.as_vec3() + element.cube.size().as_vec3() / 2.0;
@@ -295,12 +295,14 @@ impl ChunkCache for ChunkFileCache {
     }
 }
 
+#[allow(dead_code)]
 pub enum Weather {
     Clear,
     Rain,
     Thunder,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum JobResult {
     /// Bare terrain
     Generation {
@@ -451,6 +453,7 @@ pub struct World {
     pub job_manager: JobManager,
     pub chunk_renderer: ChunkRenderer,
 
+    #[allow(dead_code)]
     pub current_weather: Weather,
 
     pub chat_history: Vec<String>,
@@ -648,6 +651,7 @@ impl World {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn update(&mut self, backend: &RenderBackend, settings: GraphicsSettings) {
         for result in self.job_manager.receiver.try_iter() {
             match result {
@@ -820,6 +824,7 @@ impl World {
         }
     }
 
+    #[allow(dead_code)]
     pub fn chunk_borders(&self, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
         self.chunk_manager.chunks().fold(Vec::new(), |mut lines, chunk| {
             let origin = chunk.origin.as_vec2() * SUBCHUNK_SIZE_F32;
@@ -837,6 +842,7 @@ impl World {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct WorldSnapshot<'a, C: ChunkAccess> {
     chunk_manager: &'a C,
     resource_storage: Arc<ResourceStorage>,
