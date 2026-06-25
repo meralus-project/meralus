@@ -1,6 +1,10 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
-use std::time::{Duration, Instant};
+use std::{
+    fs::File,
+    io::BufReader,
+    time::{Duration, Instant},
+};
 
 use horns::RenderBackend;
 use meralus_shared::{InspectMut, Point2D, USize2D, Vector2D};
@@ -11,7 +15,7 @@ use winit::{
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::PhysicalKey,
     raw_window_handle::{HasDisplayHandle, HasWindowHandle},
-    window::{Window, WindowId},
+    window::{Icon, Window, WindowId},
 };
 pub use winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode};
 
@@ -62,6 +66,9 @@ pub struct KeyboardModifiers {
 #[allow(unused)]
 pub trait State {
     type Args;
+
+    const ICON: Option<&str>;
+    const NAME: &str;
 
     fn new(context: WindowContext, display: &RenderBackend, args: Self::Args) -> Self;
 
@@ -122,7 +129,16 @@ impl<T: State> ApplicationWindow<T> {
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn new(event_loop: &ActiveEventLoop, args: T::Args) -> Self {
-        let window_attrs = Window::default_attributes().with_transparent(false);
+        let icon = T::ICON.and_then(|icon| {
+            let decoder = png::Decoder::new(BufReader::new(File::open(icon).unwrap()));
+            let mut reader = decoder.read_info().unwrap();
+            let mut buf = vec![0; reader.output_buffer_size().unwrap()];
+            let info = reader.next_frame(&mut buf).unwrap();
+
+            Icon::from_rgba(buf[..info.buffer_size()].to_vec(), info.width, info.height).ok()
+        });
+
+        let window_attrs = Window::default_attributes().with_transparent(false).with_title(T::NAME).with_window_icon(icon);
         let window = event_loop.create_window(window_attrs).expect("failed to create window");
         let (width, height): (u32, u32) = window.inner_size().into();
         let backend = RenderBackend::new(window.display_handle().unwrap(), window.window_handle().unwrap(), width, height).unwrap();

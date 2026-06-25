@@ -8,6 +8,7 @@ meralus-shared.workspace = true
 glutin = { version = "0.32.3", features = ["egl"] }
 winit = "0.30.13"
 horns.workspace = true
+png = "0.18.1"
 
 [lints]
 workspace = true

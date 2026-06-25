@@ -327,6 +327,9 @@ fn register_block<T: Block + 'static>(
 
 impl State for GameLoop {
     type Args = ();
+    
+    const ICON: Option<&str> = Some("./resources/icon.png");
+    const NAME: &str = "Meralus";
 
     fn new(window: WindowContext, backend: &RenderBackend, (): Self::Args) -> Self {
         let (tx, rx) = mpsc::channel();

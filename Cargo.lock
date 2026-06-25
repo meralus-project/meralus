@@ -1637,6 +1637,7 @@ dependencies = [
  "glutin",
  "horns",
  "meralus-shared",
+ "png",
  "winit",
 ]
 

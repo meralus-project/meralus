@@ -380,8 +380,6 @@ impl CommonRenderer {
         let vbo = backend.create_empty_vertex_buffer(Self::PREALLOCATE_VERTICES, &shader, true)?;
         let ibo = backend.create_empty_index_buffer(ElementType::Triangles, Self::PREALLOCATE_INDICES, true)?;
 
-        println!("vbo + ibo created");
-
         Ok(Self {
             shader,
             vbo,
