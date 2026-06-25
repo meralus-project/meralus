@@ -17,6 +17,37 @@ pub use self::{
 };
 
 #[macro_export]
+macro_rules! create_shader {
+    ($struct_name:ident => $path:literal) => {
+        struct $struct_name;
+
+        impl $crate::Shader for $struct_name {
+            fn vertex(&self) -> String {
+                std::fs::read_to_string(concat![$path, ".vs"]).unwrap()
+            }
+
+            fn fragment(&self) -> String {
+                std::fs::read_to_string(concat![$path, ".fs"]).unwrap()
+            }
+        }
+    };
+
+    ($visibility:vis $struct_name:ident => $path:literal) => {
+        $visibility struct $struct_name;
+
+        impl $crate::Shader for $struct_name {
+            fn vertex(&self) -> String {
+                std::fs::read_to_string(concat![$path, ".vs"]).unwrap()
+            }
+
+            fn fragment(&self) -> String {
+                std::fs::read_to_string(concat![$path, ".fs"]).unwrap()
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! impl_vertex {
     ($struct_name:ident { $($field_name:ident: [$field_ty:ident; $count:literal]),+ }) => {
         impl $struct_name {

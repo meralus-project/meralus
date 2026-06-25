@@ -79,6 +79,7 @@ impl Face {
     }
 
     #[must_use]
+    #[inline]
     #[cfg(feature = "geometry")]
     pub const fn get_neighbours(self) -> [IPoint3D; 8] {
         let normal = self.as_normal();

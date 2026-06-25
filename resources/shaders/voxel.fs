@@ -46,10 +46,10 @@ vec4 apply_fog(vec4 in_color, float spherical_dist, float cylindrical_dist) {
 
 void main() {
   if (with_tex) {
-    vec4 lightmap_intensity = texture2D(lightmap, v_tex_coords) * vec4(0.21, 0.71, 0.07, 0.0);
+    vec4 lightmap_intensity = texture(lightmap, v_tex_coords) * vec4(0.21, 0.71, 0.07, 0.0);
     float gray = lightmap_intensity.r + lightmap_intensity.g + lightmap_intensity.b;
     float light_intensity = max(gray, v_light_intensity);
-    vec4 color = texture2D(tex, v_tex_coords) * vec4(v_color.rgb * light_intensity, v_color.a);
+    vec4 color = texture(tex, v_tex_coords) * vec4(v_color.rgb * light_intensity, v_color.a);
 
     f_color = apply_fog(color, v_spherical_dist, v_cylindrical_dist);
 

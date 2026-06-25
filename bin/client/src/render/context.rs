@@ -10,6 +10,7 @@ use crate::render::{
     common::{CommonRenderer, CommonVertex, ObjectFit, Path},
 };
 
+#[derive(Debug, Clone, Copy)]
 pub struct RenderInfo {
     pub draw_calls: usize,
     pub vertices: usize,

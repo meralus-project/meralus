@@ -6,6 +6,7 @@ use crate::AsValue;
 pub struct Color([u8; 4]);
 
 impl AsValue<[f32; 4]> for Color {
+    #[inline]
     fn as_value(&self) -> [f32; 4] {
         [
             f32::from(self.0[0]) / 255.0,
@@ -17,6 +18,7 @@ impl AsValue<[f32; 4]> for Color {
 }
 
 impl AsValue<[f32; 3]> for Color {
+    #[inline]
     fn as_value(&self) -> [f32; 3] {
         [f32::from(self.0[0]) / 255.0, f32::from(self.0[1]) / 255.0, f32::from(self.0[2]) / 255.0]
     }
@@ -330,34 +332,42 @@ impl Color {
     pub const WHITE: Self = Self([255, 255, 255, 255]);
     pub const YELLOW: Self = Self([255, 255, 0, 255]);
 
+    #[inline]
     pub const fn get_red(&self) -> u8 {
         self.0[0]
     }
 
+    #[inline]
     pub const fn get_green(&self) -> u8 {
         self.0[1]
     }
 
+    #[inline]
     pub const fn get_blue(&self) -> u8 {
         self.0[2]
     }
 
+    #[inline]
     pub const fn get_alpha(&self) -> u8 {
         self.0[3]
     }
 
+    #[inline]
     pub const fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         Self([red, green, blue, alpha])
     }
 
+    #[inline]
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self::new(red, green, blue, 255)
     }
 
+    #[inline]
     pub const fn from_u32_rgb(rgb: u32) -> Self {
         Self::new(((rgb >> 16) & 0xFF) as u8, ((rgb >> 8) & 0xFF) as u8, (rgb & 0xFF) as u8, 255)
     }
 
+    #[inline]
     pub const fn as_u32(&self) -> u32 {
         let red = (self.0[0] as u32) << 16;
         let green = (self.0[1] as u32) << 8;
@@ -366,11 +376,13 @@ impl Color {
         red | green | blue
     }
 
+    #[inline]
     pub const fn new_f32(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self([(255.0 * red) as u8, (255.0 * green) as u8, (255.0 * blue) as u8, (255.0 * alpha) as u8])
     }
 
     #[must_use]
+    #[inline]
     pub const fn with_alpha(mut self, value: f32) -> Self {
         self.0[3] = (255.0 * value) as u8;
 
@@ -416,10 +428,12 @@ impl Color {
         Self::new_f32(red, green, blue, 1.0)
     }
 
+    #[inline]
     pub const fn to_linear(&self) -> [f32; 3] {
         [color_to_linear(self.0[0]), color_to_linear(self.0[1]), color_to_linear(self.0[2])]
     }
 
+    #[inline]
     pub const fn to_linear_rgba(&self) -> [f32; 4] {
         [
             color_to_linear(self.0[0]),
@@ -430,6 +444,7 @@ impl Color {
     }
 
     #[must_use]
+    #[inline]
     pub const fn multiply_rgb(self, factor: f32) -> Self {
         Self([
             (self.0[0] as f32 * factor) as u8,
@@ -439,6 +454,7 @@ impl Color {
         ])
     }
 
+    #[inline]
     pub fn as_rgb_hex(&self) -> String {
         format!("{:02x}{:02x}{:02x}", self.0[0], self.0[1], self.0[2])
     }

@@ -1,9 +1,12 @@
 use meralus_physics::{AabbSource, PhysicsContext, RayCastResult};
-use meralus_shared::{FrustumCulling, Point3D, Transform3D, Vector3D};
+use meralus_shared::{FrustumCulling, Point3D, Quat, Transform3D, Vector3D};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
     pub position: Point3D,
+
+    pub yaw: f32,
+    pub pitch: f32,
 
     pub right: Vector3D,
     pub up: Vector3D,
@@ -30,6 +33,8 @@ impl Camera {
         let up = right.cross(front).normalize();
 
         Self {
+            yaw,
+            pitch,
             position: Point3D::ZERO,
             right,
             up,
@@ -72,8 +77,6 @@ impl Camera {
         self.up = self.right.cross(self.front).normalize();
 
         self.update_looking_at(context);
-
-        // println!("{}", Self::calc_order(self.front));
     }
 
     pub fn projection(&self) -> Transform3D {
@@ -90,33 +93,5 @@ impl Camera {
 
     pub fn update_frustum(&mut self) {
         self.frustum.update(self.matrix());
-    }
-
-    #[allow(dead_code)]
-    pub const fn calc_order(direction: Vector3D) -> usize {
-        let sx = (direction.x < 0.0) as usize;
-        let sy = (direction.y < 0.0) as usize;
-        let sz = (direction.z < 0.0) as usize;
-        let ax = direction.x.abs();
-        let ay = direction.y.abs();
-        let az = direction.z.abs();
-
-        if ax > ay && ax > az {
-            if ay > az {
-                (sx << 2) | (sy << 1) | sz
-            } else {
-                8 + ((sx << 2) | (sz << 1) | sy)
-            }
-        } else if ay > az {
-            if ax > az {
-                16 + ((sy << 2) | (sx << 1) | sz)
-            } else {
-                24 + ((sy << 2) | (sz << 1) | sx)
-            }
-        } else if ax > ay {
-            32 + ((sz << 2) | (sx << 1) | sy)
-        } else {
-            40 + ((sz << 2) | (sy << 1) | sx)
-        }
     }
 }

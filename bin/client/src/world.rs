@@ -648,7 +648,7 @@ impl World {
         }
     }
 
-    pub fn update(&mut self, settings: GraphicsSettings) {
+    pub fn update(&mut self, backend: &RenderBackend, settings: GraphicsSettings) {
         for result in self.job_manager.receiver.try_iter() {
             match result {
                 JobResult::Generation { chunk } => {
@@ -685,7 +685,10 @@ impl World {
                     self.chunk_manager.set_stage(origin, ChunkStage::Meshed);
 
                     for (subchunk_idx, mesh) in mesh.into_iter().rev().enumerate() {
-                        self.chunk_renderer.set_subchunk((origin, subchunk_idx), mesh);
+                        let solid = VoxelMeshBuilder::build_from_slice(backend, &self.chunk_renderer.shader, &mesh[0]);
+                        let translucent = VoxelMeshBuilder::build_from_slice(backend, &self.chunk_renderer.shader, &mesh[1]);
+
+                        self.chunk_renderer.set_subchunk((origin, subchunk_idx), solid, translucent);
                     }
                 }
             }
@@ -695,7 +698,7 @@ impl World {
         let origin = ChunkManager::<()>::to_local(self.player.body.position.as_ivec3());
         let mut chunks = (-10..10)
             .flat_map(|x| (-10..10).map(move |z| origin + IPoint2D::new(x, z)))
-            .filter(|origin| self.chunk_manager.stages.get(origin).is_some())
+            .filter(|origin| self.chunk_manager.stages.contains_key(origin))
             .collect::<Vec<_>>();
 
         chunks.sort_unstable_by(|a, b| {

@@ -4,7 +4,7 @@ use std::{
 };
 
 use ahash::HashMap;
-use meralus_shared::{IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
+use meralus_shared::{Face, IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
 
 use crate::{BfsLight, BiomeBase, BlockSource, Chunk, LightNode, SUBCHUNK_COUNT_I32, SUBCHUNK_SIZE, SUBCHUNK_SIZE_I32, chunk::SubChunkBlockState};
 
@@ -429,6 +429,27 @@ impl<C: ChunkCache> ChunkManager<C> {
             let local = Chunk::to_local(position);
 
             chunk.set_block(local, SubChunkBlockState::new("game:air"));
+            chunk.dirty = true;
+
+            for normal in Face::NORMALS {
+                let chunk = Self::to_local(position + normal);
+
+                if chunk != chunk_position
+                    && let Some(chunk) = self.get_chunk_mut(chunk)
+                {
+                    chunk.dirty = true;
+                }
+            }
+
+            for normal in [IPoint3D::NEG_ONE, IPoint3D::NEG_ONE.with_x(1), IPoint3D::ONE.with_x(-1), IPoint3D::ONE] {
+                let chunk = Self::to_local(position + normal);
+
+                if chunk != chunk_position
+                    && let Some(chunk) = self.get_chunk_mut(chunk)
+                {
+                    chunk.dirty = true;
+                }
+            }
 
             let mut bfs_light = BfsLight::new(self);
 

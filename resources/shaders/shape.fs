@@ -17,6 +17,6 @@ void main() {
         discard;
     }
     
-    f_color = v_color * texture2D(atlas, v_uv);
+    f_color = v_color * texture(atlas, v_uv);
     f_bright_color = vec4(vec3(0.0), 1.0);
 }

@@ -19,6 +19,7 @@ pub enum Plane {
 }
 
 impl Plane {
+    #[inline]
     const fn k(self, other: Self) -> usize {
         self as usize * (9 - self as usize) / 2 + other as usize - 1
     }
@@ -33,18 +34,21 @@ pub struct FrustumCulling {
 impl Index<Plane> for FrustumCulling {
     type Output = Vector4D;
 
+    #[inline]
     fn index(&self, index: Plane) -> &Self::Output {
         &self.planes[index as usize]
     }
 }
 
 impl IndexMut<Plane> for FrustumCulling {
+    #[inline]
     fn index_mut(&mut self, index: Plane) -> &mut Self::Output {
         &mut self.planes[index as usize]
     }
 }
 
 impl FrustumCulling {
+    #[inline]
     pub const fn default() -> Self {
         Self {
             planes: [Vector4D::ZERO; Plane::Count as usize],
@@ -52,6 +56,7 @@ impl FrustumCulling {
         }
     }
 
+    #[inline]
     pub fn update(&mut self, projection_view: Transform3D) {
         use Plane::{Bottom, Combinations, Far, Left, Near, Right, Top};
 
@@ -92,10 +97,12 @@ impl FrustumCulling {
         self.points[7] = self.intersection(Right, Top, Far, &crosses);
     }
 
+    #[inline]
     fn plane_cross(&self, a: Plane, b: Plane) -> Vector3D {
         self[a].truncate().cross(self[b].truncate())
     }
 
+    #[inline]
     fn intersection(&self, a: Plane, b: Plane, c: Plane, crosses: &[Vector3D]) -> Vector3D {
         let d = self[a].truncate().dot(crosses[b.k(c)]);
         let res = Transform2D::from_cols(crosses[b.k(c)], -crosses[a.k(c)], crosses[a.k(b)]) * Vector3D::new(self[a].w, self[b].w, self[c].w);
@@ -105,6 +112,7 @@ impl FrustumCulling {
 }
 
 impl Frustum for FrustumCulling {
+    #[inline]
     fn is_box_visible(&self, minp: Point3D, maxp: Point3D) -> bool {
         // check box outside/inside of frustum
         for i in 0..(Plane::Count as usize) {

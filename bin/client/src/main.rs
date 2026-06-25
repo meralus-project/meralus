@@ -31,10 +31,12 @@ use horns::{MagnifyFilter, MinifyFilter, RenderBackend, Texture2d};
 use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use meralus_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext};
 use meralus_physics::{Aabb, AabbSource, PhysicsContext};
-use meralus_shared::{AsValue, Color, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, USizePoint3D, Vector2D, Vector3D};
+use meralus_shared::{
+    AsValue, Color, Face, IPoint2D, IPoint3D, Lerp, Point2D, Point3D, Quat, Rect, Size2D, Transform3D, USize2D, USizePoint3D, Vector2D, Vector3D,
+};
 use meralus_storage::{Block, ResourceStorage, TextureStorage};
 use meralus_tween::{Animation, Tween};
-use meralus_world::{BfsLight, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SubChunkBlockState};
+use meralus_world::{BfsLight, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, SUBCHUNK_COUNT, SubChunkBlockState};
 use tracing::info;
 
 use crate::{
@@ -90,23 +92,27 @@ const GRASS_COLOR: Color = Color::from_hsl(120.0, 0.4, 0.75);
 #[derive(Debug, Clone)]
 struct Debugging {
     enabled: bool,
+    draw_calls_stat: VecDeque<usize>,
+    draw_calls_max: usize,
     fps_stat: VecDeque<Duration>,
     fps_max: Duration,
+    render_info: RenderInfo,
 }
 
 impl Default for Debugging {
     fn default() -> Self {
         Self {
             enabled: false,
+            draw_calls_stat: VecDeque::new(),
+            draw_calls_max: 0,
             fps_stat: VecDeque::new(),
             fps_max: Duration::ZERO,
+            render_info: RenderInfo::default(),
         }
     }
 }
 
 enum Action {
-    #[allow(dead_code)]
-    RemoveBlock(IPoint2D, USizePoint3D),
     ReplaceResourceManager(ResourceStorage),
     #[cfg(feature = "addons")]
     ReplaceAddonManager(meralus_addons::AddonManager),
@@ -291,7 +297,6 @@ impl Default for Settings {
 struct GameLoop {
     audio_manager: AudioManager,
     input: Input,
-    // animation_player: AnimationPlayer,
     common_renderer: CommonRenderer,
     resource_manager: Arc<ResourceStorage>,
 
@@ -404,7 +409,7 @@ impl State for GameLoop {
             sender.set_visible(false)
         });
 
-        let size = window.window_size().as_vec2() / window.window_scale_factor() as f32;
+        let size = window.window_size().as_vec2();
 
         let mut common_renderer = CommonRenderer::new(backend).unwrap_or_else(|e| panic!("failed to create CommonRenderer: {e}"));
 
@@ -482,9 +487,7 @@ impl State for GameLoop {
         // self.scene.resize(facade, size.to_array()).unwrap();
         // self.kawase.resize(facade, size.to_array()).unwrap();
 
-        let size = size.as_vec2() / scale_factor as f32;
-
-        println!("window matrix: {size:?}");
+        let size = size.as_vec2();
 
         self.common_renderer
             .set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.x, size.y, 0.0, -1000.0, 1000.0));
@@ -525,6 +528,30 @@ impl State for GameLoop {
                         let block = self.resource_manager.get_block(&item).unwrap();
 
                         world.chunk_manager.set_block(position, SubChunkBlockState::new(item));
+
+                        if let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk) {
+                            chunk.dirty = true;
+                        }
+
+                        for normal in Face::NORMALS {
+                            let chunk_position = ChunkManager::<()>::to_local(position + normal);
+
+                            if chunk_position != chunk
+                                && let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk_position)
+                            {
+                                chunk.dirty = true;
+                            }
+                        }
+
+                        for normal in [IPoint3D::NEG_ONE, IPoint3D::NEG_ONE.with_x(1), IPoint3D::ONE.with_x(-1), IPoint3D::ONE] {
+                            let chunk_position = ChunkManager::<()>::to_local(position + normal);
+
+                            if chunk_position != chunk
+                                && let Some(chunk) = world.chunk_manager.get_chunk_mut(chunk_position)
+                            {
+                                chunk.dirty = true;
+                            }
+                        }
 
                         let mut light = BfsLight::new(&mut world.chunk_manager);
 
@@ -582,7 +609,7 @@ impl State for GameLoop {
     }
 
     #[allow(clippy::too_many_lines, clippy::significant_drop_tightening)]
-    fn update(&mut self, context: WindowContext, _backend: &RenderBackend, delta: Duration) {
+    fn update(&mut self, context: WindowContext, backend: &RenderBackend, delta: Duration) {
         self.overlay.update(delta);
 
         if let Some(info) = &self.progress.info
@@ -598,8 +625,6 @@ impl State for GameLoop {
                 for _ in 0..self.fixed_interval.update(delta) {
                     world.physics_step(&self.input);
 
-                    // self.particles.physics_update(&context, FIXED_FRAMERATE.as_secs_f32());
-
                     if let Some(entity) = world.entities.get_mut(0) {
                         entity.set_rotation(0, world.player.get_vector_for_rotation().as_vec3());
                     }
@@ -610,7 +635,7 @@ impl State for GameLoop {
                 world.tick(true);
             }
 
-            world.update(self.settings.graphics);
+            world.update(backend, self.settings.graphics);
         }
 
         for _ in 0..self.debug_interval.update(delta) {
@@ -626,8 +651,6 @@ impl State for GameLoop {
 
         if self.input.keyboard.is_key_pressed_once(KeyCode::F3) {
             self.settings.debugging.enabled = !self.settings.debugging.enabled;
-
-            println!("{}", self.settings.debugging.enabled);
         }
 
         if self.input.keyboard.is_key_pressed_once(KeyCode::Tab) {
@@ -636,15 +659,16 @@ impl State for GameLoop {
             }
 
             if self.world.as_ref().is_some_and(|world| world.player_controllable) {
+                #[cfg(not(target_os = "macos"))]
                 context.set_cursor_grab(CursorGrabMode::Confined);
+                #[cfg(target_os = "macos")]
+                context.set_cursor_grab(CursorGrabMode::Locked);
                 context.set_cursor_visible(false);
             } else {
                 context.set_cursor_grab(CursorGrabMode::None);
                 context.set_cursor_visible(true);
             }
         }
-
-        // self.animation_player.advance(delta.as_secs_f32());
 
         if let Some(world) = &mut self.world {
             for (_, drop) in &mut world.entities {
@@ -692,11 +716,6 @@ impl State for GameLoop {
 
         if let Ok(action) = self.action_receiver.try_recv() {
             match action {
-                Action::RemoveBlock(chunk, position) => {
-                    if let Some(world) = self.world.as_mut() {
-                        world.destroy_block_local(chunk, position);
-                    }
-                }
                 Action::ReplaceResourceManager(manager) => self.resource_manager = Arc::new(manager),
                 #[cfg(feature = "addons")]
                 Action::ReplaceAddonManager(addons) => self.addons = addons,
@@ -723,7 +742,7 @@ impl State for GameLoop {
         self.settings.debugging.fps_stat.push_back(delta);
         self.settings.debugging.fps_max = self.settings.debugging.fps_max.max(delta);
 
-        let RenderInfo { draw_calls, vertices } = RenderInfo::default();
+        let mut info = self.settings.debugging.render_info.take();
 
         let (width, height) = window_context.window_size().into();
         let mut frame = backend.begin_pass();
@@ -747,10 +766,12 @@ impl State for GameLoop {
                 )
                 .unwrap();
 
-            self.common_renderer.render(buffer, backend, None, window_context.window_size()).unwrap();
+            self.settings
+                .debugging
+                .render_info
+                .extend(&self.common_renderer.render(buffer, backend, None, window_context.window_size()).unwrap());
 
-            world.chunk_renderer.render(
-                backend,
+            let rendered_subchunks = world.chunk_renderer.render(
                 buffer,
                 world.camera.position,
                 &world.camera.frustum,
@@ -759,20 +780,22 @@ impl State for GameLoop {
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
 
+            self.settings.debugging.render_info.extend(&rendered_subchunks);
+
             let mut builder = VoxelMeshBuilder::with_capacity(world.entities.len());
 
             for (_, entity) in &world.entities {
                 entity.render_to(&mut builder, &world.chunk_manager, self.resource_manager.as_ref());
             }
 
-            builder.render(
+            self.settings.debugging.render_info.extend(&builder.render(
                 backend,
                 &world.chunk_renderer,
                 &mut buffer,
                 world.camera.matrix(),
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
-            );
+            ));
 
             // self.kawase.apply(backend, &self.scene).unwrap();
 
@@ -834,40 +857,6 @@ impl State for GameLoop {
 
                 self.common_renderer.set_default_matrix();
             }
-
-            // {
-            //     let sun_position = {
-            //         let angle: f32 = self.animation_player.get_value_unchecked("sun");
-
-            //         [angle.cos(), angle.sin()]
-            //     };
-
-            //     self.shape_renderer.set_matrix(self.camera.matrix());
-            //     self.shape_renderer.draw_rects(
-            //         &mut frame,
-            //         display,
-            //         &[Rectangle::new_3d(
-            //             -4.0,
-            //             (256.0 + 64.0) * sun_position[1],
-            //             (256.0 + 64.0) * sun_position[0],
-            //             8.0,
-            //             8.0,
-            //             Color::RED,
-            //         )
-            //         .with_rotation_matrix(Some(Mat4::look_at_rh(
-            //             Point3D::new(
-            //                 0.0,
-            //                 (256.0 + 64.0) * sun_position[1],
-            //                 (256.0 + 64.0) * sun_position[0],
-            //             ),
-            //             Point3D::ZERO,
-            //             Point3D::Z,
-            //         )))],
-            //         &mut self.debugging.draw_calls,
-            //         &mut self.debugging.vertices,
-            //     );
-            //     self.shape_renderer.set_default_matrix();
-            // }
 
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
             let bounds = context.bounds;
@@ -999,8 +988,7 @@ impl State for GameLoop {
                 };
 
                 let version = backend.get_opengl_version_string();
-                let rendered_chunks = world.chunk_renderer.rendered_chunks();
-                let total_chunks = world.chunk_renderer.total_chunks();
+                let total_subchunks = world.chunk_manager.len() * SUBCHUNK_COUNT;
 
                 let text = format!(
                     "OpenGL {version}
@@ -1008,25 +996,12 @@ OpenGL Renderer: {}
 OpenGL Vendor: {}
 Free GPU memory: {}
 Window size: {width}x{height}
-Player position: {:?} (chunk: {} {}, biome: {:?})
 Game Time: {hours:02}:{minutes:02}
-FPS: {:.0} ({:.2}ms)
-TPS: {}
 Looking at {}
-Draw calls: {draw_calls}
-Rotation: {} {} {}
-Rendered chunks: {rendered_chunks} / {total_chunks}
-Rendered vertices: {vertices}",
+Rendered subchunks: {} / {total_subchunks}",
                     backend.get_opengl_renderer_string(),
                     backend.get_opengl_vendor_string(),
                     backend.get_free_video_memory().map_or_else(|| String::from("unknown"), util::format_bytes),
-                    world.player.body.position,
-                    chunk.x,
-                    chunk.y,
-                    world.chunk_manager.get_biome(world.player.body.position.as_ivec3()),
-                    1.0 / delta.as_secs_f32(),
-                    delta.as_secs_f32() * 1000.0,
-                    world.ticks,
                     world
                         .camera
                         .looking_at
@@ -1053,9 +1028,7 @@ Rendered vertices: {vertices}",
                                 }
                             ))))
                         .unwrap_or_else(|| String::from("nothing")),
-                    const { 200f32.to_radians() },
-                    const { 35f32.to_radians() },
-                    0.0,
+                    rendered_subchunks.draw_calls
                 );
 
                 let text_size = context
@@ -1077,11 +1050,10 @@ Rendered vertices: {vertices}",
                 });
             }
 
-            // if self.animation_player.get_value::<_, f32>("chunks-opacity") > Some(0.0) {
-            //     show_world_generation_screen(&self.animation_player, &mut context,
-            // &world.chunks_progress, self.window_matrix); }
-
-            context.finish(backend, &mut frame, window_context.window_size());
+            self.settings
+                .debugging
+                .render_info
+                .extend(&context.finish(backend, &mut frame, window_context.window_size()));
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.player.inventory.get_hotbar_items().count());
 
@@ -1118,14 +1090,14 @@ Rendered vertices: {vertices}",
                 }
             }
 
-            builder.render_full_bright(
+            self.settings.debugging.render_info.extend(&builder.render_full_bright(
                 backend,
                 &world.chunk_renderer,
                 &mut frame,
                 self.common_renderer.window_matrix(),
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
-            );
+            ));
 
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
 
@@ -1156,47 +1128,94 @@ Rendered vertices: {vertices}",
                     CHUNK_UI_CONTAINER_SIZE.y / CHUNK_UI_COUNT as f32,
                 );
 
-                context.clipped_bounds(
-                    Rect::new(Point2D::new(bounds.size.x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0), CHUNK_UI_CONTAINER_SIZE),
-                    |context, bounds| {
-                        context.fill(Color::BLACK);
+                let container_origin = Point2D::new(bounds.size.x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0);
 
-                        let player_chunk = ChunkManager::<()>::to_local(world.player.body.position.as_ivec3());
-                        let player_offset = Point2D::new(world.player.body.position.x % 16.0, world.player.body.position.z % 16.0);
-                        let origin = bounds.origin + bounds.size / 2.0;
+                context.clipped_bounds(Rect::new(container_origin, CHUNK_UI_CONTAINER_SIZE), |context, bounds| {
+                    context.fill(Color::BLACK);
 
-                        for x in -1..(CHUNK_UI_COUNT + 1) as i32 {
-                            let x = x - (CHUNK_UI_COUNT / 2) as i32;
+                    let player_chunk = ChunkManager::<()>::to_local(world.player.body.position.as_ivec3());
+                    let player_offset = Point2D::new(world.player.body.position.x % 16.0, world.player.body.position.z % 16.0);
+                    let origin = bounds.origin + bounds.size / 2.0;
 
-                            for z in -1..(CHUNK_UI_COUNT + 1) as i32 {
-                                let z = z - (CHUNK_UI_COUNT / 2) as i32;
-                                let chunk = player_chunk + IPoint2D::new(x, z);
+                    for x in -1..(CHUNK_UI_COUNT + 1) as i32 {
+                        let x = x - (CHUNK_UI_COUNT / 2) as i32;
 
-                                if let Some(stage) = world.chunk_manager.stages.get(&chunk) {
-                                    let color = match stage {
-                                        ChunkStage::Unloaded => continue,
-                                        ChunkStage::Bare => Color::new(150, 150, 150, 255),
-                                        ChunkStage::PopulationInProgress => Color::from_u32_rgb(0x73AF73),
-                                        ChunkStage::Populated => Color::GREEN,
-                                        ChunkStage::LightningInProgress => Color::from_u32_rgb(0xB8FF00),
-                                        ChunkStage::Lighted => Color::YELLOW,
-                                        ChunkStage::MeshingInProgress => Color::from_u32_rgb(0x63639C),
-                                        ChunkStage::Meshed => Color::BLUE,
-                                    };
+                        for z in -1..(CHUNK_UI_COUNT + 1) as i32 {
+                            let z = z - (CHUNK_UI_COUNT / 2) as i32;
+                            let chunk = player_chunk + IPoint2D::new(x, z);
 
-                                    context.draw_rect(
-                                        Rect::new(
-                                            origin - player_offset + Vector2D::new(x as f32 * CHUNK_UI_SIZE.x, z as f32 * CHUNK_UI_SIZE.y),
-                                            CHUNK_UI_SIZE,
-                                        ),
-                                        color,
-                                    );
-                                }
+                            if let Some(stage) = world.chunk_manager.stages.get(&chunk) {
+                                let color = match stage {
+                                    ChunkStage::Unloaded => continue,
+                                    ChunkStage::Bare => Color::new(150, 150, 150, 255),
+                                    ChunkStage::PopulationInProgress => Color::from_u32_rgb(0x73AF73),
+                                    ChunkStage::Populated => Color::GREEN,
+                                    ChunkStage::LightningInProgress => Color::from_u32_rgb(0xB8FF00),
+                                    ChunkStage::Lighted => Color::YELLOW,
+                                    ChunkStage::MeshingInProgress => Color::from_u32_rgb(0x63639C),
+                                    ChunkStage::Meshed => Color::BLUE,
+                                };
+
+                                context.draw_rect(
+                                    Rect::new(
+                                        origin - player_offset + Vector2D::new(x as f32 * CHUNK_UI_SIZE.x, z as f32 * CHUNK_UI_SIZE.y),
+                                        CHUNK_UI_SIZE,
+                                    ),
+                                    color,
+                                );
                             }
                         }
+                    }
 
-                        context.draw_rect(Rect::new(origin - Vector2D::splat(1.0), Size2D::splat(2.0)), Color::RED);
-                    },
+                    context.draw_rect(Rect::new(origin - Vector2D::splat(1.0), Size2D::splat(2.0)), Color::RED);
+                });
+
+                let text = context
+                    .measure_text(
+                        "default",
+                        format!(
+                            "{} {} {}",
+                            world.player.body.position.x as i32, world.player.body.position.y as i32, world.player.body.position.z as i32
+                        ),
+                        9.0,
+                        None,
+                    )
+                    .unwrap_or_default();
+                let new_container_origin =
+                    container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + Point2D::new(0.0, 2.0);
+
+                context.draw_rect(Rect::new(new_container_origin, Size2D::new(text.x + 4.0, 20.0)), Color::from_u32_rgb(0x1D211B));
+                context.draw_text(
+                    new_container_origin + Point2D::splat(4.0),
+                    "default",
+                    format!(
+                        "{} {} {}",
+                        world.player.body.position.x as i32, world.player.body.position.y as i32, world.player.body.position.z as i32
+                    ),
+                    9.0,
+                    Color::from_hsl(110.0, 0.5, 0.8),
+                    None,
+                );
+
+                let text = context
+                    .measure_text(
+                        "default",
+                        format!("{:?}", world.chunk_manager.get_biome(world.player.body.position.as_ivec3())),
+                        9.0,
+                        None,
+                    )
+                    .unwrap_or_default();
+                let new_container_origin =
+                    container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + Point2D::new(0.0, 24.0);
+
+                context.draw_rect(Rect::new(new_container_origin, Size2D::new(text.x + 4.0, 20.0)), Color::from_u32_rgb(0x1D211B));
+                context.draw_text(
+                    new_container_origin + Point2D::splat(4.0),
+                    "default",
+                    format!("{:?}", world.chunk_manager.get_biome(world.player.body.position.as_ivec3())),
+                    9.0,
+                    Color::from_hsl(110.0, 0.5, 0.8),
+                    None,
                 );
             });
 
@@ -1231,6 +1250,23 @@ Rendered vertices: {vertices}",
                         x += ELEMENT_WIDTH + SPACING;
                     }
 
+                    let text = context
+                        .measure_text(
+                            "default",
+                            format!("fps: {:.0} ({:.2}ms)", 1.0 / delta.as_secs_f32(), delta.as_secs_f32() * 1000.0),
+                            9.0,
+                            None,
+                        )
+                        .unwrap_or_default();
+
+                    context.draw_rect(
+                        Rect::new(
+                            bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - Point2D::new(0.0, 4.0),
+                            text,
+                        ),
+                        Color::from_u32_rgb(0x1D211B),
+                    );
+
                     context.draw_text(
                         bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - Point2D::new(0.0, 4.0),
                         "default",
@@ -1240,9 +1276,61 @@ Rendered vertices: {vertices}",
                         None,
                     );
                 });
+
+                context.ui(|context, bounds| {
+                    const SPACING: f32 = 1.0;
+                    const SIZE: Size2D = Size2D::new(100.0 * (2.0 + SPACING), 96.0);
+                    const CONTAINER_SIZE: Size2D = Size2D::new(SIZE.x - SPACING, SIZE.y);
+                    const ELEMENT_WIDTH: f32 = (SIZE.x - 100.0 * SPACING) / 100.0;
+
+                    let container_origin = bounds.origin + bounds.size - CONTAINER_SIZE - Point2D::splat(4.0);
+
+                    context.draw_rect(Rect::new(container_origin, CONTAINER_SIZE), Color::from_u32_rgb(0x1D211B));
+
+                    let mut x = 0.0;
+
+                    for &stat in &self.settings.debugging.draw_calls_stat {
+                        let size = Size2D::new(ELEMENT_WIDTH, CONTAINER_SIZE.y * (stat as f32 / self.settings.debugging.draw_calls_max as f32));
+
+                        context.draw_rect(
+                            Rect::new(container_origin + CONTAINER_SIZE.with_x(0.0) - size.with_x(-x), size),
+                            Color::from_hsl(110.0, 0.4, 0.7),
+                        );
+
+                        x += ELEMENT_WIDTH + SPACING;
+                    }
+
+                    let text = context
+                        .measure_text("default", format!("draw calls: {}\nvertices: {}", info.draw_calls, info.vertices), 9.0, None)
+                        .unwrap_or_default();
+
+                    context.draw_rect(Rect::new(container_origin + Point2D::splat(4.0), text), Color::from_u32_rgb(0x1D211B));
+                    context.draw_text(
+                        container_origin + Point2D::splat(4.0),
+                        "default",
+                        format!("draw calls: {}\nvertices: {}", info.draw_calls, info.vertices),
+                        9.0,
+                        Color::from_hsl(110.0, 0.5, 0.8),
+                        None,
+                    );
+                });
             }
 
-            context.finish(backend, &mut frame, window_context.window_size());
+            self.settings
+                .debugging
+                .render_info
+                .extend(&context.finish(backend, &mut frame, window_context.window_size()));
+
+            if self.settings.debugging.draw_calls_stat.len() >= 100 {
+                self.settings.debugging.draw_calls_stat.pop_front();
+            }
+
+            self.settings
+                .debugging
+                .draw_calls_stat
+                .push_back(self.settings.debugging.render_info.draw_calls);
+
+            self.settings.debugging.draw_calls_max = self.settings.debugging.draw_calls_max.max(self.settings.debugging.render_info.draw_calls);
         } else {
             frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).as_value(), 1.0);
 

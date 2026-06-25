@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use ahash::HashMap;
 use meralus_shared::{Face, IPoint2D, USizePoint3D};
 
 use crate::{BlockSource, CHUNK_HEIGHT, Chunk, ChunkAccess, SubChunk};
@@ -13,18 +14,33 @@ pub struct BfsLight<'a, C: ChunkAccess> {
     pub block_removing_queue: Vec<(LightNode, u8)>,
     pub sky_addition_queue: VecDeque<LightNode>,
     pub sky_removing_queue: Vec<(LightNode, u8)>,
+    props_cache: HashMap<String, (bool, u8)>,
 }
 
 impl<'a, C: ChunkAccess> BfsLight<'a, C> {
     #[must_use]
-    pub const fn new(chunk_manager: &'a mut C) -> Self {
+    pub fn new(chunk_manager: &'a mut C) -> Self {
         Self {
             chunk_manager,
             block_addition_queue: VecDeque::new(),
             block_removing_queue: Vec::new(),
             sky_addition_queue: VecDeque::new(),
             sky_removing_queue: Vec::new(),
+            props_cache: HashMap::default(),
         }
+    }
+
+    #[inline]
+    fn get_props<T: BlockSource>(cache: &mut HashMap<String, (bool, u8)>, block_source: &T, name: &str) -> (bool, u8) {
+        if let Some(&props) = cache.get(name) {
+            return props;
+        }
+ 
+        let props = (block_source.blocks_light(name), block_source.light_consumption(name));
+ 
+        cache.insert(name.to_string(), props);
+ 
+        props
     }
 
     pub fn add_block(&mut self, node: LightNode) {
@@ -155,12 +171,11 @@ impl<'a, C: ChunkAccess> BfsLight<'a, C> {
                     let block = chunk.get_block_by_idx_unchecked(subchunk, index);
 
                     let skip_decrease = face == Face::Bottom && light_level == 15;
+                    let (blocks, consumes) = Self::get_props(&mut self.props_cache, block_source, &block.name);
 
-                    if !block_source.blocks_light(&block.name) && chunk.get_sky_light_by_idx(subchunk, index) + 2 <= light_level {
-                        let light_consumed = block_source.light_consumption(&block.name);
-
+                    if !blocks && chunk.get_sky_light_by_idx(subchunk, index) + 2 <= light_level {
                         chunk.dirty = true;
-                        chunk.set_sky_light(position, light_level - light_consumed - u8::from(!skip_decrease));
+                        chunk.set_sky_light(position, light_level - consumes - u8::from(!skip_decrease));
 
                         self.sky_addition_queue.push_back(LightNode(position, chunk.origin));
                     }
