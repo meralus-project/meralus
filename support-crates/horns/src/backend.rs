@@ -28,10 +28,12 @@ impl RenderBackend {
         Self: Sized,
     {
         let window = window.as_raw();
-	#[cfg(not(windows))]
+	#[cfg(not(windows), not(target_os = "macos"))]
         let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::EglThenGlx(Box::new(|_| {}))) }?;
 	#[cfg(windows)]
         let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::EglThenWgl(Some(window))) }?;
+	#[cfg(target_os = "macos")]
+        let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::Cgl) }?;
         let config = unsafe { display.find_configs(ConfigTemplate::default()) }?
             .next()
             .ok_or_else(|| glutin::error::Error::from(glutin::error::ErrorKind::NotSupported("no config")))?;
