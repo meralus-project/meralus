@@ -104,3 +104,28 @@ pub mod __vertex_impl {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct RenderInfo {
+    pub draw_calls: usize,
+    pub vertices: usize,
+}
+
+impl RenderInfo {
+    pub const fn default() -> Self {
+        Self { draw_calls: 0, vertices: 0 }
+    }
+
+    pub const fn extend(&mut self, other: &Self) {
+        self.draw_calls += other.draw_calls;
+        self.vertices += other.vertices;
+    }
+
+    #[must_use]
+    pub const fn take(&mut self) -> Self {
+        Self {
+            draw_calls: std::mem::replace(&mut self.draw_calls, 0),
+            vertices: std::mem::replace(&mut self.vertices, 0),
+        }
+    }
+}

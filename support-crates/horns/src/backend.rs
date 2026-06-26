@@ -11,7 +11,7 @@ use glutin::{
 };
 use raw_window_handle::{DisplayHandle, WindowHandle};
 
-use crate::{ElementType, Error, GlPrimitive, IndexBuffer, Program, RenderPass, Shader, Texture2d, Vertex, VertexBuffer};
+use crate::{ElementType, Error, GlPrimitive, IndexBuffer, Program, RenderInfo, RenderPass, Shader, Texture2d, Vertex, VertexBuffer};
 
 pub struct RenderBackend {
     pub(crate) gl: Rc<glow::Context>,
@@ -175,6 +175,7 @@ impl RenderBackend {
             depth: None,
             finished: false,
             culling: None,
+            render_info: RenderInfo::default(),
         }
     }
 }

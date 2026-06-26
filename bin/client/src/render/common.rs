@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use ahash::{HashMap, HashMapExt};
 use horns::{
-    Blend, BlendingFactor, DrawParams, ElementType, Error, IndexBuffer, Program, RenderBackend, RenderPass, Shader, Texture2d, VertexBuffer, impl_vertex,
+    Blend, BlendingFactor, DrawParams, ElementType, Error, IndexBuffer, Program, RenderBackend, RenderInfo, RenderPass, Shader, Texture2d, VertexBuffer,
+    impl_vertex,
 };
 use image::ImageBuffer;
 use lyon_tessellation::{
@@ -18,7 +19,7 @@ use meck::TextureViewAtlas;
 use meralus_shared::{AsValue, Color, ConvertTo, Point2D, Point3D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D, Vector4D};
 use swash::{CacheKey, FontRef, shape::ShapeContext};
 
-use crate::render::{RawRenderBuffer, context::RenderInfo};
+use crate::render::RawRenderBuffer;
 
 pub struct ShapeShader;
 
@@ -964,7 +965,6 @@ impl CommonRenderer {
     //     Ok(RenderInfo { draw_calls: 1, vertices })
     // }
 
-    #[must_use = "RenderInfo itself needs to be extended into other"]
     pub fn render(&mut self, pass: &mut RenderPass, _backend: &RenderBackend, matrix: Option<Transform3D>, size: USize2D) -> RenderInfo {
         let matrix = matrix.or(self.matrix).unwrap_or(self.window_matrix);
 

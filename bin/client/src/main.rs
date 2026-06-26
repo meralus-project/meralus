@@ -27,7 +27,7 @@ use std::{
 };
 
 use cpal::traits::HostTrait;
-use horns::{MagnifyFilter, MinifyFilter, RenderBackend, Texture2d};
+use horns::{MagnifyFilter, MinifyFilter, RenderBackend, RenderInfo, Texture2d};
 use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use meralus_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext};
 use meralus_physics::{Aabb, AabbSource, PhysicsContext};
@@ -49,7 +49,7 @@ use crate::{
     render::{
         chunk::{VoxelFace, VoxelMeshBuilder},
         common::CommonRenderer,
-        context::{ArrangeStrategy, Arrangement, MeasureStrategy, RenderContext, RenderInfo, UiContext, UiSubcontext, WidgetState},
+        context::{ArrangeStrategy, Arrangement, MeasureStrategy, RenderContext, UiContext, UiSubcontext, WidgetState},
     },
     scenes::{Screen, loading_overlay::LoadingOverlay},
     util::{cube_outline, get_movement_direction, get_rotation_directions, vertex_ao},
@@ -765,10 +765,7 @@ impl State for GameLoop {
                 )
                 .unwrap();
 
-            self.settings
-                .debugging
-                .render_info
-                .extend(&self.common_renderer.render(buffer, backend, None, window_context.window_size()));
+            self.common_renderer.render(buffer, backend, None, window_context.window_size());
 
             let rendered_subchunks = world.chunk_renderer.render(
                 buffer,
@@ -779,22 +776,20 @@ impl State for GameLoop {
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
 
-            self.settings.debugging.render_info.extend(&rendered_subchunks);
-
             let mut builder = VoxelMeshBuilder::with_capacity(world.entities.len());
 
             for (_, entity) in &world.entities {
                 entity.render_to(&mut builder, &world.chunk_manager, self.resource_manager.as_ref());
             }
 
-            self.settings.debugging.render_info.extend(&builder.render(
+            builder.render(
                 backend,
                 &world.chunk_renderer,
                 buffer,
                 world.camera.matrix(),
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
-            ));
+            );
 
             // self.kawase.apply(backend, &self.scene).unwrap();
 
@@ -1047,10 +1042,7 @@ Rendered subchunks: {} / {total_subchunks}",
                 });
             }
 
-            self.settings
-                .debugging
-                .render_info
-                .extend(&context.finish(backend, &mut frame, window_context.window_size()));
+            context.finish(backend, &mut frame, window_context.window_size());
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.player.inventory.get_hotbar_items().count());
 
@@ -1087,14 +1079,14 @@ Rendered subchunks: {} / {total_subchunks}",
                 }
             }
 
-            self.settings.debugging.render_info.extend(&builder.render_full_bright(
+            builder.render_full_bright(
                 backend,
                 &world.chunk_renderer,
                 &mut frame,
                 self.common_renderer.window_matrix(),
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
-            ));
+            );
 
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
 
@@ -1313,21 +1305,7 @@ Rendered subchunks: {} / {total_subchunks}",
                 });
             }
 
-            self.settings
-                .debugging
-                .render_info
-                .extend(&context.finish(backend, &mut frame, window_context.window_size()));
-
-            if self.settings.debugging.draw_calls_stat.len() >= 100 {
-                self.settings.debugging.draw_calls_stat.pop_front();
-            }
-
-            self.settings
-                .debugging
-                .draw_calls_stat
-                .push_back(self.settings.debugging.render_info.draw_calls);
-
-            self.settings.debugging.draw_calls_max = self.settings.debugging.draw_calls_max.max(self.settings.debugging.render_info.draw_calls);
+            context.finish(backend, &mut frame, window_context.window_size());
         } else {
             frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).as_value(), 1.0);
 
@@ -1468,7 +1446,15 @@ Rendered subchunks: {} / {total_subchunks}",
         self.input.mouse.clear();
         self.input.keyboard.clear();
 
-        frame.finish(backend);
+        let info = frame.finish(backend);
+
+        if self.settings.debugging.draw_calls_stat.len() >= 100 {
+            self.settings.debugging.draw_calls_stat.pop_front();
+        }
+
+        self.settings.debugging.draw_calls_stat.push_back(info.draw_calls);
+        self.settings.debugging.draw_calls_max = self.settings.debugging.draw_calls_max.max(info.draw_calls);
+        self.settings.debugging.render_info = info;
     }
 }
 

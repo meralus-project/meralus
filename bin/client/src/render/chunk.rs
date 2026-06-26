@@ -1,17 +1,14 @@
 use std::{borrow::Borrow, hash::Hash};
 
 use horns::{
-    BackfaceCullingMode, Blend, BlendingFactor, Depth, DepthTest, DrawParams, ElementType, Program, RenderBackend, RenderPass, SampledTexture2d, create_shader,
-    impl_vertex,
+    BackfaceCullingMode, Blend, BlendingFactor, Depth, DepthTest, DrawParams, ElementType, Program, RenderBackend, RenderInfo, RenderPass, SampledTexture2d,
+    create_shader, impl_vertex,
 };
 use indexmap::IndexMap;
 use meralus_shared::{AsValue, Color, FromValue, Frustum, FrustumCulling, IPoint2D, Point2D, Point3D, Transform3D};
 use meralus_world::{ChunkManager, SUBCHUNK_SIZE, SUBCHUNK_SIZE_F32};
 
-use crate::{
-    get_sky_color,
-    render::{RenderBuffer, context::RenderInfo},
-};
+use crate::{get_sky_color, render::RenderBuffer};
 
 create_shader!(pub VoxelShader => "./resources/shaders/voxel");
 

@@ -1,35 +1,8 @@
-use std::mem::replace;
-
-use horns::{RenderBackend, RenderPass};
+use horns::{RenderBackend, RenderInfo, RenderPass};
 use lyon_tessellation::{FillBuilder, TessellationError, path::builder::NoAttributes};
 use meralus_shared::{Color, Point2D, RRect, Rect, Size2D, Thickness, Transform3D, USize2D, Vector2D};
 
 use crate::render::common::{CommonRenderer, ObjectFit, Path};
-
-#[derive(Debug, Clone, Copy)]
-pub struct RenderInfo {
-    pub draw_calls: usize,
-    pub vertices: usize,
-}
-
-impl RenderInfo {
-    pub const fn default() -> Self {
-        Self { draw_calls: 0, vertices: 0 }
-    }
-
-    pub const fn extend(&mut self, other: &Self) {
-        self.draw_calls += other.draw_calls;
-        self.vertices += other.vertices;
-    }
-
-    #[must_use]
-    pub const fn take(&mut self) -> Self {
-        Self {
-            draw_calls: replace(&mut self.draw_calls, 0),
-            vertices: replace(&mut self.vertices, 0),
-        }
-    }
-}
 
 pub trait ArrangeStrategy {
     fn arrange(&mut self, context: &mut UiContext, widget: WidgetId);

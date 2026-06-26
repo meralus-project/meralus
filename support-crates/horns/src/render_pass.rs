@@ -3,7 +3,7 @@ use std::rc::Rc;
 use glow::HasContext;
 use glutin::surface::GlSurface;
 
-use crate::{ElementType, GlPrimitive, IndexBuffer, Program, RenderBackend, Shader, Vertex, VertexBuffer};
+use crate::{ElementType, GlPrimitive, IndexBuffer, Program, RenderBackend, RenderInfo, Shader, Vertex, VertexBuffer};
 
 pub struct RenderPass {
     pub(crate) gl: Rc<glow::Context>,
@@ -11,6 +11,7 @@ pub struct RenderPass {
     pub(crate) depth: Option<Depth>,
     pub(crate) culling: Option<BackfaceCullingMode>,
     pub(crate) finished: bool,
+    pub render_info: RenderInfo,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -227,6 +228,9 @@ impl RenderPass {
             self.gl
                 .draw_elements(index_buffer.element_type.as_gl(), count as i32, I::gl_code(), offset as i32);
         }
+
+        self.render_info.draw_calls += 1;
+        self.render_info.vertices += count;
     }
 
     pub fn draw_arrays_slice<V: Vertex, S: Shader>(
@@ -262,6 +266,9 @@ impl RenderPass {
         vertex_buffer.unbind();
 
         self.reset_params();
+
+        self.render_info.draw_calls += 1;
+        self.render_info.vertices += count;
     }
 
     #[inline]
@@ -275,12 +282,14 @@ impl RenderPass {
     }
 
     #[inline]
-    pub fn finish(mut self, backend: &RenderBackend) {
+    pub fn finish(mut self, backend: &RenderBackend) -> RenderInfo {
         if let Err(error) = backend.surface.swap_buffers(&backend.context) {
             eprintln!("failed to swap buffers: {error}");
         } else {
             self.finished = true;
         }
+
+        self.render_info
     }
 }
 
