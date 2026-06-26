@@ -435,8 +435,6 @@ impl State for GameLoop {
         let mut frame = backend.begin_pass();
 
         if let Some(world) = self.world.as_mut() {
-            info!("start world render");
-
             let buffer = &mut frame; // self.scene.buffer(backend);
 
             let progress = world.clock.get_progress();
@@ -447,8 +445,6 @@ impl State for GameLoop {
 
             buffer.clear_color_and_depth(Color::BLACK.to_linear_rgba(), 1.0);
 
-            info!("cleared");
-
             self.common_renderer.draw_rect(
                 Point2D::ZERO,
                 Size2D::new(width as f32, height as f32),
@@ -457,11 +453,7 @@ impl State for GameLoop {
 
             self.common_renderer.render(buffer, backend, None, window_context.window_size());
 
-            info!("drawn rect");
-
             world.chunk_renderer.set_fog_color(get_sky_color(world.clock.get_visual_progress(), 0.0));
-
-            info!("set fog color");
 
             let rendered_subchunks = world.chunk_renderer.render(
                 backend,
@@ -472,8 +464,6 @@ impl State for GameLoop {
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
-
-            info!("rendered chunks");
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.entities.len());
 
@@ -489,8 +479,6 @@ impl State for GameLoop {
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
-
-            info!("rendered entities");
 
             // self.kawase.apply(backend, &self.scene).unwrap();
 
@@ -556,8 +544,6 @@ impl State for GameLoop {
                         .draw_rect(Point2D::ZERO, Size2D::new(width as f32, height as f32), Color::from_hsl(215.0, 1.0, 0.6).with_alpha(0.5));
 
                     self.common_renderer.render(buffer, backend, None, window_context.window_size());
-
-                    info!("rendered water filter");
                 }
 
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
@@ -719,8 +705,6 @@ Rendered subchunks: {} / {total_subchunks}",
 
             context.finish(backend, &mut frame, window_context.window_size());
 
-            info!("rendered ui 1");
-
             let mut builder = VoxelMeshBuilder::with_capacity(world.player.inventory.get_hotbar_items().count());
 
             let matrix = Transform3D::from_rotation_x(const { 200f32.to_radians() })
@@ -770,8 +754,6 @@ Rendered subchunks: {} / {total_subchunks}",
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
-
-            info!("rendered hotbar icons");
 
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
 
@@ -991,8 +973,6 @@ Rendered subchunks: {} / {total_subchunks}",
             }
 
             context.finish(backend, &mut frame, window_context.window_size());
-
-            info!("rendered ui 2");
         } else {
             frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).as_value(), 1.0);
 
@@ -1029,8 +1009,6 @@ Rendered subchunks: {} / {total_subchunks}",
         }
 
         let info = frame.finish(backend);
-
-        info!("finished frame rendering");
 
         if self.settings.debugging.draw_calls_stat.len() >= 100 {
             self.settings.debugging.draw_calls_stat.pop_front();
