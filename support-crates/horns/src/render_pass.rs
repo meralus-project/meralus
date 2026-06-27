@@ -196,13 +196,13 @@ impl RenderPass {
         unsafe {
             if self.blend.is_some() {
                 self.gl.disable(glow::BLEND);
-                self.gl.depth_func(glow::ALWAYS);
-                self.gl.depth_mask(false);
 
                 self.blend = None;
             }
 
             if self.depth.is_some() {
+                self.gl.depth_func(glow::ALWAYS);
+                self.gl.depth_mask(false);
                 self.gl.disable(glow::DEPTH_TEST);
 
                 self.depth = None;

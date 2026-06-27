@@ -71,6 +71,7 @@ impl TranslucentSubchunk {
             Self::resort_faces(&mut self.faces, last_pos, origin);
 
             self.buffer = VoxelMeshBuilder::build_from_slice(backend, shader, &self.faces);
+            self.last_pos = last_pos;
         }
     }
 

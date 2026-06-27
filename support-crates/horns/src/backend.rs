@@ -33,7 +33,7 @@ impl RenderBackend {
         #[cfg(all(not(windows), not(target_os = "macos")))]
         let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::EglThenGlx(Box::new(|_| {}))) }?;
         #[cfg(windows)]
-        let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::EglThenWgl(Some(window))) }?;
+        let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::WglThenEgl(Some(window))) }?;
         #[cfg(target_os = "macos")]
         let display = unsafe { Display::new(display.as_raw(), DisplayApiPreference::Cgl) }?;
         let config = unsafe { display.find_configs(ConfigTemplate::default()) }?
