@@ -435,8 +435,6 @@ impl State for GameLoop {
         let mut frame = backend.begin_pass();
 
         if let Some(world) = self.world.as_mut() {
-            info!("started rendering world");
-
             let buffer = &mut frame; // self.scene.buffer(backend);
 
             let progress = world.clock.get_progress();
@@ -447,8 +445,6 @@ impl State for GameLoop {
 
             buffer.clear_color_and_depth(Color::BLACK.to_linear_rgba(), 1.0);
 
-            info!("cleared buffer");
-
             self.common_renderer.draw_rect(
                 Point2D::ZERO,
                 Size2D::new(width as f32, height as f32),
@@ -457,11 +453,7 @@ impl State for GameLoop {
 
             self.common_renderer.render(buffer, backend, None, window_context.window_size());
 
-            info!("drawn sky");
-
             world.chunk_renderer.set_fog_color(get_sky_color(world.clock.get_visual_progress(), 0.0));
-
-            info!("set fog color");
 
             let rendered_subchunks = world.chunk_renderer.render(
                 backend,
@@ -472,8 +464,6 @@ impl State for GameLoop {
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
-
-            info!("rendered subchunks");
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.entities.len());
 
@@ -489,8 +479,6 @@ impl State for GameLoop {
                 self.texture_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
-
-            info!("rendered entities");
 
             // self.kawase.apply(backend, &self.scene).unwrap();
 
@@ -525,8 +513,6 @@ impl State for GameLoop {
             //     self.common_renderer.set_default_matrix();
             // }
 
-            info!("before looking at check");
-
             if let Some(result) = world.camera.looking_at
                 && let Some(mut model) = world.chunk_manager.get_block(result.position).filter(|b| !b.is_air()).and_then(|block| {
                     self.resource_manager
@@ -551,11 +537,7 @@ impl State for GameLoop {
                 self.common_renderer.set_default_matrix();
             }
 
-            info!("after looking at check");
-
             let position = world.player.camera_position().floor().as_ivec3();
-
-            info!("before below water check");
 
             if let Some(block) = world.chunk_manager.get_block(position)&& block.id == self.resource_manager.get_block_id("game:water") {
                     self.common_renderer
@@ -564,10 +546,7 @@ impl State for GameLoop {
                     self.common_renderer.render(buffer, backend, None, window_context.window_size());
                 }
 
-            info!("after below water check + creating render context");
-
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
-            info!("created render context");
 
             let bounds = context.bounds;
 
@@ -590,8 +569,6 @@ impl State for GameLoop {
                     Color::from_u32_rgb(0x1D211B),
                 );
             });
-
-            info!("drawn hotbar");
 
 /*             context.ui(|context, bounds| {
                 let opacity: f32 = 0.0; // self.animation_player.get_value_unchecked("opacity");
@@ -662,24 +639,11 @@ impl State for GameLoop {
                     (hours, minutes)
                 };
 
-                info!("debug info: got time");
-
                 let version = backend.get_opengl_version_string();
-                info!("debug info: got opengl version string");
-
                 let renderer = backend.get_opengl_renderer_string();
-
-                info!("debug info: got opengl renderer string");
-
                 let vendor = backend.get_opengl_vendor_string();
-
-                info!("debug info: got opengl vendor string");
-
                 let free_memory = backend.get_free_video_memory().map_or_else(|| String::from("unknown"), util::format_bytes);
-
-                info!("debug info: got opengl free memory string");
-
-                let block =                     world
+                let block = world
                         .camera
                         .looking_at
                         .and_then(
@@ -708,11 +672,7 @@ impl State for GameLoop {
                         )
                         .unwrap_or_else(|| String::from("nothing"));
 
-                info!("debug info: got looking at");
-
                 let total_subchunks = world.chunk_manager.len() * SUBCHUNK_COUNT;
-
-                info!("debug info: got total subchunks");
 
                 let text = format!(
                     "OpenGL {version}
@@ -726,13 +686,9 @@ Rendered subchunks: {} / {total_subchunks}",
                     rendered_subchunks.draw_calls
                 );
 
-                info!("debug info: got text");
-
                 let text_size = context
                     .measure_text("default", &text, 18.0, None)
                     .unwrap_or_else(|| panic!("failed to measure next text: {text}"));
-
-                info!("debug info: measured text");
 
                 let overlay_width = 1.0; // self.animation_player.get_value_unchecked::<_, f32>("overlay-width");
 
@@ -747,13 +703,9 @@ Rendered subchunks: {} / {total_subchunks}",
                         });
                     });
                 });
-
-                info!("pushed debug overlay");
             }
 
             context.finish(backend, &mut frame, window_context.window_size());
-
-            info!("finished context");
 
             let mut builder = VoxelMeshBuilder::with_capacity(world.player.inventory.get_hotbar_items().count());
 
@@ -805,11 +757,7 @@ Rendered subchunks: {} / {total_subchunks}",
                 self.lightmap_atlas.with_filters(MinifyFilter::NearestMipmapLinear, MagnifyFilter::Nearest),
             );
 
-            info!("drawn hotbar items + creating render context");
-
             let mut context = RenderContext::new(&mut self.common_renderer, window_context.window_size());
-
-            info!("created render context");
 
             context.ui(|context, bounds| {
                 const CHUNK_UI_CONTAINER_SIZE: Size2D = Size2D::new(128.0, 128.0);
@@ -929,8 +877,6 @@ Rendered subchunks: {} / {total_subchunks}",
                 );
             });
 
-            info!("drawn chunk map + position + biome");
-
             if self.settings.debugging.enabled {
                 context.ui(|context, bounds| {
                     const SPACING: f32 = 1.0;
@@ -1026,13 +972,9 @@ Rendered subchunks: {} / {total_subchunks}",
                         None,
                     );
                 });
-
-                info!("drawn debug overlays");
             }
 
             context.finish(backend, &mut frame, window_context.window_size());
-
-            info!("finished frame");
         } else {
             frame.clear_color_and_depth(Color::from_u32_rgb(0x1D211B).as_value(), 1.0);
 
