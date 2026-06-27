@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 meralus-shared.workspace = true
-glutin = { version = "0.32.3", features = ["egl"] }
 winit = "0.31.0-beta.2"
 horns.workspace = true
 png = "0.18.1"

@@ -8,7 +8,6 @@ ahash.workspace = true
 lasso.workspace = true
 meralus-shared = { workspace = true, features = ["face"] }
 serde = { workspace = true, optional = true }
-tracing = "0.1.44"
 
 [features]
 default = []

@@ -341,5 +341,9 @@
 //         // assert_eq!(chunk.light_levels, deserialized.light_levels);
 //     }
 // }
+use meralus_network as _;
+use meralus_shared as _;
+use meralus_world as _;
+use tokio as _;
 
 const fn main() {}

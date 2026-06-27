@@ -17,7 +17,6 @@ meralus-world.workspace = true
 meck.workspace = true
 image = { workspace = true, features = ["png"] }
 tracing = "0.1.44"
-lasso.workspace = true
 
 [lints]
 workspace = true

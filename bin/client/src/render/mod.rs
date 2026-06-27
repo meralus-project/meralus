@@ -162,7 +162,15 @@ impl<V: Vertex, S: Shader, I: GlPrimitive> RenderBuffer<V, S, I> {
     pub fn new(backend: &RenderBackend, vertices: &[V], shader: &Program, element_type: ElementType, indices: &[I]) -> Result<Self, Error> {
         Ok(Self {
             vertices: backend.create_vertex_buffer(vertices, shader, false)?,
-            indices: backend.create_index_buffer(element_type, indices)?,
+            indices: backend.create_index_buffer(element_type, indices, false)?,
+        })
+    }
+
+    #[inline]
+    pub fn new_dynamic(backend: &RenderBackend, vertices: &[V], shader: &Program, element_type: ElementType, indices: &[I]) -> Result<Self, Error> {
+        Ok(Self {
+            vertices: backend.create_vertex_buffer(vertices, shader, true)?,
+            indices: backend.create_index_buffer(element_type, indices, true)?,
         })
     }
 }

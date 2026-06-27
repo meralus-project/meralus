@@ -60,17 +60,22 @@ impl TranslucentSubchunk {
         Self::resort_faces(&mut faces, last_pos, origin);
 
         Self {
-            buffer: VoxelMeshBuilder::build_from_slice(backend, shader, &faces),
+            buffer: VoxelMeshBuilder::build_dynamic_from_slice(backend, shader, &faces),
             faces,
             last_pos,
         }
     }
 
-    fn update(&mut self, backend: &RenderBackend, shader: &Program, last_pos: Point3D, origin: IPoint2D) {
+    fn update(&mut self, last_pos: Point3D, origin: IPoint2D) {
         if self.last_pos.distance_squared(last_pos) > 3.0 {
             Self::resort_faces(&mut self.faces, last_pos, origin);
 
-            self.buffer = VoxelMeshBuilder::build_from_slice(backend, shader, &self.faces);
+            let mut builder = VoxelMeshBuilder::new();
+
+            builder.extend_from_slice(&self.faces);
+
+            self.buffer.vertices.dynamic_write(&builder.vertices);
+            self.buffer.indices.dynamic_write(&builder.indices);
             self.last_pos = last_pos;
         }
     }
@@ -121,6 +126,15 @@ impl VoxelMeshBuilder {
         this.extend_from_slice(voxels);
 
         this.build(backend, shader)
+    }
+
+    #[inline]
+    pub fn build_dynamic_from_slice(backend: &RenderBackend, shader: &Program, voxels: &[VoxelFace]) -> RenderBuffer<VoxelVertex, VoxelShader, u32> {
+        let mut this = Self::new();
+
+        this.extend_from_slice(voxels);
+
+        this.build_dynamic(backend, shader)
     }
 
     #[inline]
@@ -199,6 +213,11 @@ impl VoxelMeshBuilder {
     #[inline]
     pub fn build(self, backend: &RenderBackend, shader: &Program) -> RenderBuffer<VoxelVertex, VoxelShader, u32> {
         RenderBuffer::new(backend, &self.vertices, shader, ElementType::Triangles, &self.indices).unwrap()
+    }
+
+    #[inline]
+    pub fn build_dynamic(self, backend: &RenderBackend, shader: &Program) -> RenderBuffer<VoxelVertex, VoxelShader, u32> {
+        RenderBuffer::new_dynamic(backend, &self.vertices, shader, ElementType::Triangles, &self.indices).unwrap()
     }
 }
 
@@ -316,7 +335,6 @@ impl ChunkRenderer {
     #[allow(clippy::too_many_arguments)]
     pub fn render<T: Frustum>(
         &mut self,
-        backend: &RenderBackend,
         pass: &mut RenderPass,
         camera_pos: Point3D,
         frustum: &T,
@@ -394,7 +412,7 @@ impl ChunkRenderer {
 
         for (&key, subchunk) in self.subchunks.iter_mut().rev() {
             if Self::is_subchunk_visible(frustum, key) && !subchunk.translucent.buffer.indices.is_empty() {
-                subchunk.translucent.update(backend, &self.shader, camera_pos, key.0);
+                subchunk.translucent.update(camera_pos, key.0);
 
                 binder.set_uniform("chunk", IPoint3D::new(key.0.x * SUBCHUNK_SIZE_I32, 0, key.0.y * SUBCHUNK_SIZE_I32));
 

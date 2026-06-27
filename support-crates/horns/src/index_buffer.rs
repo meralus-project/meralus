@@ -80,12 +80,16 @@ impl<I: GlPrimitive> IndexBuffer<I> {
         }
     }
 
-    pub(crate) fn new(gl: &Rc<glow::Context>, element_type: ElementType, indices: &[I]) -> Result<Self, Error> {
+    pub(crate) fn new(gl: &Rc<glow::Context>, element_type: ElementType, indices: &[I], is_dynamic: bool) -> Result<Self, Error> {
         unsafe {
             let ptr = gl.create_buffer().map_err(Error::BufferCreation)?;
 
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ptr));
-            gl.buffer_data_u8_slice(glow::ELEMENT_ARRAY_BUFFER, bytemuck::cast_slice(indices), glow::STATIC_DRAW);
+            gl.buffer_data_u8_slice(
+                glow::ELEMENT_ARRAY_BUFFER,
+                bytemuck::cast_slice(indices),
+                if is_dynamic { glow::DYNAMIC_DRAW } else { glow::STATIC_DRAW },
+            );
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
 
             Ok(Self {

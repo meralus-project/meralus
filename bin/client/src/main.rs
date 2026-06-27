@@ -456,7 +456,6 @@ impl State for GameLoop {
             world.chunk_renderer.set_fog_color(get_sky_color(world.clock.get_visual_progress(), 0.0));
 
             let rendered_subchunks = world.chunk_renderer.render(
-                backend,
                 buffer,
                 world.camera.position,
                 &world.camera.frustum,

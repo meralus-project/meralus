@@ -119,8 +119,8 @@ impl RenderBackend {
     }
 
     #[inline]
-    pub fn create_index_buffer<I: GlPrimitive>(&self, element_type: ElementType, indices: &[I]) -> Result<IndexBuffer<I>, Error> {
-        IndexBuffer::new(&self.gl, element_type, indices)
+    pub fn create_index_buffer<I: GlPrimitive>(&self, element_type: ElementType, indices: &[I], is_dynamic: bool) -> Result<IndexBuffer<I>, Error> {
+        IndexBuffer::new(&self.gl, element_type, indices, is_dynamic)
     }
 
     #[inline]
