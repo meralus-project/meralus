@@ -6,27 +6,28 @@ use std::{
     time::{Duration, Instant},
 };
 
-use horns::RenderBackend;
+use horns::{RenderBackend, RenderPass};
 use meralus_shared::{InspectMut, Point2D, USize2D, Vector2D};
 use winit::{
     application::ApplicationHandler,
     error::EventLoopError,
-    event::{DeviceEvent, DeviceId, MouseScrollDelta, WindowEvent},
+    event::{ButtonSource, DeviceEvent, DeviceId, MouseScrollDelta, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    icon::RgbaIcon,
     keyboard::PhysicalKey,
     raw_window_handle::{HasDisplayHandle, HasWindowHandle},
-    window::{Icon, Window, WindowId},
+    window::{Window, WindowAttributes, WindowId},
 };
 pub use winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode};
 
 #[derive(Debug, Clone, Copy)]
 pub struct WindowContext<'a> {
-    event_loop: &'a ActiveEventLoop,
-    window: &'a Window,
+    event_loop: &'a dyn ActiveEventLoop,
+    window: &'a dyn Window,
 }
 
 impl<'a> WindowContext<'a> {
-    const fn new(event_loop: &'a ActiveEventLoop, window: &'a Window) -> Self {
+    const fn new(event_loop: &'a dyn ActiveEventLoop, window: &'a dyn Window) -> Self {
         Self { event_loop, window }
     }
 
@@ -40,7 +41,7 @@ impl<'a> WindowContext<'a> {
     }
 
     pub fn window_size(&self) -> USize2D {
-        let size = self.window.inner_size();
+        let size = self.window.surface_size();
 
         USize2D::new(size.width, size.height)
     }
@@ -60,7 +61,7 @@ pub struct KeyboardModifiers {
     pub alt_key: bool,
     pub control_key: bool,
     pub shift_key: bool,
-    pub super_key: bool,
+    pub meta_key: bool,
 }
 
 #[allow(unused)]
@@ -80,12 +81,12 @@ pub trait State {
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
     fn update(&mut self, context: WindowContext, display: &RenderBackend, delta: Duration) {}
-    fn render(&mut self, context: WindowContext, display: &RenderBackend, delta: Duration);
+    fn render(&mut self, context: WindowContext, display: &RenderBackend, delta: Duration) -> RenderPass;
 }
 
 pub struct ApplicationWindow<T: State> {
     state: T,
-    window: Window,
+    window: Box<dyn Window>,
     backend: RenderBackend,
     last_time: Option<Instant>,
     delta: Duration,
@@ -96,11 +97,11 @@ pub struct Application<T: State> {
     args: Option<T::Args>,
 }
 
-impl<T: State> Application<T> {
+impl<T: State + 'static> Application<T> {
     /// # Errors
     ///
     /// May return an error from event loop
-    pub fn start(&mut self) -> Result<(), EventLoopError> {
+    pub fn start(self) -> Result<(), EventLoopError> {
         let event_loop = EventLoop::builder().build()?;
 
         event_loop.set_control_flow(ControlFlow::Poll);
@@ -128,23 +129,23 @@ impl<T: State> Application<T> {
 impl<T: State> ApplicationWindow<T> {
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
-    pub fn new(event_loop: &ActiveEventLoop, args: T::Args) -> Self {
+    pub fn new(event_loop: &dyn ActiveEventLoop, args: T::Args) -> Self {
         let icon = T::ICON.and_then(|icon| {
             let decoder = png::Decoder::new(BufReader::new(File::open(icon).unwrap()));
             let mut reader = decoder.read_info().unwrap();
             let mut buf = vec![0; reader.output_buffer_size().unwrap()];
             let info = reader.next_frame(&mut buf).unwrap();
 
-            Icon::from_rgba(buf[..info.buffer_size()].to_vec(), info.width, info.height).ok()
+            RgbaIcon::new(buf[..info.buffer_size()].to_vec(), info.width, info.height).map(Into::into).ok()
         });
 
-        let window_attrs = Window::default_attributes().with_transparent(false).with_title(T::NAME).with_window_icon(icon);
+        let window_attrs = WindowAttributes::default().with_transparent(false).with_title(T::NAME).with_window_icon(icon);
         let window = event_loop.create_window(window_attrs).expect("failed to create window");
-        let (width, height): (u32, u32) = window.inner_size().into();
+        let (width, height): (u32, u32) = window.surface_size().into();
         let backend = RenderBackend::new(window.display_handle().unwrap(), window.window_handle().unwrap(), width, height).unwrap();
 
         Self {
-            state: T::new(WindowContext::new(event_loop, &window), &backend, args),
+            state: T::new(WindowContext::new(event_loop, window.as_ref()), &backend, args),
             window,
             backend,
             last_time: None,
@@ -154,19 +155,15 @@ impl<T: State> ApplicationWindow<T> {
 }
 
 impl<T: State> ApplicationHandler for Application<T> {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         if let Some(args) = self.args.take() {
             self.window.replace(ApplicationWindow::new(event_loop, args));
         }
     }
 
-    fn suspended(&mut self, _: &ActiveEventLoop) {
-        self.window.take();
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::Resized(physical_size) => self.window.inspect_mut(move |window| {
+            WindowEvent::SurfaceResized(physical_size) => self.window.inspect_mut(move |window| {
                 window.backend.resize(physical_size.width, physical_size.height).unwrap();
 
                 window.state.handle_window_resize(
@@ -183,7 +180,7 @@ impl<T: State> ApplicationHandler for Application<T> {
                         alt_key: state.alt_key(),
                         control_key: state.control_key(),
                         shift_key: state.shift_key(),
-                        super_key: state.super_key(),
+                        meta_key: state.meta_key(),
                     });
                 });
             }
@@ -204,12 +201,16 @@ impl<T: State> ApplicationHandler for Application<T> {
                     window.state.handle_mouse_wheel(delta);
                 });
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            WindowEvent::PointerMoved { position, .. } => {
                 self.window.inspect_mut(|window| {
                     window.state.handle_mouse_motion(None, Some(Point2D::new(position.x as f32, position.y as f32)));
                 });
             }
-            WindowEvent::MouseInput { state, button, .. } => {
+            WindowEvent::PointerButton {
+                state,
+                button: ButtonSource::Mouse(button),
+                ..
+            } => {
                 self.window.inspect_mut(|window| {
                     window.state.handle_mouse_button(button, state.is_pressed());
                 });
@@ -217,11 +218,15 @@ impl<T: State> ApplicationHandler for Application<T> {
             WindowEvent::RedrawRequested => self.window.inspect_mut(|window| {
                 window
                     .state
-                    .update(WindowContext::new(event_loop, &window.window), &window.backend, window.delta);
+                    .update(WindowContext::new(event_loop, window.window.as_ref()), &window.backend, window.delta);
 
-                window
+                let pass = window
                     .state
-                    .render(WindowContext::new(event_loop, &window.window), &window.backend, window.delta);
+                    .render(WindowContext::new(event_loop, window.window.as_ref()), &window.backend, window.delta);
+
+                window.window.pre_present_notify();
+
+                pass.finish(&window.backend);
 
                 window.delta = window.last_time.map_or_else(|| Duration::ZERO, |last_time| last_time.elapsed());
                 window.last_time.replace(Instant::now());
@@ -233,8 +238,8 @@ impl<T: State> ApplicationHandler for Application<T> {
         }
     }
 
-    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
-        if let DeviceEvent::MouseMotion { delta } = event {
+    fn device_event(&mut self, _: &dyn ActiveEventLoop, _: Option<DeviceId>, event: DeviceEvent) {
+        if let DeviceEvent::PointerMotion { delta } = event {
             self.window.inspect_mut(|window| {
                 window.state.handle_mouse_motion(Some(Vector2D::new(delta.0 as f32, delta.1 as f32)), None);
             });

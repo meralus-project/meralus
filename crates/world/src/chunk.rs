@@ -1,4 +1,4 @@
-use std::iter::repeat_n;
+use std::{iter::repeat_n, marker::PhantomData};
 
 use ahash::HashMap;
 use meralus_shared::{Face, IPoint2D, IPoint3D, USizePoint2D, USizePoint3D};
@@ -88,12 +88,91 @@ impl SubChunkBlockState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackedArray<const N: usize> {
+    data: Vec<u64>,
+    /// Bits per Entry
+    bpe: u32,
+    /// Entries per Element
+    epe: u32,
+    mask: u64,
+    _phantom: PhantomData<[u8; N]>,
+}
+
+#[allow(clippy::inline_always)]
+impl<const N: usize> PackedArray<N> {
+    pub fn new(palette_size: usize) -> Self {
+        let bpe = Self::ceil_log2(palette_size as u64);
+        let epe = u64::BITS / bpe;
+        let mask = (1u64 << u64::from(bpe)) - 1;
+
+        Self {
+            data: vec![0u64; N.div_ceil(epe as usize)],
+            bpe,
+            epe,
+            mask,
+            _phantom: PhantomData,
+        }
+    }
+
+    #[inline(always)]
+    const fn ceil_log2(x: u64) -> u32 {
+        u64::BITS - (x.saturating_sub(1)).leading_zeros()
+    }
+
+    #[inline]
+    const fn index_of(&self, i: usize) -> (usize, u64) {
+        (i / self.epe as usize, ((i % self.epe as usize) * self.bpe as usize) as u64)
+    }
+
+    #[inline]
+    pub const fn get(&self, i: usize) -> usize {
+        let (index, bit) = self.index_of(i);
+
+        ((self.data.as_slice()[index] >> bit) & self.mask) as usize
+    }
+
+    #[inline]
+    pub const fn set(&mut self, i: usize, value: usize) {
+        let (index, bit) = self.index_of(i);
+
+        self.data.as_mut_slice()[index] &= !(self.mask << bit);
+        self.data.as_mut_slice()[index] |= (value as u64) << bit;
+    }
+
+    pub fn grow(&mut self, palette_size: usize) {
+        let new_bits = Self::ceil_log2(palette_size as u64);
+
+        if new_bits == self.bpe {
+            return;
+        }
+
+        let epe = u64::BITS / new_bits;
+        let mut new_data = vec![0u64; N.div_ceil(epe as usize)];
+
+        for i in 0..N {
+            new_data[i / epe as usize] |= (self.get(i) as u64) << ((i % epe as usize) * new_bits as usize);
+        }
+
+        self.data = new_data;
+        self.bpe = new_bits;
+        self.epe = epe;
+        self.mask = (1u64 << new_bits) - 1;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PaletteData<const N: usize> {
+    Single,
+    Linear(PackedArray<N>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Cube whose size is specified by [`CHUNK_SIZE`] constant.
 pub struct SubChunk {
     /// Palette of block states.
     pub palette: Vec<SubChunkBlockState>,
     /// Array of palette indices.
-    pub data: [u8; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
+    pub data: PaletteData<{ SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE }>,
     /// Array of block light level values.
     pub light_levels: [u8; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
 }
@@ -103,7 +182,7 @@ impl SubChunk {
     pub fn empty() -> Self {
         Self {
             palette: vec![SubChunkBlockState::air()],
-            data: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
+            data: PaletteData::Single,
             light_levels: [0; SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE],
         }
     }
@@ -132,6 +211,13 @@ impl SubChunk {
 
             self.palette.push(block);
 
+            if self.palette.len() > 1 {
+                match &mut self.data {
+                    PaletteData::Single => self.data = PaletteData::Linear(PackedArray::new(self.palette.len())),
+                    PaletteData::Linear(packed_array) => packed_array.grow(self.palette.len()),
+                }
+            }
+
             index
         }
     }
@@ -145,7 +231,24 @@ impl SubChunk {
     #[must_use]
     #[inline]
     pub fn get_block_by_idx_unchecked(&self, index: usize) -> &SubChunkBlockState {
-        unsafe { self.palette.get_unchecked(*self.data.get_unchecked(index) as usize) }
+        unsafe { self.palette.get_unchecked(self.get_index_unchecked(index)) }
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn get_index_unchecked(&self, index: usize) -> usize {
+        match &self.data {
+            PaletteData::Single => 0,
+            PaletteData::Linear(data) => data.get(index),
+        }
+    }
+
+    #[inline]
+    pub const fn set_index_unchecked(&mut self, index: usize, val: usize) {
+        match &mut self.data {
+            PaletteData::Single => (),
+            PaletteData::Linear(data) => data.set(index, val),
+        }
     }
 
     #[inline]
@@ -366,7 +469,7 @@ impl Chunk {
             let subchunk = self.subchunks.get_unchecked_mut(subchunk);
             let index = subchunk.try_insert(block);
 
-            *subchunk.data.get_unchecked_mut(SubChunk::index_of(position.with_y(y))) = index as u8;
+            subchunk.set_index_unchecked(SubChunk::index_of(position.with_y(y)), index);
         }
     }
 
@@ -457,7 +560,9 @@ impl Chunk {
     pub fn check_for_local_block(&self, local_position: USizePoint3D) -> bool {
         let [subchunk, y] = Self::get_subchunk_index(local_position.y);
 
-        !self.subchunks[subchunk].palette[self.subchunks[subchunk].data[SubChunk::index_of(USizePoint3D { y, ..local_position })] as usize].is_air()
+        !self.subchunks[subchunk]
+            .get_block_by_idx_unchecked(SubChunk::index_of(USizePoint3D { y, ..local_position }))
+            .is_air()
     }
 
     #[inline]
@@ -717,7 +822,7 @@ impl<'a> Iterator for SubChunkIter<'a> {
 
         self.current_index += 1;
 
-        let block_state = &self.subchunk.palette[self.subchunk.data[idx] as usize];
+        let block_state = self.subchunk.get_block_by_idx_unchecked(idx);
 
         let local_x = idx & 0xF;
         let local_z = (idx >> 4) & 0xF;
