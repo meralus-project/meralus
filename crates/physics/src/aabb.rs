@@ -46,7 +46,7 @@ fn get_intermediate_with_z_value(a: DPoint3D, b: DPoint3D, z: f64) -> Option<DPo
     if d2 * d2 < 1.000_000_011_686_097_4E-7 {
         None
     } else {
-        let d3 = (z - a.x) / d2;
+        let d3 = (z - a.z) / d2;
 
         if (0.0..=1.0).contains(&d3) {
             Some(DPoint3D::new(d0.mul_add(d3, a.x), d1.mul_add(d3, a.y), d2.mul_add(d3, a.z)))

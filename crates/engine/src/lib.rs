@@ -164,6 +164,8 @@ impl<T: State> ApplicationWindow<T> {
             .unwrap_or(FALLBACK_RATE);
         let vsync = Cell::new(true);
 
+        backend.set_vsync(false).unwrap();
+
         Self {
             state: T::new(WindowContext::new(event_loop, window.as_ref(), &vsync), &backend, args),
             window,
