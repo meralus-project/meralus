@@ -2,7 +2,7 @@
 
 [![License: MIT or Apache 2.0](https://img.shields.io/badge/License-MIT_or_Apache_2.0-634f7d.svg?style=for-the-badge)](LICENSE-APACHE)
 
-A voxel game that visually copies Minecraft.
+A yet another blocky game.
 
 ## Running
 
@@ -13,19 +13,20 @@ Executable must be in the same folder as the `resources` folder.
 - Walking: `WASD`
 - Jumping: `Space`
 - Running: `Shift + W`
+- Dash: `E` while in air
+- Toggle V-Sync: `CTRL + V`
+- Toggle debug information: `F3`
 - Toggle mouse capture: `TAB`
 - Select hotbar item: `1-9` or `Mouse Wheel`
-- \[Debugging\] Open W.I.P chat: `T`
-- \[Debugging\] Unpause in-game clock: `P`
-- \[Debugging\] Toggle entity borders: `B`
-- \[Debugging\] Save texture atlas (with mipmaps): `L`
 
 ## Screenshots (they may not reflect the current state of the game)
-![image](https://github.com/user-attachments/assets/e75e8014-192e-482b-a9ed-74a86d2336c9)
-![image](https://github.com/user-attachments/assets/ac261b69-b57a-49b4-87f0-98de1474d0ba)
-![image](https://github.com/user-attachments/assets/ac9b4616-638c-4909-a613-cae3a55007c8)
-![image](https://github.com/user-attachments/assets/c61d3605-bee2-4b1b-a7d7-f46853f458f4)
-![image](https://github.com/user-attachments/assets/04bcfbde-37bc-4a98-bdaf-8d0e27b5933e)
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/f6585771-09d2-4d4d-80fd-6ec68b542a12" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/9e0f3a39-986f-4530-b501-cb68978a8011" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ec8ae685-667f-4087-8b3b-84f2345fab9e" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/03e4a7b4-a08f-4d00-a859-a82356f8b637" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/37e362e7-e3fd-46c4-9b7e-672b415f6beb" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/9012b653-0752-4417-af35-2887b1ec05a9" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/39d9cd1f-6065-40a6-8c82-49626956eee1" />
 
 ## MSRV
 
