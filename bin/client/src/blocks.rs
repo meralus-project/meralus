@@ -1,6 +1,6 @@
 use meralus_shared::Color;
 
-use crate::Block;
+use crate::{Block, world::GRASS_COLOR};
 
 pub struct AirBlock;
 
@@ -78,7 +78,7 @@ impl Block for GrassBlock {
     }
 
     fn tint_color(&self) -> Option<Color> {
-        Some(Color::from_hsl(120.0, 0.4, 0.75))
+        Some(GRASS_COLOR)
     }
 }
 
@@ -114,7 +114,7 @@ impl Block for OakLeavesBlock {
     }
 
     fn tint_color(&self) -> Option<Color> {
-        Some(Color::from_hsl(120.0, 0.4, 0.75))
+        Some(Color::from_hsl(126.0, 0.712, 0.505))
     }
 
     fn consume_light_level(&self) -> u8 {

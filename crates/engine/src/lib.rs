@@ -255,14 +255,7 @@ impl<T: State> ApplicationHandler for Application<T> {
 
                 window.state.update(context, &window.backend, delta);
                 window.state.render(context, &window.backend, delta);
-                window.window.request_redraw();
                 window.vsync = vsync.get();
-
-                let frame_time = now.elapsed();
-
-                if window.vsync && window.refresh_rate > frame_time {
-                    std::thread::sleep(window.refresh_rate.checked_sub(frame_time).unwrap());
-                }
             }),
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
@@ -275,5 +268,19 @@ impl<T: State> ApplicationHandler for Application<T> {
                 window.state.handle_mouse_motion(Some(Vector2D::new(delta.0 as f32, delta.1 as f32)), None);
             });
         }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
+        self.window.inspect_mut(|window| {
+            window.window.request_redraw();
+
+            let frame_time = window.last_time.map_or(Duration::ZERO, |time| time.elapsed());
+
+            if window.vsync && window.refresh_rate > frame_time {
+                let wait = window.refresh_rate.checked_sub(frame_time).unwrap();
+
+                event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + wait));
+            }
+        });
     }
 }
