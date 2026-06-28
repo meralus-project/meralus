@@ -248,10 +248,6 @@ impl State for GameLoop {
         common_renderer.add_font("default_bold", include_bytes!("../../../resources/fonts/Monocraft-Bold.ttf"));
         common_renderer.set_window_matrix(Transform3D::orthographic_rh_gl(0.0, size.x, size.y, 0.0, -100.0, 100.0));
 
-        // let mut animation_player = AnimationPlayer::default();
-
-        // init_animation_player(&mut animation_player);
-
         // let sounds = fs::read_dir("./resources/sounds")
         //     .unwrap()
         //     .flatten()
@@ -286,7 +282,6 @@ impl State for GameLoop {
                 ("walk.left", KeyCode::KeyA),
                 ("walk.right", KeyCode::KeyD),
             ]),
-            // animation_player,
             common_renderer,
             current_page: Page::Main,
             resource_manager,

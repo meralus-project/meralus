@@ -93,7 +93,6 @@ pub struct ApplicationWindow<T: State> {
     window: Box<dyn Window>,
     backend: RenderBackend,
     last_time: Option<Instant>,
-    delta: Duration,
 }
 
 pub struct Application<T: State> {
@@ -153,7 +152,6 @@ impl<T: State> ApplicationWindow<T> {
             window,
             backend,
             last_time: None,
-            delta: Duration::ZERO,
         }
     }
 }
@@ -228,18 +226,25 @@ impl<T: State> ApplicationHandler for Application<T> {
                 });
             }
             WindowEvent::RedrawRequested => self.window.inspect_mut(|window| {
-                window
-                    .state
-                    .update(WindowContext::new(event_loop, window.window.as_ref()), &window.backend, window.delta);
+                const SLEEP_INTERVAL: Duration = Duration::from_secs(1).checked_div(60).unwrap();
 
-                window
-                    .state
-                    .render(WindowContext::new(event_loop, window.window.as_ref()), &window.backend, window.delta);
+                let now = Instant::now();
+                let delta = now.duration_since(window.last_time.unwrap_or_else(Instant::now));
 
-                window.delta = window.last_time.map_or_else(|| Duration::ZERO, |last_time| last_time.elapsed());
-                window.last_time.replace(Instant::now());
+                window.last_time.replace(now);
+
+                let context = WindowContext::new(event_loop, window.window.as_ref());
+
+                window.state.update(context, &window.backend, delta);
+                window.state.render(context, &window.backend, delta);
 
                 window.window.request_redraw();
+
+                let frame_time = now.elapsed();
+
+                if SLEEP_INTERVAL > frame_time {
+                    std::thread::sleep(SLEEP_INTERVAL.checked_sub(frame_time).unwrap());
+                }
             }),
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
