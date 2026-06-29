@@ -1075,9 +1075,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.33.1"
+version = "0.33.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "898f5a568a84989b6c0f8caa50a93074b97dbdc58fc6d9543157bb4562758933"
+checksum = "7f22fb22f065b308be0d8724e3706c7fa3fc2a6c7d6899df4cad7860e7a75436"
 dependencies = [
  "bytemuck",
  "mint",
@@ -1916,7 +1916,7 @@ dependencies = [
 [[package]]
 name = "naga"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -1941,7 +1941,7 @@ dependencies = [
 [[package]]
 name = "naga-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
@@ -3713,7 +3713,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.0",
@@ -3742,7 +3742,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -3775,7 +3775,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3783,7 +3783,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-emscripten"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3791,7 +3791,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3799,7 +3799,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -3854,7 +3854,7 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -3863,7 +3863,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#6fd13ee8f8d2cc1ecbf6bbe1d51679e3c1f5b3dc"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
 dependencies = [
  "bitflags 2.13.0",
  "bytemuck",
