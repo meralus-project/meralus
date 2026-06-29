@@ -1916,7 +1916,7 @@ dependencies = [
 [[package]]
 name = "naga"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -1941,7 +1941,7 @@ dependencies = [
 [[package]]
 name = "naga-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
@@ -3713,7 +3713,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.0",
@@ -3742,7 +3742,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -3775,7 +3775,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3783,7 +3783,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-emscripten"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3791,7 +3791,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3799,7 +3799,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -3854,7 +3854,7 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -3863,7 +3863,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5f9ab1395e68523d0f736e8dfe6624b655115a2c"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#5a14945e89d34b110a7248c7da268be59799b17d"
 dependencies = [
  "bitflags 2.13.0",
  "bytemuck",
