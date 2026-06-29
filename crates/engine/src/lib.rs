@@ -307,7 +307,7 @@ impl<T: State> ApplicationWindow<T> {
             .and_then(|video_mode| video_mode.refresh_rate_millihertz())
             .and_then(|refresh_rate| Duration::from_secs(1).checked_div(refresh_rate.get() / 1000))
             .unwrap_or(FALLBACK_RATE);
-        let vsync = Cell::new(true);
+        let vsync = Cell::new(false);
 
         let depth_texture = Texture::create_depth_texture(&device, width, height, "Mavelin Depth Texture");
 
@@ -360,11 +360,9 @@ impl<T: State> ApplicationWindow<T> {
             width,
             height,
             desired_maximum_frame_latency: 2,
-            present_mode: if self.vsync {
-                wgpu::PresentMode::AutoVsync
-            } else {
+            present_mode: 
                 wgpu::PresentMode::AutoNoVsync
-            },
+            ,
         });
     }
 }
