@@ -502,13 +502,13 @@ impl<T: State> ApplicationHandler for Application<T> {
         self.window.inspect_mut(|window| {
             window.window.request_redraw();
 
-            let frame_time = window.last_time.map_or(Duration::ZERO, |time| time.elapsed());
+            // let frame_time = window.last_time.map_or(Duration::ZERO, |time| time.elapsed());
 
-            if window.vsync && window.refresh_rate > frame_time {
-                let wait = window.refresh_rate.checked_sub(frame_time).unwrap();
+            // if window.vsync && window.refresh_rate > frame_time {
+            //     let wait = window.refresh_rate.checked_sub(frame_time).unwrap();
 
-                event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + wait));
-            }
+            //     event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + wait));
+            // }
         });
     }
 }
