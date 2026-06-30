@@ -114,6 +114,10 @@ impl GameLoop {
             self.settings.debugging.enabled = !self.settings.debugging.enabled;
         }
 
+        if self.input.keyboard.is_key_pressed_once(KeyCode::F11) {
+            context.toggle_fullscreen();
+        }
+
         if self.input.keyboard.is_key_pressed_once(KeyCode::KeyL) {
             self.resource_manager.debug_save();
         }
@@ -384,12 +388,6 @@ impl State for GameLoop {
         self.handle_shortcuts(context);
 
         if let Some(world) = &mut self.world {
-            if self.input.mouse.is_pressed_once(MouseButton::Left) {
-                world.destroy_looking_at();
-            } else if self.input.mouse.is_pressed(MouseButton::Right) {
-                world.place_held();
-            }
-
             world.update(&context, self.settings.graphics, &self.input, delta);
 
             for (_, drop) in &mut world.entities {
@@ -427,11 +425,7 @@ impl State for GameLoop {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn render(&mut self, context: WindowContext, delta: Duration) {
-        let Some(output) = context.get_surface_texture() else {
-            return;
-        };
-
+    fn render(&mut self, context: WindowContext, output: wgpu::SurfaceTexture, delta: Duration) {
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         if self.settings.debugging.fps_stat.len() >= 100 {

@@ -7,13 +7,12 @@ use std::{
 };
 
 use ahash::{HashMap, HashSet};
-use mavelin_engine::WindowContext;
+use mavelin_engine::{MouseButton, WindowContext};
 #[cfg(feature = "multiplayer")]
 use mavelin_network::{IncomingPacket, OutgoingPacket, Uuid};
 use mavelin_physics::{Aabb, PhysicsBody, PhysicsContext};
 use mavelin_shared::{
-    Color, Face, IPoint2D, IPoint3D, Point2D, Point3D, Ranged, Rect, Size2D, Size3D, Transform3D, USize2D, USizePoint2D, USizePoint3D, Vector2D,
-    Vector3D,
+    Color, Face, IPoint2D, IPoint3D, Point2D, Point3D, Ranged, Rect, Size2D, Size3D, Transform3D, USize2D, USizePoint2D, USizePoint3D, Vector2D, Vector3D,
 };
 use mavelin_tween::{Animation, RepeatMode, Tween};
 use mavelin_world::{
@@ -770,6 +769,8 @@ impl World {
         self.colors.sky.advance(delta);
         self.colors.fog.advance(delta);
 
+        self.player.handle_keyboard(input);
+
         if self.clock.active() {
             for _ in 0..self.physics_interval.update(delta) {
                 self.physics_step(input);
@@ -778,6 +779,12 @@ impl World {
             for _ in 0..self.tick_interval.update(delta) {
                 self.tick();
             }
+        }
+
+        if input.mouse.is_pressed_once(MouseButton::Left) {
+            self.destroy_looking_at();
+        } else if input.mouse.is_pressed(MouseButton::Right) {
+            self.place_held();
         }
 
         if let Some(biome) = self.chunk_manager.get_biome(self.player.body.position.as_ivec3())

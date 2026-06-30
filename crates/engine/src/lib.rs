@@ -16,6 +16,7 @@ use winit::{
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     icon::RgbaIcon,
     keyboard::{ModifiersKeyState, PhysicalKey},
+    monitor::Fullscreen,
     window::{Window, WindowAttributes, WindowId},
 };
 pub use winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode};
@@ -74,7 +75,6 @@ pub struct WindowContext<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
     pub depth_texture: &'a Texture,
-    pub surface: &'a wgpu::Surface<'static>,
     pub surface_format: &'a wgpu::TextureFormat,
     pub adapter: &'a wgpu::Adapter,
     event_loop: &'a dyn ActiveEventLoop,
@@ -83,54 +83,6 @@ pub struct WindowContext<'a> {
 }
 
 impl WindowContext<'_> {
-    pub fn get_surface_texture(&self) -> Option<wgpu::SurfaceTexture> {
-        match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(texture) => Some(texture),
-            wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Timeout => None,
-            wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
-                drop(texture);
-
-                self.configure_surface();
-
-                None
-            }
-            wgpu::CurrentSurfaceTexture::Outdated => {
-                self.configure_surface();
-
-                None
-            }
-            wgpu::CurrentSurfaceTexture::Validation => {
-                unreachable!("No error scope registered, so validation errors will panic")
-            }
-            wgpu::CurrentSurfaceTexture::Lost => {
-                // self.surface = self.instance.create_surface(self.window.clone()).unwrap();
-                // self.configure_surface();
-
-                None
-            }
-        }
-    }
-
-    fn configure_surface(&self) {
-        let (width, height) = self.window.surface_size().into();
-
-        self.surface.configure(self.device, &wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: *self.surface_format,
-            color_space: wgpu::SurfaceColorSpace::Auto,
-            view_formats: vec![self.surface_format.add_srgb_suffix()],
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            width,
-            height,
-            desired_maximum_frame_latency: 2,
-            present_mode: if self.vsync.get() {
-                wgpu::PresentMode::AutoVsync
-            } else {
-                wgpu::PresentMode::AutoNoVsync
-            },
-        });
-    }
-
     #[allow(clippy::missing_panics_doc)]
     pub fn set_cursor_grab(&self, mode: CursorGrabMode) {
         self.window.set_cursor_grab(mode).unwrap();
@@ -142,6 +94,14 @@ impl WindowContext<'_> {
 
     pub fn set_vsync(&self, enabled: bool) {
         self.vsync.set(enabled);
+    }
+
+    pub fn toggle_fullscreen(&self) {
+        if self.window.fullscreen().is_some() {
+            self.window.set_fullscreen(None);
+        } else {
+            self.window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+        }
     }
 
     pub fn window_size(&self) -> USize2D {
@@ -189,7 +149,7 @@ pub trait State {
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
     fn update(&mut self, context: WindowContext, delta: Duration) {}
-    fn render(&mut self, context: WindowContext, delta: Duration);
+    fn render(&mut self, context: WindowContext, surface: wgpu::SurfaceTexture, delta: Duration);
 }
 
 pub struct ApplicationWindow<T: State> {
@@ -302,7 +262,6 @@ impl<T: State> ApplicationWindow<T> {
                 instance: &instance,
                 device: &device,
                 queue: &queue,
-                surface: &surface,
                 surface_format: &format,
                 event_loop,
                 window: window.as_ref(),
@@ -359,17 +318,18 @@ impl<T: State> ApplicationHandler for Application<T> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::SurfaceResized(physical_size) => self.window.inspect_mut(move |window| {
                 let vsync = Cell::new(window.vsync);
 
+                window.configure_surface(physical_size.width, physical_size.height);
                 window.state.handle_window_resize(
                     WindowContext {
                         instance: &window.instance,
                         device: &window.device,
                         queue: &window.queue,
-                        surface: &window.surface,
                         surface_format: &window.surface_format,
                         event_loop,
                         window: window.window.as_ref(),
@@ -380,9 +340,6 @@ impl<T: State> ApplicationHandler for Application<T> {
                     USize2D::new(physical_size.width, physical_size.height),
                     window.window.scale_factor(),
                 );
-
-                window.vsync = vsync.get();
-                window.configure_surface(physical_size.width, physical_size.height);
             }),
             WindowEvent::ModifiersChanged(modifiers) => {
                 let state = modifiers.state();
@@ -437,7 +394,9 @@ impl<T: State> ApplicationHandler for Application<T> {
             }
             WindowEvent::RedrawRequested => self.window.inspect_mut(|window| {
                 let now = Instant::now();
-                let delta = now.duration_since(window.last_time.unwrap_or_else(Instant::now));
+                let delta = now
+                    .duration_since(window.last_time.unwrap_or_else(Instant::now))
+                    .min(Duration::from_millis(150));
 
                 window.last_time.replace(now);
 
@@ -446,7 +405,6 @@ impl<T: State> ApplicationHandler for Application<T> {
                     instance: &window.instance,
                     device: &window.device,
                     queue: &window.queue,
-                    surface: &window.surface,
                     surface_format: &window.surface_format,
                     event_loop,
                     window: window.window.as_ref(),
@@ -456,7 +414,30 @@ impl<T: State> ApplicationHandler for Application<T> {
                 };
 
                 window.state.update(context, delta);
-                window.state.render(context, delta);
+
+                if window.window.is_visible().unwrap_or(true) {
+                    let (width, height): (u32, u32) = window.window.surface_size().into();
+
+                    match window.surface.get_current_texture() {
+                        wgpu::CurrentSurfaceTexture::Success(texture) => window.state.render(context, texture, delta),
+                        wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Timeout => (),
+                        wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
+                            drop(texture);
+
+                            window.configure_surface(width, height);
+                        }
+                        wgpu::CurrentSurfaceTexture::Outdated => {
+                            window.configure_surface(width, height);
+                        }
+                        wgpu::CurrentSurfaceTexture::Validation => {
+                            unreachable!("No error scope registered, so validation errors will panic")
+                        }
+                        wgpu::CurrentSurfaceTexture::Lost => {
+                            window.surface = window.instance.create_surface(window.window.clone()).unwrap();
+                            window.configure_surface(width, height);
+                        }
+                    }
+                }
 
                 let prev_vsync = window.vsync;
 
@@ -467,6 +448,8 @@ impl<T: State> ApplicationHandler for Application<T> {
 
                     window.configure_surface(width, height);
                 }
+
+                window.window.request_redraw();
             }),
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {}
@@ -479,9 +462,5 @@ impl<T: State> ApplicationHandler for Application<T> {
                 window.state.handle_mouse_motion(Some(Vector2D::new(delta.0 as f32, delta.1 as f32)), None);
             });
         }
-    }
-
-    fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
-        self.window.inspect_mut(|window| window.window.request_redraw());
     }
 }

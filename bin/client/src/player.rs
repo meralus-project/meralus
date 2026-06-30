@@ -182,7 +182,7 @@ impl Player {
 
     #[inline]
     pub fn camera_position(&self) -> Point3D {
-        self.body.position + Point3D::Y * (Self::PLAYER_HALF_SIZE.y as f32 - 0.15) + self.bob_offset + Self::CAMERA_OFFSET
+        self.body.position + Point3D::Y * (Self::PLAYER_HALF_SIZE.y as f32) + self.bob_offset + Self::CAMERA_OFFSET
     }
 
     #[inline]
@@ -194,13 +194,25 @@ impl Player {
         (self.yaw, self.pitch)
     }
 
+    pub fn handle_keyboard(&mut self, input: &Input) {
+        const DASH_SPEED: f32 = 30.0;
+        const DASH_DURATION: f32 = 0.2;
+
+        if input.keyboard.is_key_pressed_once(KeyCode::KeyE) && !self.body.is_on_ground {
+            let (front, _right, _) = get_rotation_directions(self.yaw, self.pitch);
+
+            self.body.velocity += front * DASH_SPEED;
+        }
+
+        if self.body.is_on_ground && input.keyboard.is_key_pressed(KeyCode::Space) {
+            self.body.velocity.y = 8.0;
+        }
+    }
+
     pub fn physics_step(&mut self, input: &Input, camera: &mut Camera, delta: f32) {
         const BOB_SPEED: f32 = 3.0;
-        const BOB_FREQ: f32 = 3.0;
-        const BOB_AMP: f32 = 0.15;
-
-        const DASH_SPEED: f32 = 30.0; // Скорость во время рывка
-        const DASH_DURATION: f32 = 0.2; // Сколько длится рывок (в секундах)
+        const BOB_FREQ: f32 = 2.0;
+        const BOB_AMP: f32 = 0.1;
 
         let was_dashing = self.dash_time > 0.0;
 
@@ -221,21 +233,19 @@ impl Player {
             self.bob_time = 0.0;
             self.bob_offset = self.bob_offset.lerp(Point3D::ZERO, (delta * 16.0).min(1.0));
         } else {
+            let mut amp = BOB_AMP;
+            let mut freq = BOB_FREQ;
+
+            if input.keyboard.is_key_pressed(KeyCode::ShiftLeft) {
+                amp *= 1.5;
+                freq *= 1.5;
+            }
+
             self.bob_time = BOB_SPEED.mul_add(delta, self.bob_time);
-            self.bob_offset = Point3D::new(
-                BOB_AMP * (self.bob_time * BOB_FREQ).sin(),
-                BOB_AMP * (self.bob_time * BOB_FREQ * 2.0).sin(),
-                0.0,
-            );
+            self.bob_offset = Point3D::new(amp * (self.bob_time * freq).sin(), amp * (self.bob_time * freq * 2.0).sin(), 0.0);
         }
 
         let direction = get_movement_direction(input);
-
-        if input.keyboard.is_key_pressed_once(KeyCode::KeyE) && !self.body.is_on_ground {
-            let (front, _right, _) = get_rotation_directions(self.yaw, self.pitch);
-
-            self.body.velocity += front * DASH_SPEED;
-        }
 
         let (front, right, _) = get_rotation_directions(self.yaw, 0.0);
 
@@ -259,10 +269,6 @@ impl Player {
         if self.body.is_on_ground {
             self.body.velocity.x = velocity.x;
             self.body.velocity.z = velocity.z;
-
-            if input.keyboard.is_key_pressed(KeyCode::Space) {
-                self.body.velocity.y = 8.0;
-            }
         } else {
             self.body.velocity.x = velocity.x.mul_add(delta, self.body.velocity.x);
             self.body.velocity.z = velocity.z.mul_add(delta, self.body.velocity.z);
