@@ -18,7 +18,6 @@ fn fog_spherical_distance(pos: vec3<f32>) -> f32 { return length(pos); }
 fn fog_cylindrical_distance(pos: vec3<f32>) -> f32 { return max(length(pos.xz), abs(pos.y)); }
 
 struct VoxelUniform {
-    camera_pos: vec3<f32>,
     sun_position: vec3<f32>
 }
 
@@ -27,7 +26,7 @@ var<uniform> voxel: VoxelUniform;
 
 struct VoxelImm {
     matrix: mat4x4<f32>,
-    chunk: vec3<i32>,
+    chunk_offset: vec3<f32>,
 }
 
 var<immediate> voxel_imm: VoxelImm;
@@ -305,7 +304,7 @@ fn vs_main(
     let light_intensity = min(max(block_light, sun_light), 1.0);
 
     let linear_color = vec4(COLOR_TO_LINEAR[in.color.r], COLOR_TO_LINEAR[in.color.g], COLOR_TO_LINEAR[in.color.b], COLOR_TO_LINEAR[in.color.a]);
-    let pos = vec3<f32>(voxel_imm.chunk) - voxel.camera_pos + in.position;
+    let pos = voxel_imm.chunk_offset + in.position;
 
     out.position = voxel_imm.matrix * vec4(pos, 1.0);
     out.spherical_dist = fog_spherical_distance(out.position.xyz);

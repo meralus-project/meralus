@@ -252,7 +252,6 @@ struct FogUniform {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 struct VoxelUniform {
-    camera_pos: Point3D,
     sun_position: Point3D,
     _pad: [u32; 2],
 }
@@ -261,7 +260,7 @@ struct VoxelUniform {
 #[repr(C)]
 struct VoxelImmediates {
     matrix: Transform3D,
-    chunk: IPoint3D,
+    chunk_offset: Point3D,
     _pad: u32,
 }
 
@@ -594,7 +593,6 @@ impl ChunkRenderer {
             fragment_bind_group,
             fog_bind_group,
             voxel: VoxelUniform {
-                camera_pos: Point3D::ZERO,
                 sun_position: Point3D::ZERO,
                 _pad: [0; 2],
             },
@@ -667,11 +665,6 @@ impl ChunkRenderer {
     }
 
     #[inline]
-    pub const fn set_camera_pos(&mut self, camera_pos: Point3D) {
-        self.voxel.camera_pos = camera_pos;
-    }
-
-    #[inline]
     pub const fn set_sun_position(&mut self, value: f32) {
         self.voxel.sun_position.y = value;
     }
@@ -716,7 +709,6 @@ impl ChunkRenderer {
         full_bright: bool,
     ) -> RenderInfo {
         self.set_sun_position(if full_bright { const { (1.0 - 0.5) / 0.96 } } else { self.sun_position });
-        self.set_camera_pos(Point3D::ZERO);
         self.update_uniforms(queue);
 
         // pass.apply_params(DrawParams {
@@ -740,7 +732,7 @@ impl ChunkRenderer {
         render_pass.set_immediates(
             0,
             bytemuck::bytes_of(&VoxelImmediates {
-                chunk: IPoint3D::ZERO,
+                chunk_offset: Point3D::ZERO,
                 matrix,
                 _pad: 0,
             }),
@@ -770,7 +762,6 @@ impl ChunkRenderer {
         matrix: Transform3D,
     ) -> RenderInfo {
         self.set_sun_position(self.sun_position);
-        self.set_camera_pos(camera_pos);
         self.update_uniforms(queue);
 
         let pos = camera_pos.as_ivec3();
@@ -801,7 +792,7 @@ impl ChunkRenderer {
         render_pass.set_immediates(
             0,
             bytemuck::bytes_of(&VoxelImmediates {
-                chunk: IPoint3D::ZERO,
+                chunk_offset: Point3D::ZERO,
                 matrix,
                 _pad: 0,
             }),
@@ -809,9 +800,12 @@ impl ChunkRenderer {
 
         for (&key, subchunk) in &self.subchunks {
             if Self::is_subchunk_visible(frustum, key) && subchunk.solid.count > 0 {
+                let chunk_origin = Point3D::new(key.0.x as f32 * SUBCHUNK_SIZE_F32, 0.0, key.0.y as f32 * SUBCHUNK_SIZE_F32);
+                let chunk_offset = chunk_origin - camera_pos;
+
                 render_pass.set_immediates(
                     64,
-                    bytemuck::bytes_of(&IPoint3D::new(key.0.x * SUBCHUNK_SIZE_I32, 0, key.0.y * SUBCHUNK_SIZE_I32).to_array()),
+                    bytemuck::bytes_of(&chunk_offset.to_array()),
                 );
 
                 render_pass.set_vertex_buffer(0, subchunk.solid.vertices.slice(..));
@@ -826,7 +820,7 @@ impl ChunkRenderer {
         render_pass.set_immediates(
             0,
             bytemuck::bytes_of(&VoxelImmediates {
-                chunk: IPoint3D::ZERO,
+                chunk_offset: Point3D::ZERO,
                 matrix,
                 _pad: 0,
             }),
@@ -834,9 +828,12 @@ impl ChunkRenderer {
 
         for (&key, subchunk) in self.subchunks.iter_mut().rev() {
             if Self::is_subchunk_visible(frustum, key) && subchunk.translucent.buffer.count > 0 {
+                let chunk_origin = Point3D::new(key.0.x as f32 * SUBCHUNK_SIZE_F32, 0.0, key.0.y as f32 * SUBCHUNK_SIZE_F32);
+                let chunk_offset = chunk_origin - camera_pos;
+
                 render_pass.set_immediates(
                     64,
-                    bytemuck::bytes_of(&IPoint3D::new(key.0.x * SUBCHUNK_SIZE_I32, 0, key.0.y * SUBCHUNK_SIZE_I32).to_array()),
+                    bytemuck::bytes_of(&chunk_offset.to_array()),
                 );
 
                 subchunk.translucent.update(queue, camera_pos, key.0);

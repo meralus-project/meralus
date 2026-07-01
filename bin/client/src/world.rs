@@ -1016,7 +1016,7 @@ impl World {
 
         let rendered_subchunks = self
             .chunk_renderer
-            .render(context.queue, pass, self.camera.position, &self.camera.frustum, self.camera.world_matrix());
+            .render(context.queue, pass, self.camera.position, &self.camera.frustum, self.camera.matrix());
 
         let mut builder = VoxelMeshBuilder::with_capacity(self.entities.len());
 
