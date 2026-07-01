@@ -11,7 +11,7 @@ bson = "2.15.0"
 futures = { version = "0.3.32", features = ["std"] }
 uuid = { version = "1.21.0", features = ["v4"] }
 serde.workspace = true
-mavelin-shared = { workspace = true, features = ["geometry"] }
+glam.workspace = true
 
 [lints]
 workspace = true

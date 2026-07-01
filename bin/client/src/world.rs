@@ -11,9 +11,7 @@ use mavelin_engine::{MouseButton, WindowContext};
 #[cfg(feature = "multiplayer")]
 use mavelin_network::{IncomingPacket, OutgoingPacket, Uuid};
 use mavelin_physics::{Aabb, PhysicsBody, PhysicsContext};
-use mavelin_shared::{
-    Color, Face, IPoint2D, IPoint3D, Point2D, Point3D, Ranged, Rect, Size2D, Size3D, Transform3D, USize2D, USizePoint2D, USizePoint3D, Vector2D, Vector3D,
-};
+use mavelin_shared::{Color, Face, Ranged, Rect};
 use mavelin_tween::{Animation, RepeatMode, Tween};
 use mavelin_world::{
     BfsLight, Biome, BlockSource, CHUNK_HEIGHT, Chunk, ChunkAccess, ChunkCache, ChunkManager, ChunkStage, LightNode, LocalChunkManager, SUBCHUNK_COUNT,
@@ -41,7 +39,7 @@ pub const GRASS_COLOR: Color = Color::from_hsl(120.0, 0.525, 0.525);
 #[non_exhaustive]
 pub enum EntityData {
     Item { item: Item, transition: Tween<f32> },
-    Model { id: usize, rotations: Vec<(Vector3D, Vector3D)> },
+    Model { id: usize, rotations: Vec<(glam::Vec3, glam::Vec3)> },
 }
 
 pub struct Entity {
@@ -50,9 +48,9 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub fn item(position: Point3D, item: Item) -> Self {
+    pub fn item(position: glam::Vec3, item: Item) -> Self {
         Self {
-            body: PhysicsBody::new(position, Size3D::new(0.3, 0.3, 0.3)),
+            body: PhysicsBody::new(position, glam::Vec3::new(0.3, 0.3, 0.3)),
             data: EntityData::Item {
                 item,
                 transition: Tween::new(0.0, 1.0, 2000).with_repeat_mode(RepeatMode::Infinite),
@@ -60,27 +58,27 @@ impl Entity {
         }
     }
 
-    pub fn model(position: Point3D, id: usize, resource_storage: &ResourceStorage) -> Self {
+    pub fn model(position: glam::Vec3, id: usize, resource_storage: &ResourceStorage) -> Self {
         Self {
             body: PhysicsBody::new(position, resource_storage.entity_models.get_aabb(id as u8).unwrap().size().as_vec3()),
             data: EntityData::Model { id, rotations: Vec::new() },
         }
     }
 
-    pub fn set_rotation(&mut self, i: usize, vector: Vector3D) {
+    pub fn set_rotation(&mut self, i: usize, vector: glam::Vec3) {
         if let EntityData::Model { rotations, .. } = &mut self.data {
             if rotations.len() <= i {
-                rotations.resize(i + 1, (Vector3D::ZERO, Vector3D::ZERO));
+                rotations.resize(i + 1, (glam::Vec3::ZERO, glam::Vec3::ZERO));
             }
 
             rotations[i].0 = vector;
         }
     }
 
-    pub fn set_translation(&mut self, i: usize, vector: Vector3D) {
+    pub fn set_translation(&mut self, i: usize, vector: glam::Vec3) {
         if let EntityData::Model { rotations, .. } = &mut self.data {
             if rotations.len() <= i {
-                rotations.resize(i + 1, (Vector3D::ZERO, Vector3D::ZERO));
+                rotations.resize(i + 1, (glam::Vec3::ZERO, glam::Vec3::ZERO));
             }
 
             rotations[i].1 = vector;
@@ -94,9 +92,9 @@ impl Entity {
                 let model = resource_storage.models.get_unchecked(resource_storage.blocks.get_model_by_name(item.id));
                 let mut current_block = self.body.position.floor().as_ivec3();
                 let light = chunk_manager.get_light_level(current_block);
-                let matrix = Transform3D::from_rotation_y(animation_value * const { 360f32.to_radians() });
+                let matrix = glam::Mat4::from_rotation_y(animation_value * const { 360f32.to_radians() });
                 let animation_value = if animation_value > 0.5 { 1.0 - animation_value } else { animation_value };
-                let position_offset = Point3D::new(0.0, const { Point3D::new(0.3, 0.3, 0.3).y / 2.0 }, 0.0);
+                let position_offset = glam::Vec3::new(0.0, const { glam::Vec3::new(0.3, 0.3, 0.3).y / 2.0 }, 0.0);
                 let block_below = loop {
                     if chunk_manager.get_block(current_block).is_some_and(|b| !b.is_air()) {
                         break Some(current_block);
@@ -112,16 +110,16 @@ impl Entity {
                         if model_face.face_data.face == Face::Top
                             && let Some(block_below) = block_below
                         {
-                            let size = Point3D::new(0.3 * 1.5, 0.3 * 1.0, 0.3 * 1.5);
+                            let size = glam::Vec3::new(0.3 * 1.5, 0.3 * 1.0, 0.3 * 1.5);
                             let origin = size / 2.0;
 
                             builder.push_transformed(
                                 &VoxelFace {
-                                    position: block_below.as_vec3() + (Point3D::new(0.5, 0.0, 0.5) - size.with_y(0.0) / 2.0) + (Point3D::Y * 1.05),
+                                    position: block_below.as_vec3() + (glam::Vec3::new(0.5, 0.0, 0.5) - size.with_y(0.0) / 2.0) + (glam::Vec3::Y * 1.05),
                                     vertices: model_face
                                         .face_data
                                         .vertices
-                                        .map(|vertex| Point3D::new(vertex.x * size.x, 0.0, vertex.z * size.z)),
+                                        .map(|vertex| glam::Vec3::new(vertex.x * size.x, 0.0, vertex.z * size.z)),
                                     lights: [light; 4],
                                     uvs: model_face.face_data.uvs,
                                     color: Color::BLACK,
@@ -131,7 +129,7 @@ impl Entity {
                             );
                         }
 
-                        let origin = Point3D::new(0.3, 0.3, 0.3) / 2.0;
+                        let origin = glam::Vec3::new(0.3, 0.3, 0.3) / 2.0;
 
                         builder.push_transformed(
                             &VoxelFace {
@@ -139,7 +137,7 @@ impl Entity {
                                 vertices: model_face
                                     .face_data
                                     .vertices
-                                    .map(|vertex| Point3D::new(vertex.x * 0.3, vertex.y * 0.3, vertex.z * 0.3)),
+                                    .map(|vertex| glam::Vec3::new(vertex.x * 0.3, vertex.y * 0.3, vertex.z * 0.3)),
                                 lights: [light; 4],
                                 uvs: model_face.face_data.uvs,
                                 color: if model_face.tint { GRASS_COLOR } else { Color::WHITE },
@@ -157,11 +155,11 @@ impl Entity {
                 for (i, element) in model.elements.iter().enumerate() {
                     for face_data in element.faces.as_ref() {
                         let vertices = rotations.get(i).map_or(face_data.vertices, |rotation| {
-                            let mut matrix = Transform3D::IDENTITY;
+                            let mut matrix = glam::Mat4::IDENTITY;
 
-                            matrix *= Transform3D::from_rotation_x(rotation.0.x);
-                            matrix *= Transform3D::from_rotation_y(rotation.0.y);
-                            matrix *= Transform3D::from_rotation_z(rotation.0.z);
+                            matrix *= glam::Mat4::from_rotation_x(rotation.0.x);
+                            matrix *= glam::Mat4::from_rotation_y(rotation.0.y);
+                            matrix *= glam::Mat4::from_rotation_z(rotation.0.z);
 
                             face_data.vertices.map(|v| matrix.transform_point3(v - element.pivot) + element.pivot)
                         });
@@ -218,11 +216,11 @@ impl EntityManager {
         id
     }
 
-    pub fn spawn_item(&mut self, position: Point3D, item: Item) -> usize {
+    pub fn spawn_item(&mut self, position: glam::Vec3, item: Item) -> usize {
         self.spawn(Entity::item(position, item))
     }
 
-    pub fn spawn_model(&mut self, position: Point3D, model_id: usize) -> usize {
+    pub fn spawn_model(&mut self, position: glam::Vec3, model_id: usize) -> usize {
         self.spawn(Entity::model(position, model_id, self.resource_storage.as_ref()))
     }
 
@@ -278,7 +276,7 @@ impl ChunkCache for ChunkFileCache {
         std::iter::empty()
     }
 
-    fn get(&self, origin: IPoint2D) -> Option<Chunk> {
+    fn get(&self, origin: glam::IVec2) -> Option<Chunk> {
         let _path = self.root.join(format!("{}x{}.cdt", origin.x, origin.y));
 
         // if path.is_file() {
@@ -290,7 +288,7 @@ impl ChunkCache for ChunkFileCache {
         // }
     }
 
-    fn insert(&mut self, _origin: IPoint2D, _chunk: &Chunk) {
+    fn insert(&mut self, _origin: glam::IVec2, _chunk: &Chunk) {
         // let path = self.root.join(format!("{}x{}.cdt", origin.x, origin.y));
         // let data = chunk.serialize();
 
@@ -322,7 +320,7 @@ enum JobResult {
         neighbours: [Arc<Chunk>; 8],
     },
     Meshing {
-        origin: IPoint2D,
+        origin: glam::IVec2,
         mesh: Box<[[Vec<VoxelFace>; 2]]>,
     },
 }
@@ -330,7 +328,7 @@ enum JobResult {
 pub struct JobManager {
     sender: crossbeam_channel::Sender<JobResult>,
     receiver: crossbeam_channel::Receiver<JobResult>,
-    jobs: HashSet<IPoint2D>,
+    jobs: HashSet<glam::IVec2>,
 }
 
 impl JobManager {
@@ -344,7 +342,7 @@ impl JobManager {
         }
     }
 
-    fn spawn_generation_job(&self, seed: u32, origin: IPoint2D, resource_storage: Arc<ResourceStorage>) {
+    fn spawn_generation_job(&self, seed: u32, origin: glam::IVec2, resource_storage: Arc<ResourceStorage>) {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
@@ -360,7 +358,7 @@ impl JobManager {
         });
     }
 
-    fn spawn_population_job(&self, origin: IPoint2D, seed: u32, mut chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>) {
+    fn spawn_population_job(&self, origin: glam::IVec2, seed: u32, mut chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>) {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
@@ -377,7 +375,7 @@ impl JobManager {
         });
     }
 
-    fn spawn_lighting_job(&self, origin: IPoint2D, mut chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>) {
+    fn spawn_lighting_job(&self, origin: glam::IVec2, mut chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>) {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
@@ -385,15 +383,15 @@ impl JobManager {
             let mut bfs_light = BfsLight::new(&mut chunk_manager);
 
             for offset in [
-                IPoint2D::NEG_ONE,
-                IPoint2D::NEG_ONE.with_y(1),
-                IPoint2D::NEG_X,
-                IPoint2D::NEG_Y,
-                IPoint2D::ZERO,
-                IPoint2D::X,
-                IPoint2D::Y,
-                IPoint2D::ONE.with_y(-1),
-                IPoint2D::ONE,
+                glam::IVec2::NEG_ONE,
+                glam::IVec2::NEG_ONE.with_y(1),
+                glam::IVec2::NEG_X,
+                glam::IVec2::NEG_Y,
+                glam::IVec2::ZERO,
+                glam::IVec2::X,
+                glam::IVec2::Y,
+                glam::IVec2::ONE.with_y(-1),
+                glam::IVec2::ONE,
             ] {
                 let origin = origin + offset;
 
@@ -401,11 +399,11 @@ impl JobManager {
                     for z in 0..SUBCHUNK_SIZE {
                         for x in 0..SUBCHUNK_SIZE {
                             for y in (0..CHUNK_HEIGHT).rev() {
-                                let pos = USizePoint3D::new(x, y, z);
+                                let pos = glam::USizeVec3::new(x, y, z);
 
                                 chunk.set_sky_light(pos, 15);
 
-                                if pos.y > 0 && chunk.get_block(pos - USizePoint3D::Y).is_some_and(|b| !b.is_air()) {
+                                if pos.y > 0 && chunk.get_block(pos - glam::USizeVec3::Y).is_some_and(|b| !b.is_air()) {
                                     bfs_light.sky_addition_queue.push_back((LightNode(pos, origin), 15));
 
                                     break;
@@ -426,7 +424,7 @@ impl JobManager {
         });
     }
 
-    fn spawn_meshing_job(&self, origin: IPoint2D, chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>, settings: GraphicsSettings) {
+    fn spawn_meshing_job(&self, origin: glam::IVec2, chunk_manager: LocalChunkManager, resource_storage: Arc<ResourceStorage>, settings: GraphicsSettings) {
         let sender = self.sender.clone();
 
         rayon::spawn(move || {
@@ -484,7 +482,7 @@ pub struct World {
     pub entities: EntityManager,
 
     pub seed: u32,
-    pub marked: Option<IPoint3D>,
+    pub marked: Option<glam::IVec3>,
 
     pub colors: WorldColors,
 }
@@ -500,7 +498,7 @@ impl World {
     ) -> Self {
         let mut player = Player::default();
 
-        player.body.position = Point3D::new(2.0, 135.0, 2.0);
+        player.body.position = glam::Vec3::new(2.0, 135.0, 2.0);
 
         let sky = resource_storage.color_config.base_sky_color;
         let fog = resource_storage.color_config.base_fog_color.unwrap_or(sky);
@@ -537,7 +535,7 @@ impl World {
         self.chat_history.push(message.into());
     }
 
-    fn destroy_block2(&mut self, position: IPoint3D) {
+    fn destroy_block2(&mut self, position: glam::IVec3) {
         let local = self.chunk_manager.to_chunk_local(position);
 
         if let Some(local) = local {
@@ -552,7 +550,7 @@ impl World {
         }
     }
 
-    pub fn destroy_block_local(&mut self, origin: IPoint2D, local: USizePoint3D) {
+    pub fn destroy_block_local(&mut self, origin: glam::IVec2, local: glam::USizeVec3) {
         let position = Chunk::to_world_pos(origin, local);
 
         if let Some(state) = self.chunk_manager.get_block(position)
@@ -560,7 +558,7 @@ impl World {
             && let Some(block) = self.resource_storage.blocks.get(state.id)
         {
             if block.droppable() {
-                self.entities.spawn_item(position.as_vec3() + Point3D::new(0.35, 0.0, 0.35), Item {
+                self.entities.spawn_item(position.as_vec3() + glam::Vec3::new(0.35, 0.0, 0.35), Item {
                     id: state.id,
                     ty: ItemType::Block,
                     amount: 1,
@@ -587,7 +585,7 @@ impl World {
         }
     }
 
-    pub fn place(&mut self, position: IPoint3D, id: u32) {
+    pub fn place(&mut self, position: glam::IVec3, id: u32) {
         let chunk = ChunkManager::<()>::to_local(position);
 
         info!("placing block in {chunk}");
@@ -614,7 +612,12 @@ impl World {
                 }
             }
 
-            for normal in [IPoint3D::NEG_ONE, IPoint3D::NEG_ONE.with_x(1), IPoint3D::ONE.with_x(-1), IPoint3D::ONE] {
+            for normal in [
+                glam::IVec3::NEG_ONE,
+                glam::IVec3::NEG_ONE.with_x(1),
+                glam::IVec3::ONE.with_x(-1),
+                glam::IVec3::ONE,
+            ] {
                 let chunk_position = ChunkManager::<()>::to_local(position + normal);
 
                 if chunk_position != chunk
@@ -753,7 +756,7 @@ impl World {
                 Ok(OutgoingPacket::UuidAssigned { uuid }) => {
                     for x in -2..2 {
                         for z in -2..2 {
-                            sender.send(IncomingPacket::RequestChunk(IPoint2D::new(x, z))).unwrap();
+                            sender.send(IncomingPacket::RequestChunk(glam::IVec2::new(x, z))).unwrap();
                         }
                     }
 
@@ -852,7 +855,7 @@ impl World {
         }
 
         thread_local! {
-            static STAGE_QUEUE: RefCell<Vec<(IPoint2D, ChunkStage)>> = const { RefCell::new(Vec::new()) };
+            static STAGE_QUEUE: RefCell<Vec<(glam::IVec2, ChunkStage)>> = const { RefCell::new(Vec::new()) };
         }
 
         let player_origin = ChunkManager::<()>::to_local(self.player.body.position.as_ivec3());
@@ -964,7 +967,7 @@ impl World {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         common_renderer: &mut CommonRenderer,
-        surface_size: USize2D,
+        surface_size: glam::UVec2,
         settings: &Settings,
         info: RenderInfo,
         delta: Duration,
@@ -976,10 +979,8 @@ impl World {
         self.chunk_renderer
             .set_sun_position(if progress > 0.5 { 1.0 - progress } else { progress } * 2.0);
 
-        // pass.clear_color_and_depth(Color::BLACK.to_linear_rgba(), 1.0);
-
-        let sky_color = *self.colors.sky.get() /* get_sky_color(self.clock.get_visual_progress(), 0.0) */;
-        let fog_color = *self.colors.fog.get() /* get_sky_color(self.clock.get_visual_progress(), 0.0) */;
+        let sky_color = self.colors.sky.get_copy();
+        let fog_color = self.colors.fog.get_copy();
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Main Menu Pass"),
@@ -1012,11 +1013,11 @@ impl World {
 
         let pass = &mut pass;
 
-        self.chunk_renderer.set_fog_color(fog_color);
+        self.chunk_renderer.set_fog_color(context.queue, fog_color);
 
         let rendered_subchunks = self
             .chunk_renderer
-            .render(context.queue, pass, self.camera.position, &self.camera.frustum, self.camera.world_matrix());
+            .render(context.queue, pass, self.camera.position, &self.camera.frustum, self.camera.matrix());
 
         let mut builder = VoxelMeshBuilder::with_capacity(self.entities.len());
 
@@ -1024,7 +1025,7 @@ impl World {
             entity.render_to(&mut builder, &self.chunk_manager, self.resource_storage.as_ref());
         }
 
-        builder.render(context, pass, &mut self.chunk_renderer, self.camera.world_matrix());
+        builder.render(context, pass, &mut self.chunk_renderer, self.camera.position, self.camera.world_matrix());
 
         // self.kawase.apply(backend, &self.scene).unwrap();
 
@@ -1032,7 +1033,7 @@ impl World {
         // self.particles.render(&mut frame, self.camera.matrix()).unwrap();
 
         if self.is_underwater(self.player.camera_position()) {
-            common_renderer.draw_rect(Point2D::ZERO, surface_size.as_vec2(), Color::from_hsl(215.0, 1.0, 0.6).with_alpha(0.5));
+            common_renderer.draw_rect(glam::Vec2::ZERO, surface_size.as_vec2(), Color::from_hsl(215.0, 1.0, 0.6).with_alpha(0.5));
         }
 
         self.render_hotbar(context, common_renderer, surface_size);
@@ -1046,7 +1047,7 @@ impl World {
         } else {
             common_renderer.draw_text(
                 context.queue,
-                Point2D::new(8.0, 4.0),
+                glam::Vec2::new(8.0, 4.0),
                 "default",
                 "Press F3 to view debug information.",
                 Color::WHITE,
@@ -1059,15 +1060,15 @@ impl World {
 
         let mut builder = VoxelMeshBuilder::with_capacity(self.player.inventory.get_hotbar_items().count());
 
-        let matrix = Transform3D::from_rotation_x(const { 200f32.to_radians() })
-            * Transform3D::from_rotation_y(const { 35f32.to_radians() })
-            * Transform3D::from_rotation_z(0.0);
+        let matrix = glam::Mat4::from_rotation_x(const { 200f32.to_radians() })
+            * glam::Mat4::from_rotation_y(const { 35f32.to_radians() })
+            * glam::Mat4::from_rotation_z(0.0);
 
         for (i, item) in self.player.inventory.get_hotbar_items() {
             const INVENTORY_HOTBAR_SLOTS: u8 = 8;
             const SLOT_SIZE: f32 = 48f32;
             const SIZE: f32 = SLOT_SIZE * 0.6;
-            const ORIGIN: Point3D = Point3D::new(SIZE / 2.0, SIZE / 2.0, SIZE / 2.0);
+            const ORIGIN: glam::Vec3 = glam::Vec3::new(SIZE / 2.0, SIZE / 2.0, SIZE / 2.0);
             const HOTBAR_WIDTH: f32 = (INVENTORY_HOTBAR_SLOTS + 1) as f32 * SLOT_SIZE;
 
             let model = self
@@ -1076,12 +1077,12 @@ impl World {
                 .get_unchecked(self.resource_storage.blocks.get_model_by_name(item.id));
 
             let size = surface_size.as_vec2();
-            let origin = Point2D::new(
+            let origin = glam::Vec2::new(
                 (size.x / 2.0) - (HOTBAR_WIDTH / 2.0) + ((SLOT_SIZE - SIZE) / 2.0),
                 size.y - SLOT_SIZE - 8.0 + ((SLOT_SIZE - SIZE) / 2.0),
             );
 
-            let slot_offset = (origin + Point2D::new(i as f32 * SLOT_SIZE, 0.0)).extend(20.0);
+            let slot_offset = (origin + glam::Vec2::new(i as f32 * SLOT_SIZE, 0.0)).extend(20.0);
 
             for element in &model.elements {
                 for model_face in &element.faces {
@@ -1100,26 +1101,26 @@ impl World {
             }
         }
 
-        builder.render_full_bright(context, pass, &mut self.chunk_renderer, common_renderer.window_matrix());
+        builder.render_full_bright(context, pass, &mut self.chunk_renderer, self.camera.position, common_renderer.window_matrix());
     }
 
     #[inline]
-    fn is_underwater(&self, position: Point3D) -> bool {
+    fn is_underwater(&self, position: glam::Vec3) -> bool {
         self.chunk_manager
             .get_block(position.floor().as_ivec3())
             .is_some_and(|block| block.id == self.resource_storage.get_block_id("game:water"))
     }
 
-    fn render_chunk_map(&self, queue: &wgpu::Queue, context: &mut CommonRenderer, surface_size: USize2D) {
-        const CHUNK_UI_CONTAINER_SIZE: Size2D = Size2D::new(128.0, 128.0);
+    fn render_chunk_map(&self, queue: &wgpu::Queue, context: &mut CommonRenderer, surface_size: glam::UVec2) {
+        const CHUNK_UI_CONTAINER_SIZE: glam::Vec2 = glam::Vec2::new(128.0, 128.0);
         const CHUNK_UI_COUNT: usize = 16;
         const SPACING: f32 = 1.0;
-        const CHUNK_UI_SIZE: Size2D = Size2D::new(
+        const CHUNK_UI_SIZE: glam::Vec2 = glam::Vec2::new(
             (CHUNK_UI_CONTAINER_SIZE.x - SPACING * (CHUNK_UI_COUNT - 1) as f32) / CHUNK_UI_COUNT as f32,
             (CHUNK_UI_CONTAINER_SIZE.y - SPACING * (CHUNK_UI_COUNT - 1) as f32) / CHUNK_UI_COUNT as f32,
         );
 
-        let container_origin = Point2D::new(surface_size.as_vec2().x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0);
+        let container_origin = glam::Vec2::new(surface_size.as_vec2().x - CHUNK_UI_CONTAINER_SIZE.x - 12.0, 12.0);
         let bounds = Rect::new(container_origin, CHUNK_UI_CONTAINER_SIZE);
 
         context.draw_rect(bounds.origin, bounds.size, Color::BLACK);
@@ -1132,7 +1133,7 @@ impl World {
 
             for z in 0..CHUNK_UI_COUNT as i32 {
                 let z = z - (CHUNK_UI_COUNT / 2) as i32;
-                let xz = IPoint2D::new(x, z);
+                let xz = glam::IVec2::new(x, z);
                 let chunk = player_chunk + xz;
 
                 if let Some(stage) = self.chunk_manager.stages.get(&chunk) {
@@ -1153,7 +1154,11 @@ impl World {
             }
         }
 
-        context.draw_rect(container_origin + bounds.size / 2.0 - Vector2D::splat(1.0), Size2D::splat(2.0), Color::RED);
+        context.draw_rect(
+            container_origin + bounds.size / 2.0 - glam::Vec2::splat(1.0),
+            glam::Vec2::splat(2.0),
+            Color::RED,
+        );
 
         let text = context
             .measure(
@@ -1166,12 +1171,12 @@ impl World {
                 None,
             )
             .unwrap_or_default();
-        let new_container_origin = container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + Point2D::new(0.0, 2.0);
+        let new_container_origin = container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + glam::Vec2::new(0.0, 2.0);
 
-        context.draw_rect(new_container_origin, Size2D::new(text.x + 8.0, 20.0), Color::from_u32_rgb(0x1D211B));
+        context.draw_rect(new_container_origin, glam::Vec2::new(text.x + 8.0, 20.0), Color::from_u32_rgb(0x1D211B));
         context.draw_text(
             queue,
-            new_container_origin + Point2D::splat(4.0),
+            new_container_origin + glam::Vec2::splat(4.0),
             "default",
             format!(
                 "{} {} {}",
@@ -1190,12 +1195,12 @@ impl World {
                 None,
             )
             .unwrap_or_default();
-        let new_container_origin = container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + Point2D::new(0.0, 24.0);
+        let new_container_origin = container_origin + CHUNK_UI_CONTAINER_SIZE.with_x((CHUNK_UI_CONTAINER_SIZE.x - text.x) / 2.0) + glam::Vec2::new(0.0, 24.0);
 
-        context.draw_rect(new_container_origin, Size2D::new(text.x + 8.0, 20.0), Color::from_u32_rgb(0x1D211B));
+        context.draw_rect(new_container_origin, glam::Vec2::new(text.x + 8.0, 20.0), Color::from_u32_rgb(0x1D211B));
         context.draw_text(
             queue,
-            new_container_origin + Point2D::splat(4.0),
+            new_container_origin + glam::Vec2::splat(4.0),
             "default",
             format!("{:?}", self.chunk_manager.get_biome(self.player.body.position.as_ivec3())),
             Color::from_hsl(110.0, 0.5, 0.8),
@@ -1210,7 +1215,7 @@ impl World {
         backend: &WindowContext,
         GraphicsSettings { render_shape, vsync, .. }: GraphicsSettings,
         rendered_subchunks: usize,
-        USize2D { x, y }: USize2D,
+        glam::UVec2 { x, y }: glam::UVec2,
     ) {
         let (hours, minutes) = {
             let time = self.clock.time().as_secs();
@@ -1280,40 +1285,40 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
 
         // let text_size = context.measure("default", &text, 18.0,
         // None).unwrap_or_default(); let text_bounds =
-        // Rect::new(Point2D::new(12.0, 12.0), Size2D::new((522.0 +
+        // Rect::new(glam::Vec2::new(12.0, 12.0), glam::Vec2::new((522.0 +
         // 4.0) * overlay_width, text_size.y + 4.0));
 
-        context.draw_text(backend.queue, Point2D::new(8.0, 4.0), "default", text, Color::WHITE, 18.0, None);
+        context.draw_text(backend.queue, glam::Vec2::new(8.0, 4.0), "default", text, Color::WHITE, 18.0, None);
     }
 
-    fn render_hotbar(&self, backend: &WindowContext, context: &mut CommonRenderer, surface_size: USize2D) {
+    fn render_hotbar(&self, backend: &WindowContext, context: &mut CommonRenderer, surface_size: glam::UVec2) {
         const INVENTORY_HOTBAR_SLOTS: u8 = 8;
         const SLOT_SIZE: f32 = 48f32;
 
         let bounds = Rect {
-            origin: Point2D::ZERO,
+            origin: glam::Vec2::ZERO,
             size: surface_size.as_vec2(),
         };
 
         let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS + 1) * SLOT_SIZE;
-        let origin = Point2D::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
+        let origin = glam::Vec2::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
         let offset = f32::from(self.inventory_slot.value) * SLOT_SIZE;
 
-        context.draw_rect(origin, Size2D::new(hotbar_width, SLOT_SIZE), Color::from_u32_rgb(0x1D211B));
+        context.draw_rect(origin, glam::Vec2::new(hotbar_width, SLOT_SIZE), Color::from_u32_rgb(0x1D211B));
         context.draw_rect(
-            origin + Point2D::new(offset, 0.0),
-            Size2D::new(SLOT_SIZE, SLOT_SIZE),
+            origin + glam::Vec2::new(offset, 0.0),
+            glam::Vec2::new(SLOT_SIZE, SLOT_SIZE),
             Color::from_hsl(110.0, 0.5, 0.8),
         );
 
         context.draw_rect(
-            origin + Point2D::new(2.0, 2.0) + Point2D::new(offset, 0.0),
-            Size2D::new(SLOT_SIZE - 4.0, SLOT_SIZE - 4.0),
+            origin + glam::Vec2::new(2.0, 2.0) + glam::Vec2::new(offset, 0.0),
+            glam::Vec2::new(SLOT_SIZE - 4.0, SLOT_SIZE - 4.0),
             Color::from_u32_rgb(0x1D211B),
         );
 
         let hotbar_width = f32::from(INVENTORY_HOTBAR_SLOTS + 1) * SLOT_SIZE;
-        let origin = Point2D::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
+        let origin = glam::Vec2::new((bounds.size.x / 2.0) - (hotbar_width / 2.0), bounds.size.y - SLOT_SIZE - 8.0);
 
         for (column, item) in self.player.inventory.get_hotbar_items() {
             let offset = (column + 1) as f32 * SLOT_SIZE;
@@ -1323,7 +1328,7 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
 
             context.draw_text(
                 backend.queue,
-                origin.with_y(bounds.size.y - 10.0 - 21.0) + Point2D::new(offset - 3.0 - text_size.x, 0.0),
+                origin.with_y(bounds.size.y - 10.0 - 21.0) + glam::Vec2::new(offset - 3.0 - text_size.x, 0.0),
                 "default",
                 text,
                 Color::from_hsl(110.0, 0.5, 0.8),
@@ -1333,25 +1338,25 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
         }
     }
 
-    fn render_draw_calls_stat(queue: &wgpu::Queue, context: &mut CommonRenderer, debugging: &Debugging, info: RenderInfo, surface_size: USize2D) {
+    fn render_draw_calls_stat(queue: &wgpu::Queue, context: &mut CommonRenderer, debugging: &Debugging, info: RenderInfo, surface_size: glam::UVec2) {
         const SPACING: f32 = 1.0;
-        const SIZE: Size2D = Size2D::new(100.0 * (2.0 + SPACING), 96.0);
-        const CONTAINER_SIZE: Size2D = Size2D::new(SIZE.x - SPACING, SIZE.y);
+        const SIZE: glam::Vec2 = glam::Vec2::new(100.0 * (2.0 + SPACING), 96.0);
+        const CONTAINER_SIZE: glam::Vec2 = glam::Vec2::new(SIZE.x - SPACING, SIZE.y);
         const ELEMENT_WIDTH: f32 = (SIZE.x - 100.0 * SPACING) / 100.0;
 
         let bounds = Rect {
-            origin: Point2D::ZERO,
+            origin: glam::Vec2::ZERO,
             size: surface_size.as_vec2(),
         };
 
-        let container_origin = bounds.origin + bounds.size - CONTAINER_SIZE - Point2D::splat(4.0);
+        let container_origin = bounds.origin + bounds.size - CONTAINER_SIZE - glam::Vec2::splat(4.0);
 
         context.draw_rect(container_origin, CONTAINER_SIZE, Color::from_u32_rgb(0x1D211B));
 
         let mut x = 0.0;
 
         for &stat in &debugging.draw_calls_stat {
-            let size = Size2D::new(ELEMENT_WIDTH, CONTAINER_SIZE.y * (stat as f32 / debugging.draw_calls_max as f32));
+            let size = glam::Vec2::new(ELEMENT_WIDTH, CONTAINER_SIZE.y * (stat as f32 / debugging.draw_calls_max as f32));
 
             context.draw_rect(
                 container_origin + CONTAINER_SIZE.with_x(0.0) - size.with_x(-x),
@@ -1366,10 +1371,10 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
             .measure("default", format!("draw calls: {}\nvertices: {}", info.draw_calls, info.vertices), 9.0, None)
             .unwrap_or_default();
 
-        context.draw_rect(container_origin + Point2D::splat(4.0), text, Color::from_u32_rgb(0x1D211B));
+        context.draw_rect(container_origin + glam::Vec2::splat(4.0), text, Color::from_u32_rgb(0x1D211B));
         context.draw_text(
             queue,
-            container_origin + Point2D::splat(4.0),
+            container_origin + glam::Vec2::splat(4.0),
             "default",
             format!("draw calls: {}\nvertices: {}", info.draw_calls, info.vertices),
             Color::from_hsl(110.0, 0.5, 0.8),
@@ -1378,19 +1383,19 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
         );
     }
 
-    fn render_fps_stat(queue: &wgpu::Queue, context: &mut CommonRenderer, debugging: &Debugging, delta: Duration, surface_size: USize2D) {
+    fn render_fps_stat(queue: &wgpu::Queue, context: &mut CommonRenderer, debugging: &Debugging, delta: Duration, surface_size: glam::UVec2) {
         const SPACING: f32 = 1.0;
-        const SIZE: Size2D = Size2D::new(100.0 * (2.0 + SPACING), 96.0);
-        const CONTAINER_SIZE: Size2D = Size2D::new(SIZE.x - SPACING, SIZE.y);
+        const SIZE: glam::Vec2 = glam::Vec2::new(100.0 * (2.0 + SPACING), 96.0);
+        const CONTAINER_SIZE: glam::Vec2 = glam::Vec2::new(SIZE.x - SPACING, SIZE.y);
         const ELEMENT_WIDTH: f32 = (SIZE.x - 100.0 * SPACING) / 100.0;
 
         let bounds = Rect {
-            origin: Point2D::ZERO,
+            origin: glam::Vec2::ZERO,
             size: surface_size.as_vec2(),
         };
 
         context.draw_rect(
-            bounds.origin + bounds.size.with_x(4.0) - CONTAINER_SIZE.with_x(0.0) - Point2D::new(0.0, 4.0),
+            bounds.origin + bounds.size.with_x(4.0) - CONTAINER_SIZE.with_x(0.0) - glam::Vec2::new(0.0, 4.0),
             CONTAINER_SIZE,
             Color::from_u32_rgb(0x1D211B),
         );
@@ -1398,10 +1403,10 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
         let mut x = 0.0;
 
         for stat in &debugging.fps_stat {
-            let size = Size2D::new(ELEMENT_WIDTH, CONTAINER_SIZE.y * (stat.as_secs_f32() / debugging.fps_max.as_secs_f32()));
+            let size = glam::Vec2::new(ELEMENT_WIDTH, CONTAINER_SIZE.y * (stat.as_secs_f32() / debugging.fps_max.as_secs_f32()));
 
             context.draw_rect(
-                bounds.origin + bounds.size.with_x(4.0 + x) - size.with_x(0.0) - Point2D::new(0.0, 4.0),
+                bounds.origin + bounds.size.with_x(4.0 + x) - size.with_x(0.0) - glam::Vec2::new(0.0, 4.0),
                 size,
                 Color::from_hsl(110.0, 0.4, 0.7),
             );
@@ -1419,14 +1424,14 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
             .unwrap_or_default();
 
         context.draw_rect(
-            bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - Point2D::new(0.0, 4.0),
+            bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - glam::Vec2::new(0.0, 4.0),
             text,
             Color::from_u32_rgb(0x1D211B),
         );
 
         context.draw_text(
             queue,
-            bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - Point2D::new(0.0, 4.0),
+            bounds.origin + bounds.size.with_x(8.0) - CONTAINER_SIZE.with_x(0.0) - glam::Vec2::new(0.0, 4.0),
             "default",
             format!("fps: {:.0} ({:.2}ms)", 1.0 / delta.as_secs_f32(), delta.as_secs_f32() * 1000.0),
             Color::from_hsl(110.0, 0.5, 0.8),
@@ -1436,14 +1441,14 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
     }
 
     // #[allow(dead_code)]
-    // pub fn chunk_borders(&self, white_pixel_uv: Point2D) -> Vec<CommonVertex> {
-    //     self.chunk_manager.chunks().fold(Vec::new(), |mut lines, chunk| {
+    // pub fn chunk_borders(&self, white_pixel_uv: glam::Vec2) -> Vec<CommonVertex>
+    // {     self.chunk_manager.chunks().fold(Vec::new(), |mut lines, chunk| {
     //         let origin = chunk.origin.as_vec2() * SUBCHUNK_SIZE_F32;
 
     //         lines.extend(cube_outline(
     //             Cube3D::new(
-    //                 Point3D::new(origin.x, 0.0, origin.y),
-    //                 Size3D::new(SUBCHUNK_SIZE_F32, CHUNK_HEIGHT_F32,
+    //                 glam::Vec3::new(origin.x, 0.0, origin.y),
+    //                 glam::Vec3::new(SUBCHUNK_SIZE_F32, CHUNK_HEIGHT_F32,
     // SUBCHUNK_SIZE_F32),             ),
     //             white_pixel_uv,
     //         ));
@@ -1457,7 +1462,7 @@ Rendered subchunks: {rendered_subchunks} / {total_subchunks} ({total_chunks} tot
 struct WorldSnapshot<'a, C: ChunkAccess> {
     chunk_manager: &'a C,
     resource_storage: Arc<ResourceStorage>,
-    calc_light_fn: fn(&C, &ResourceStorage, IPoint3D, IPoint3D, [[IPoint3D; 3]; 4], bool) -> ([f32; 4], [u8; 4]),
+    calc_light_fn: fn(&C, &ResourceStorage, glam::IVec3, glam::IVec3, [[glam::IVec3; 3]; 4], bool) -> ([f32; 4], [u8; 4]),
 }
 
 impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
@@ -1469,7 +1474,7 @@ impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
         }
     }
 
-    pub fn compute_subchunk_mesh(&self, origin: IPoint2D, subchunk_idx: usize) -> [Vec<VoxelFace>; 2] {
+    pub fn compute_subchunk_mesh(&self, origin: glam::IVec2, subchunk_idx: usize) -> [Vec<VoxelFace>; 2] {
         use std::cell::RefCell;
 
         thread_local! {
@@ -1491,7 +1496,7 @@ impl<'a, C: ChunkAccess> WorldSnapshot<'a, C> {
                     .get_unchecked(self.resource_storage.blocks.get_model_by_name(state.id));
 
                 let world_position = chunk.to_world(local_position);
-                let biome = chunk.get_biome_unchecked(USizePoint2D::new(local_position.x, local_position.z));
+                let biome = chunk.get_biome_unchecked(glam::USizeVec2::new(local_position.x, local_position.z));
                 let (cull_if_same, tint_color): (bool, Option<Color>) = self
                     .resource_storage
                     .blocks

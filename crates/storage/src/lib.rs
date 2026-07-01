@@ -13,7 +13,6 @@ use std::{
 use ahash::HashMap;
 use image::RgbaImage;
 pub use mavelin_io::{BiomeColorConfig, ColorConfig};
-use mavelin_shared::{Point2D, Vector2D};
 use mavelin_world::BlockSource;
 
 pub use self::{
@@ -125,7 +124,7 @@ impl ResourceStorage {
         self.textures.get_texture_count()
     }
 
-    pub fn get_texture<I: AsRef<str>>(&self, name: I) -> Option<(Point2D, Vector2D, u8)> {
+    pub fn get_texture<I: AsRef<str>>(&self, name: I) -> Option<(glam::Vec2, glam::Vec2, u8)> {
         self.textures.get_texture(name.as_ref())
     }
 

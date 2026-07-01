@@ -1,4 +1,4 @@
-use mavelin_shared::{DPoint3D, IPoint2D, Random};
+use mavelin_shared::Random;
 use mavelin_world::Biome;
 
 use super::noise;
@@ -24,24 +24,24 @@ impl BiomeGenerator {
         }
     }
 
-    pub fn get_biome_noise(&self, origin: IPoint2D, size: IPoint2D) -> BiomeNoise {
+    pub fn get_biome_noise(&self, origin: glam::IVec2, size: glam::IVec2) -> BiomeNoise {
         let mut temp = self.temp.generate_noise2d(
             origin.as_dvec2(),
             size,
-            DPoint3D::new(0.025_000_000_372_529_03, 0.025_000_000_372_529_03, 0.25),
+            glam::DVec3::new(0.025_000_000_372_529_03, 0.025_000_000_372_529_03, 0.25),
             0.5,
         );
 
         let mut rain = self.rain.generate_noise2d(
             origin.as_dvec2(),
             size,
-            DPoint3D::new(0.050_000_000_745_058_06, 0.050_000_000_745_058_06, 0.333_333_333_333_333_3),
+            glam::DVec3::new(0.050_000_000_745_058_06, 0.050_000_000_745_058_06, 0.333_333_333_333_333_3),
             0.5,
         );
 
         let base_data = self
             .base
-            .generate_noise2d(origin.as_dvec2(), size, DPoint3D::new(0.25, 0.25, 0.588_235_294_117_647_1), 0.5);
+            .generate_noise2d(origin.as_dvec2(), size, glam::DVec3::new(0.25, 0.25, 0.588_235_294_117_647_1), 0.5);
 
         let mut biomes = vec![Biome::Sky; size.x as usize * size.y as usize];
         let mut index = 0;

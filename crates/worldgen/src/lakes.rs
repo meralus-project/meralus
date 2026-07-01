@@ -1,4 +1,4 @@
-use mavelin_shared::{IPoint3D, Random};
+use mavelin_shared::Random;
 use mavelin_world::{ChunkAccess, SubChunkBlockState};
 
 pub struct LakesGenerator {
@@ -7,7 +7,7 @@ pub struct LakesGenerator {
 }
 
 impl LakesGenerator {
-    pub fn populate<C: ChunkAccess>(&self, chunk_manager: &mut C, random: &mut Random, mut center: IPoint3D) -> bool {
+    pub fn populate<C: ChunkAccess>(&self, chunk_manager: &mut C, random: &mut Random, mut center: glam::IVec3) -> bool {
         center.x -= 8;
         center.z -= 8;
 
@@ -55,7 +55,7 @@ impl LakesGenerator {
                             || y < 7 && water_noise[(x * 16 + z) * 8 + y + 1]
                             || y > 0 && water_noise[(x * 16 + z) * 8 + (y - 1)])
                     {
-                        let material = chunk_manager.get_block(center + IPoint3D::new(x as i32, y as i32, z as i32));
+                        let material = chunk_manager.get_block(center + glam::IVec3::new(x as i32, y as i32, z as i32));
 
                         if y >= 4 && material.is_some_and(|material| material.id == self.water) {
                             return false;
@@ -76,7 +76,7 @@ impl LakesGenerator {
                 for y in 0..8 {
                     if water_noise[(x * 16 + z) * 8 + y] {
                         chunk_manager.set_block(
-                            center + IPoint3D::new(x as i32, y as i32, z as i32),
+                            center + glam::IVec3::new(x as i32, y as i32, z as i32),
                             if y >= 4 {
                                 SubChunkBlockState::new(self.air)
                             } else {

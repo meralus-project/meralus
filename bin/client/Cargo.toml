@@ -36,6 +36,7 @@ lyon_tessellation = "1.0.20"
 swash = { version = "0.2.9", features = ["render"] }
 euclid = { version = "0.22.14", features = ["bytemuck"] }
 etagere = "0.3.0"
+glam.workspace = true
 
 [lints]
 workspace = true

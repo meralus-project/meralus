@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 mavelin-shared = { workspace = true, features = ["geometry", "face"] }
+glam.workspace = true
 
 [lints]
 workspace = true

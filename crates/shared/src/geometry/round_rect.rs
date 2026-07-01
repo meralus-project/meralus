@@ -1,23 +1,23 @@
-use super::{Box2D, Point2D, Rect, Size2D, Thickness};
+use super::{Box2, Rect, Thickness};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RRect {
     /// Coordinates of the rectangle.
-    pub origin: Point2D,
+    pub origin: glam::Vec2,
     /// Size of the rectangle.
-    pub size: Size2D,
+    pub size: glam::Vec2,
     /// Radius of all four corners.
     pub corner_radius: Thickness,
 }
 
 impl RRect {
     pub const EMPTY: Self = Self {
-        origin: Point2D::ZERO,
-        size: Size2D::ZERO,
+        origin: glam::Vec2::ZERO,
+        size: glam::Vec2::ZERO,
         corner_radius: Thickness::default(),
     };
 
-    pub const fn new(origin: Point2D, size: Size2D, corner_radius: Thickness) -> Self {
+    pub const fn new(origin: glam::Vec2, size: glam::Vec2, corner_radius: Thickness) -> Self {
         Self { origin, size, corner_radius }
     }
 
@@ -36,18 +36,18 @@ impl RRect {
         self.size.y
     }
 
-    pub fn center(&self) -> Point2D {
+    pub fn center(&self) -> glam::Vec2 {
         self.origin + self.size / 2.0
     }
 
-    pub fn as_box(&self) -> Box2D {
-        Box2D {
+    pub fn as_box(&self) -> Box2 {
+        Box2 {
             min: self.origin,
             max: self.origin + self.size,
         }
     }
 
-    pub fn contains(&self, pt: Point2D) -> bool {
+    pub fn contains(&self, pt: glam::Vec2) -> bool {
         let center = self.center();
         let pt = pt - center;
         let radius = match pt {

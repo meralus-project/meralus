@@ -1,5 +1,5 @@
 use ahash::HashMap;
-use mavelin_shared::{Face, Point2D, Point3D, Size2D};
+use mavelin_shared::Face;
 use serde::{Deserialize, Serialize};
 
 use crate::TextureRef;
@@ -7,13 +7,13 @@ use crate::TextureRef;
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct EntityTexture {
     pub path: TextureRef,
-    pub size: Size2D,
+    pub size: glam::Vec2,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct EntityElementFace {
-    pub origin: Point2D,
-    pub size: Point2D,
+    pub origin: glam::Vec2,
+    pub size: glam::Vec2,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -21,9 +21,9 @@ pub struct EntityElementFace {
 #[serde(rename_all = "kebab-case")]
 pub enum EntityElementData {
     Cube {
-        start: Point3D,
-        end: Point3D,
-        pivot: Option<Point3D>,
+        start: glam::Vec3,
+        end: glam::Vec3,
+        pivot: Option<glam::Vec3>,
         faces: HashMap<Face, EntityElementFace>,
     },
 }

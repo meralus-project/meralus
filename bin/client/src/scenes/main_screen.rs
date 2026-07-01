@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mavelin_shared::{Color, Point2D};
+use mavelin_shared::Color;
 
 use crate::{
     render::context::{ArrangeStrategy, Arrangement, MeasureStrategy, RowStrategy, UiSubcontext, WidgetState},
@@ -14,12 +14,12 @@ fn menu_button<A: ArrangeStrategy, M: MeasureStrategy>(scope: &mut UiSubcontext<
 
         scope.column(|scope| {
             scope.row(|scope| {
-                scope.add_space(Point2D::new(12.0, 0.0));
+                scope.add_space(glam::Vec2::new(12.0, 0.0));
                 scope.text(name, 18.0, "default", Color::from_hsl(110.0, 0.25, 0.1));
-                scope.add_space(Point2D::new(12.0, 0.0));
+                scope.add_space(glam::Vec2::new(12.0, 0.0));
             });
 
-            scope.add_space(Point2D::new(0.0, 6.0));
+            scope.add_space(glam::Vec2::new(0.0, 6.0));
         });
     })
 }

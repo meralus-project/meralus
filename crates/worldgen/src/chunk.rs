@@ -1,4 +1,4 @@
-use mavelin_shared::{DPoint3D, IPoint2D, IPoint3D, Random, USizePoint2D, USizePoint3D};
+use mavelin_shared::Random;
 use mavelin_world::{Biome, BlockSource, CHUNK_HEIGHT_I32, Chunk, ChunkAccess, SUBCHUNK_SIZE_I32, SubChunkBlockState};
 
 use super::{BiomeGenerator, BiomeNoise, LakesGenerator, noise};
@@ -51,8 +51,8 @@ impl ChunkGenerator {
     }
 
     pub fn generate_bare_terrain<T: BlockSource>(&self, chunk: &mut Chunk, block_source: &T, biome_cache: &BiomeNoise) {
-        let offset = IPoint3D::new(chunk.origin.x, 0, chunk.origin.y) * i32::from(B0);
-        let terrain_noise = self.generate_terrain_noise(offset, IPoint3D::new(K.into(), B2.into(), L.into()), biome_cache);
+        let offset = glam::IVec3::new(chunk.origin.x, 0, chunk.origin.y) * i32::from(B0);
+        let terrain_noise = self.generate_terrain_noise(offset, glam::IVec3::new(K.into(), B2.into(), L.into()), biome_cache);
 
         let air = block_source.get_block_id("game:air");
         let stone = block_source.get_block_id("game:stone");
@@ -101,7 +101,7 @@ impl ChunkGenerator {
                                     SubChunkBlockState::new(air)
                                 };
 
-                                chunk.set_block(USizePoint3D::new(j2 >> 11, j2 & 127, (j2 >> 7) & 15), block_data);
+                                chunk.set_block(glam::USizeVec3::new(j2 >> 11, j2 & 127, (j2 >> 7) & 15), block_data);
 
                                 j2 += 128;
                                 d15 += d16;
@@ -128,17 +128,17 @@ impl ChunkGenerator {
 
         let sand_noise = self
             .sand_and_gravel_noise
-            .generate_noise(chunk_origin.extend(0.0), IPoint3D::new(16, 16, 1), DPoint3D::splat(d0).with_z(1.0));
+            .generate_noise(chunk_origin.extend(0.0), glam::IVec3::new(16, 16, 1), glam::DVec3::splat(d0).with_z(1.0));
 
         let gravel_noise = self.sand_and_gravel_noise.generate_noise(
-            DPoint3D::new(chunk_origin.x, 109.0134, chunk_origin.y),
-            IPoint3D::new(16, 1, 16),
-            DPoint3D::splat(d0).with_y(1.0),
+            glam::DVec3::new(chunk_origin.x, 109.0134, chunk_origin.y),
+            glam::IVec3::new(16, 1, 16),
+            glam::DVec3::splat(d0).with_y(1.0),
         );
 
         let stone_noise = self
             .stone_noise
-            .generate_noise(chunk_origin.extend(0.0), IPoint3D::new(16, 16, 1), DPoint3D::splat(d0 * 2.0));
+            .generate_noise(chunk_origin.extend(0.0), glam::IVec3::new(16, 16, 1), glam::DVec3::splat(d0 * 2.0));
 
         let air = block_source.get_block_id("game:air");
         let stone = block_source.get_block_id("game:stone");
@@ -166,7 +166,7 @@ impl ChunkGenerator {
                 let mut bottom = biome.bottom(SubChunkBlockState::new(sand), SubChunkBlockState::new(dirt));
 
                 for y in (0..128).rev() {
-                    let position = USizePoint3D::new(x, y as usize, z);
+                    let position = glam::USizeVec3::new(x, y as usize, z);
 
                     if y <= random.next_i32(5) {
                         // LegacyUtil173.setBlockData(chunkData, l1,
@@ -237,13 +237,13 @@ impl ChunkGenerator {
     pub fn generate_unpopulated_chunk_data<T: BlockSource>(&self, chunk: &mut Chunk, block_source: &T) {
         let mut random = Random::new(i64::from(chunk.origin.x) * 341_873_128_712 + i64::from(chunk.origin.y) * 132_897_987_541);
 
-        let biome_noise_cache = self.biome_generator.get_biome_noise(chunk.origin * 16, IPoint2D::splat(16));
+        let biome_noise_cache = self.biome_generator.get_biome_noise(chunk.origin * 16, glam::IVec2::splat(16));
 
         for z in 0..16 {
             for x in 0..16 {
                 let biome = biome_noise_cache.biomes[z | (x << 4)];
 
-                chunk.set_biome_unchecked(USizePoint2D::new(x, z), biome);
+                chunk.set_biome_unchecked(glam::USizeVec2::new(x, z), biome);
             }
         }
 
@@ -252,22 +252,22 @@ impl ChunkGenerator {
         // this.caveGenerator.generate(this.world, chunkX, chunkZ, chunkData);
     }
 
-    fn generate_terrain_noise(&self, offset: IPoint3D, size: IPoint3D, biome_cache: &BiomeNoise) -> [f64; TERRAIN_NOISE_SIZE] {
+    fn generate_terrain_noise(&self, offset: glam::IVec3, size: glam::IVec3, biome_cache: &BiomeNoise) -> [f64; TERRAIN_NOISE_SIZE] {
         let mut noise = [0.0; TERRAIN_NOISE_SIZE];
 
         let d0 = 684.412;
         let d1 = 684.412;
-        let scale = DPoint3D::new(d0, d1, d0);
+        let scale = glam::DVec3::new(d0, d1, d0);
 
         let offset = offset.as_dvec3();
         let offset2 = offset.with_y(10.0);
         let size2 = size.with_y(1);
 
-        let terrain_noise4 = self.terrain_noise4.generate_noise(offset2, size2, DPoint3D::new(1.121, 1.0, 1.121));
-        let terrain_noise5 = self.terrain_noise5.generate_noise(offset2, size2, DPoint3D::new(200.0, 1.0, 200.0));
+        let terrain_noise4 = self.terrain_noise4.generate_noise(offset2, size2, glam::DVec3::new(1.121, 1.0, 1.121));
+        let terrain_noise5 = self.terrain_noise5.generate_noise(offset2, size2, glam::DVec3::new(200.0, 1.0, 200.0));
         let terrain_noise1 = self
             .terrain_noise1
-            .generate_noise(offset, size, DPoint3D::new(scale.x / 80.0, scale.y / 160.0, scale.z / 80.0));
+            .generate_noise(offset, size, glam::DVec3::new(scale.x / 80.0, scale.y / 160.0, scale.z / 80.0));
 
         let terrain_noise2 = self.terrain_noise2.generate_noise(offset, size, scale);
         let terrain_noise3 = self.terrain_noise3.generate_noise(offset, size, scale);
@@ -369,9 +369,9 @@ impl ChunkGenerator {
         noise
     }
 
-    pub fn populate<C: ChunkAccess, T: BlockSource>(&self, chunk_manager: &mut C, block_source: &T, world_seed: i64, chunk: IPoint2D) {
+    pub fn populate<C: ChunkAccess, T: BlockSource>(&self, chunk_manager: &mut C, block_source: &T, world_seed: i64, chunk: glam::IVec2) {
         let origin = chunk * SUBCHUNK_SIZE_I32;
-        let biomebase = self.biome_generator.get_biome_noise(origin + SUBCHUNK_SIZE_I32, IPoint2D::ONE).biomes[0];
+        let biomebase = self.biome_generator.get_biome_noise(origin + SUBCHUNK_SIZE_I32, glam::IVec2::ONE).biomes[0];
         let mut random = Random::new(world_seed);
 
         let i1 = random.next_i64() / 2 * 2 + 1;
@@ -394,7 +394,7 @@ impl ChunkGenerator {
             let l1 = random.next_i32(128);
             let i2 = origin.y + random.next_i32(16) + 8;
 
-            LakesGenerator { air, water }.populate(chunk_manager, &mut random, IPoint3D::new(k1, l1, i2));
+            LakesGenerator { air, water }.populate(chunk_manager, &mut random, glam::IVec3::new(k1, l1, i2));
         }
 
         let d0 = 0.5;
@@ -424,7 +424,7 @@ impl ChunkGenerator {
             let mut highest_y = CHUNK_HEIGHT_I32 - 1;
 
             for y in (0..CHUNK_HEIGHT_I32).rev() {
-                if chunk_manager.get_block(IPoint3D::new(j2, y, k2)).is_some_and(|block| !block.is_air()) {
+                if chunk_manager.get_block(glam::IVec3::new(j2, y, k2)).is_some_and(|block| !block.is_air()) {
                     highest_y = y;
 
                     break;
@@ -444,7 +444,7 @@ impl ChunkGenerator {
                         glass,
                         snow,
                     }
-                    .populate(chunk_manager, &mut random, IPoint3D::new(j2, highest_y + 1, k2));
+                    .populate(chunk_manager, &mut random, glam::IVec3::new(j2, highest_y + 1, k2));
                 } else {
                     TreesGenerator {
                         air,
@@ -457,7 +457,7 @@ impl ChunkGenerator {
                         glass,
                         snow,
                     }
-                    .populate(chunk_manager, &mut random, IPoint3D::new(j2, highest_y + 1, k2));
+                    .populate(chunk_manager, &mut random, glam::IVec3::new(j2, highest_y + 1, k2));
                 }
             } else {
                 TreesGenerator {
@@ -471,7 +471,7 @@ impl ChunkGenerator {
                     glass,
                     snow,
                 }
-                .populate(chunk_manager, &mut random, IPoint3D::new(j2, highest_y + 1, k2));
+                .populate(chunk_manager, &mut random, glam::IVec3::new(j2, highest_y + 1, k2));
             }
         }
     }

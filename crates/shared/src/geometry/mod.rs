@@ -4,47 +4,7 @@ mod rect;
 mod round_rect;
 mod thickness;
 
-pub use self::{box2d::Box2D, cube::Cube3D, rect::Rect, round_rect::RRect, thickness::Thickness};
-
-pub mod camera {
-    pub use glam::camera::rh::proj;
-    pub use glam::camera::rh::view;
-}
-
-pub type ISize2D = glam::IVec2;
-pub type ISize3D = glam::IVec3;
-pub type IPoint2D = glam::IVec2;
-pub type IPoint3D = glam::IVec3;
-
-pub type USize2D = glam::UVec2;
-pub type USize3D = glam::UVec3;
-pub type UPoint2D = glam::UVec2;
-pub type UPoint3D = glam::UVec3;
-
-pub type U16Size2D = glam::U16Vec2;
-pub type U16Size3D = glam::U16Vec3;
-pub type U16Point2D = glam::U16Vec2;
-pub type U16Point3D = glam::U16Vec3;
-
-pub type USizePoint2D = glam::USizeVec2;
-pub type USizePoint3D = glam::USizeVec3;
-
-pub type DSize3D = glam::DVec3;
-pub type DPoint2D = glam::DVec2;
-pub type DPoint3D = glam::DVec3;
-pub type DVector2D = glam::DVec2;
-pub type DVector3D = glam::DVec3;
-
-pub type Size2D = glam::Vec2;
-pub type Size3D = glam::Vec3;
-pub type Point2D = glam::Vec2;
-pub type Point3D = glam::Vec3;
-pub type Vector2D = glam::Vec2;
-pub type Vector3D = glam::Vec3;
-pub type Vector4D = glam::Vec4;
-pub type Transform2D = glam::Mat3;
-pub type Transform3D = glam::Mat4;
-pub type Quat = glam::Quat;
+pub use self::{box2d::Box2, cube::Cube, rect::Rect, round_rect::RRect, thickness::Thickness};
 
 pub trait MatrixExt<T> {
     #[must_use]
@@ -59,12 +19,12 @@ pub trait MatrixExt<T> {
     fn rotate_z(self, angle: f32) -> Self;
 }
 
-impl MatrixExt<Vector3D> for Transform3D {
-    fn translate(self, position: Vector3D) -> Self {
+impl MatrixExt<glam::Vec3> for glam::Mat4 {
+    fn translate(self, position: glam::Vec3) -> Self {
         self * Self::from_translation(position)
     }
 
-    fn scale(self, value: Vector3D) -> Self {
+    fn scale(self, value: glam::Vec3) -> Self {
         self * Self::from_scale(value)
     }
 

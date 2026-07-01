@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mavelin_shared::{Color, Face, Lerp, Point3D, Vector3D};
+use mavelin_shared::{Color, Face, Lerp};
 
 use crate::input::Input;
 
@@ -8,8 +8,8 @@ const AMBIENT_OCCLUSION_VALUES: [f32; 4] = [0.55, 0.65, 0.8, 1.0];
 
 #[must_use]
 #[inline]
-pub fn get_movement_direction(binds: &Input) -> Point3D {
-    let mut direction = Point3D::ZERO;
+pub fn get_movement_direction(binds: &Input) -> glam::Vec3 {
+    let mut direction = glam::Vec3::ZERO;
 
     if binds.is_pressed("walk.forward") {
         direction.z += 1.0;
@@ -32,9 +32,9 @@ pub fn get_movement_direction(binds: &Input) -> Point3D {
 
 #[must_use]
 #[inline]
-pub fn get_rotation_directions(yaw: f32, pitch: f32) -> (Vector3D, Vector3D, Vector3D) {
-    let front = Vector3D::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
-    let right = front.cross(Vector3D::Y).normalize();
+pub fn get_rotation_directions(yaw: f32, pitch: f32) -> (glam::Vec3, glam::Vec3, glam::Vec3) {
+    let front = glam::Vec3::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
+    let right = front.cross(glam::Vec3::Y).normalize();
 
     (front, right, right.cross(front).normalize())
 }
@@ -69,8 +69,8 @@ impl AsColor for Face {
 }
 
 // #[allow(dead_code)]
-// pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv: Point2D)
-// -> Vec<CommonVertex> {     [
+// pub fn cube_outline(Cube3D { origin, size }: Cube3D, white_pixel_uv:
+// glam::Vec2) -> Vec<CommonVertex> {     [
 //         [[0.0, 0.0, 0.0], [0.0, size.y, 0.0]],
 //         [[size.x, 0.0, 0.0], [size.x, size.y, 0.0]],
 //         [[0.0, 0.0, size.z], [0.0, size.y, size.z]],
@@ -88,17 +88,17 @@ impl AsColor for Face {
 //     .fold(Vec::new(), |mut vertices, [start, end]| {
 //         vertices.extend([
 //             CommonVertex {
-//                 position: origin + Point3D::from_array(start),
+//                 position: origin + glam::Vec3::from_array(start),
 //                 color: Color::BLUE.as_value(),
 //                 uv: white_pixel_uv,
-//                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),
+//                 clip: glam::Vec4::new(0.0, 0.0, 1.0, 1.0),
 //                 _pad: [0; 8],
 //             },
 //             CommonVertex {
-//                 position: origin + Point3D::from_array(end),
+//                 position: origin + glam::Vec3::from_array(end),
 //                 color: Color::BLUE.as_value(),
 //                 uv: white_pixel_uv,
-//                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),
+//                 clip: glam::Vec4::new(0.0, 0.0, 1.0, 1.0),
 //                 _pad: [0; 8],
 //             },
 //         ]);
@@ -108,7 +108,7 @@ impl AsColor for Face {
 // }
 
 // #[allow(dead_code)]
-// pub fn aabb_outline(Aabb { min, max }: Aabb, white_pixel_uv: Point2D) ->
+// pub fn aabb_outline(Aabb { min, max }: Aabb, white_pixel_uv: glam::Vec2) ->
 // Vec<CommonVertex> {     let size = (max - min).as_vec3();
 
 //     [
@@ -129,17 +129,17 @@ impl AsColor for Face {
 //     .fold(Vec::new(), |mut vertices, [start, end]| {
 //         vertices.extend([
 //             CommonVertex {
-//                 position: min.as_vec3() + Point3D::from_array(start),
+//                 position: min.as_vec3() + glam::Vec3::from_array(start),
 //                 color: Color::BLUE.as_value(),
 //                 uv: white_pixel_uv,
-//                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),
+//                 clip: glam::Vec4::new(0.0, 0.0, 1.0, 1.0),
 //                 _pad: [0; 8],
 //             },
 //             CommonVertex {
-//                 position: min.as_vec3() + Point3D::from_array(end),
+//                 position: min.as_vec3() + glam::Vec3::from_array(end),
 //                 color: Color::BLUE.as_value(),
 //                 uv: white_pixel_uv,
-//                 clip: Vector4D::new(0.0, 0.0, 1.0, 1.0),
+//                 clip: glam::Vec4::new(0.0, 0.0, 1.0, 1.0),
 //                 _pad: [0; 8],
 //             },
 //         ]);

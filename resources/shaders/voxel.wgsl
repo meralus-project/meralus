@@ -18,8 +18,7 @@ fn fog_spherical_distance(pos: vec3<f32>) -> f32 { return length(pos); }
 fn fog_cylindrical_distance(pos: vec3<f32>) -> f32 { return max(length(pos.xz), abs(pos.y)); }
 
 struct VoxelUniform {
-    camera_pos: vec3<f32>,
-    sun_position: vec3<f32>
+    camera_pos: vec3<f32>
 }
 
 @group(0) @binding(0)
@@ -28,6 +27,7 @@ var<uniform> voxel: VoxelUniform;
 struct VoxelImm {
     matrix: mat4x4<f32>,
     chunk: vec3<i32>,
+    sun_position: vec3<f32>
 }
 
 var<immediate> voxel_imm: VoxelImm;
@@ -300,7 +300,7 @@ fn vs_main(
     let block_light = (f32(in.light & u32(15)) + 1.0) / 16.0;
     var sun_light = (f32((in.light >> u32(4)) & u32(15)) + 1.0) / 16.0;
 
-    sun_light *= max(voxel.sun_position.y * 0.45 + 0.5, 0.02);
+    sun_light *= max(voxel_imm.sun_position.y * 0.45 + 0.5, 0.02);
 
     let light_intensity = min(max(block_light, sun_light), 1.0);
 
@@ -364,7 +364,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let sampled_raw = textureSample(tex, base_sampler, in.uv);
     let linear_rgb = pow(sampled_raw.rgb, vec3<f32>(2.2));
     let tex_color = vec4<f32>(linear_rgb, sampled_raw.a);
-    var f_color = sampled_raw * vec4(in.color.rgb * light_intensity, in.color.a);
+    var f_color = sampled_raw * in.color;
+    
+    f_color = vec4(f_color.rgb * light_intensity, f_color.a);
 
     if fog.with_fog == 1 {
         f_color = apply_fog(

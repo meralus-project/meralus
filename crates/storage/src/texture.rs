@@ -2,7 +2,6 @@ use core::fmt;
 use std::{io, path::Path};
 
 use image::RgbaImage;
-use mavelin_shared::{Point2D, USize2D, Vector2D};
 use meck::TextureAtlas;
 use tracing::info;
 
@@ -44,11 +43,11 @@ impl TextureStorage {
         self.regular_atlas.contains_texture(name.as_ref())
     }
 
-    pub fn get_texture<T: AsRef<str>>(&self, name: T) -> Option<(Point2D, Vector2D, u8)> {
+    pub fn get_texture<T: AsRef<str>>(&self, name: T) -> Option<(glam::Vec2, glam::Vec2, u8)> {
         self.regular_atlas.get_texture_uv(name.as_ref())
     }
 
-    pub fn get_lightmap<T: AsRef<str>>(&self, name: T) -> Option<(Point2D, Vector2D, u8)> {
+    pub fn get_lightmap<T: AsRef<str>>(&self, name: T) -> Option<(glam::Vec2, glam::Vec2, u8)> {
         self.lightmap_atlas.get_texture_uv(name.as_ref())
     }
 
@@ -82,7 +81,7 @@ impl TextureStorage {
     ///
     /// An error will be returned if the passed path does not contain a filename
     /// or cannot be read.
-    pub fn load_lightmap<P: AsRef<Path>>(&mut self, size: USize2D, path: P) -> LoadingResult<()> {
+    pub fn load_lightmap<P: AsRef<Path>>(&mut self, size: glam::UVec2, path: P) -> LoadingResult<()> {
         let path = path.as_ref();
 
         // println!(
@@ -123,7 +122,7 @@ impl TextureStorage {
     ///
     /// An error will be returned if the passed path does not contain a filename
     /// or cannot be read.
-    pub fn load<P: AsRef<Path>>(&mut self, path: P) -> LoadingResult<Option<USize2D>> {
+    pub fn load<P: AsRef<Path>>(&mut self, path: P) -> LoadingResult<Option<glam::UVec2>> {
         let path = path.as_ref();
 
         let name = path.file_stem().ok_or(LoadingError::Texture(TextureLoadingError::InvalidPath))?;

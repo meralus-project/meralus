@@ -1,6 +1,5 @@
 use core::fmt;
 
-use mavelin_shared::IPoint2D;
 use wgpu::util::DeviceExt;
 
 pub mod chunk;
@@ -71,15 +70,15 @@ enum Leg {
 pub struct RenderShapeIter {
     shape: RenderShape,
     max_distance: i32,
-    center: IPoint2D,
+    center: glam::IVec2,
 
-    point: IPoint2D,
+    point: glam::IVec2,
     layer: i32,
     leg: Leg,
 }
 
 impl RenderShapeIter {
-    const fn new(center: IPoint2D, shape: RenderShape) -> Self {
+    const fn new(center: glam::IVec2, shape: RenderShape) -> Self {
         let [w, h] = match shape {
             RenderShape::Circle(r) => [round_up(r * 2) as i32; 2],
             RenderShape::Rect(w, h) => [round_up(w) as i32, round_up(h) as i32],
@@ -90,13 +89,13 @@ impl RenderShapeIter {
             max_distance: if w > h { w } else { h },
             center,
             shape,
-            point: IPoint2D::ZERO,
+            point: glam::IVec2::ZERO,
             layer: 1,
             leg: Leg::Center,
         }
     }
 
-    const fn next_pair(&mut self) -> Option<IPoint2D> {
+    const fn next_pair(&mut self) -> Option<glam::IVec2> {
         match self.leg {
             Leg::Center => {
                 self.leg = Leg::Right;
@@ -144,9 +143,9 @@ impl RenderShapeIter {
 }
 
 impl Iterator for RenderShapeIter {
-    type Item = IPoint2D;
+    type Item = glam::IVec2;
 
-    fn next(&mut self) -> Option<IPoint2D> {
+    fn next(&mut self) -> Option<glam::IVec2> {
         let mut p = self.next_pair()?;
 
         while !self.shape.test(self.center, p) {
@@ -158,7 +157,7 @@ impl Iterator for RenderShapeIter {
 }
 
 impl RenderShape {
-    pub const fn test(self, center: IPoint2D, p: IPoint2D) -> bool {
+    pub const fn test(self, center: glam::IVec2, p: glam::IVec2) -> bool {
         match self {
             Self::Circle(r) => (p.x - center.x).pow(2) + (p.y - center.y).pow(2) <= (r as i32).pow(2),
             Self::Rect(w, h) => {
@@ -183,7 +182,7 @@ impl RenderShape {
         }
     }
 
-    pub const fn iter_from_center(self, center: IPoint2D) -> RenderShapeIter {
+    pub const fn iter_from_center(self, center: glam::IVec2) -> RenderShapeIter {
         RenderShapeIter::new(center, self)
     }
 }

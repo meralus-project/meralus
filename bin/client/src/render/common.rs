@@ -4,7 +4,7 @@ use ahash::{HashMap, HashMapExt};
 use etagere::{AllocId, AtlasAllocator};
 use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers, geometry_builder::simple_builder};
 use mavelin_engine::WindowContext;
-use mavelin_shared::{AsValue, Color, ISize2D, Point2D, RRect, Rect, Size2D, Thickness, Transform3D};
+use mavelin_shared::{AsValue, Color, RRect, Rect, Thickness};
 use swash::{
     CacheKey, FontRef,
     scale::{Render, ScaleContext, Source, StrikeWith},
@@ -18,8 +18,8 @@ use crate::render::RawRenderBuffer;
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct CommonVertex {
-    pub position: Point2D,
-    pub local_uv: Point2D,
+    pub position: glam::Vec2,
+    pub local_uv: glam::Vec2,
     pub radii: Thickness,
     pub half_size: [f32; 2],
     pub color: [u8; 4],
@@ -47,12 +47,12 @@ pub struct ShapeData {
 #[derive(Debug)]
 #[allow(dead_code)]
 enum Op {
-    Circle { origin: Point2D, radius: f32 },
+    Circle { origin: glam::Vec2, radius: f32 },
     Rect(Rect),
     RoundRect(RRect),
-    Begin(Point2D),
-    LineTo(Point2D),
-    CubicBezierTo(Point2D, Point2D, Point2D),
+    Begin(glam::Vec2),
+    LineTo(glam::Vec2),
+    CubicBezierTo(glam::Vec2, glam::Vec2, glam::Vec2),
     Close,
 }
 
@@ -64,37 +64,37 @@ pub struct Path {
 
 #[allow(dead_code)]
 impl Path {
-    pub fn add_circle(&mut self, origin: Point2D, radius: f32) -> &mut Self {
+    pub fn add_circle(&mut self, origin: glam::Vec2, radius: f32) -> &mut Self {
         self.ops.push(Op::Circle { origin, radius });
 
         self
     }
 
-    pub fn add_rect(&mut self, origin: Point2D, size: Size2D) -> &mut Self {
+    pub fn add_rect(&mut self, origin: glam::Vec2, size: glam::Vec2) -> &mut Self {
         self.ops.push(Op::Rect(Rect::new(origin, size)));
 
         self
     }
 
-    pub fn add_round_rect(&mut self, origin: Point2D, size: Size2D, corner_radius: Thickness) -> &mut Self {
+    pub fn add_round_rect(&mut self, origin: glam::Vec2, size: glam::Vec2, corner_radius: Thickness) -> &mut Self {
         self.ops.push(Op::RoundRect(RRect::new(origin, size, corner_radius)));
 
         self
     }
 
-    pub fn line_to(&mut self, point: Point2D) -> &mut Self {
+    pub fn line_to(&mut self, point: glam::Vec2) -> &mut Self {
         self.ops.push(Op::LineTo(point));
 
         self
     }
 
-    pub fn cubic_bezier_to(&mut self, ctrl1: Point2D, ctrl2: Point2D, to: Point2D) -> &mut Self {
+    pub fn cubic_bezier_to(&mut self, ctrl1: glam::Vec2, ctrl2: glam::Vec2, to: glam::Vec2) -> &mut Self {
         self.ops.push(Op::CubicBezierTo(ctrl1, ctrl2, to));
 
         self
     }
 
-    pub fn begin(&mut self, at: Point2D) -> &mut Self {
+    pub fn begin(&mut self, at: glam::Vec2) -> &mut Self {
         self.ops.push(Op::Begin(at));
 
         self
@@ -136,19 +136,19 @@ pub struct CommonRenderer {
 
     // TEXT RENDERING
     font_name_map: HashMap<String, usize>,
-    glyph_map: HashMap<GlyphKey, (AllocId, ISize2D)>,
+    glyph_map: HashMap<GlyphKey, (AllocId, glam::IVec2)>,
     fonts: Vec<OwnedFont>,
 
     // COMMON RENDERING
     pub(crate) buffers: RawRenderBuffer<CommonVertex>,
 
     // VERTICES TRANSFORMATION
-    transform: Option<Transform3D>,
+    transform: Option<glam::Mat4>,
 
-    matrix: Option<Transform3D>,
-    window_matrix: Transform3D,
+    matrix: Option<glam::Mat4>,
+    window_matrix: glam::Mat4,
 
-    pub clip: Option<(Point2D, Point2D)>,
+    pub clip: Option<(glam::Vec2, glam::Vec2)>,
 }
 
 pub struct OwnedFont {
@@ -342,7 +342,7 @@ impl CommonRenderer {
             buffers: RawRenderBuffer::new(),
 
             transform: None,
-            window_matrix: Transform3D::IDENTITY,
+            window_matrix: glam::Mat4::IDENTITY,
             matrix: None,
             clip: None,
         }
@@ -353,12 +353,12 @@ impl CommonRenderer {
         &self.fonts
     }
 
-    pub const fn window_matrix(&self) -> Transform3D {
+    pub const fn window_matrix(&self) -> glam::Mat4 {
         self.window_matrix
     }
 
     #[allow(dead_code)]
-    pub const fn set_matrix(&mut self, matrix: Transform3D) {
+    pub const fn set_matrix(&mut self, matrix: glam::Mat4) {
         self.matrix = Some(matrix);
     }
 
@@ -367,14 +367,14 @@ impl CommonRenderer {
         self.matrix = None;
     }
 
-    pub fn set_window_matrix(&mut self, queue: &wgpu::Queue, matrix: Transform3D) {
+    pub fn set_window_matrix(&mut self, queue: &wgpu::Queue, matrix: glam::Mat4) {
         self.window_matrix = matrix;
 
         queue.write_buffer(&self.matrix_buffer, 0, bytemuck::cast_slice(&matrix.to_cols_array()));
     }
 
     #[allow(dead_code)]
-    pub const fn set_transform(&mut self, transform: Option<Transform3D>) {
+    pub const fn set_transform(&mut self, transform: Option<glam::Mat4>) {
         self.transform = transform;
     }
 
@@ -398,7 +398,7 @@ impl CommonRenderer {
         // }
     }
 
-    pub fn measure<F: AsRef<str>, T: AsRef<str>>(&self, font: F, text: T, size: f32, _max_width: Option<f32>) -> Option<Size2D> {
+    pub fn measure<F: AsRef<str>, T: AsRef<str>>(&self, font: F, text: T, size: f32, _max_width: Option<f32>) -> Option<glam::Vec2> {
         self.font_name_map.get(font.as_ref()).copied().map(|font_index| {
             let text = text.as_ref();
 
@@ -410,7 +410,7 @@ impl CommonRenderer {
 
             shaper.add_str(text);
 
-            let mut metrics = Size2D::ZERO;
+            let mut metrics = glam::Vec2::ZERO;
             let mut x = 0.0;
             let mut y = size;
 
@@ -434,7 +434,7 @@ impl CommonRenderer {
         })
     }
 
-    fn push_quad(&mut self, positions: [Point2D; 4], local_uvs: [Point2D; 4], half_size: Size2D, radii: Thickness, color: Color) {
+    fn push_quad(&mut self, positions: [glam::Vec2; 4], local_uvs: [glam::Vec2; 4], half_size: glam::Vec2, radii: Thickness, color: Color) {
         let base = self.buffers.vertices.len() as u32;
 
         self.buffers.vertices.extend((0..4).map(|i| CommonVertex {
@@ -450,15 +450,15 @@ impl CommonRenderer {
     }
 
     #[allow(dead_code)]
-    pub fn draw_circle(&mut self, origin: Point2D, radius: f32, color: Color) {
-        self.draw_round_rect(origin, Size2D::splat(radius * 2.0), Thickness::all(radius), color);
+    pub fn draw_circle(&mut self, origin: glam::Vec2, radius: f32, color: Color) {
+        self.draw_round_rect(origin, glam::Vec2::splat(radius * 2.0), Thickness::all(radius), color);
     }
 
-    pub fn draw_rect(&mut self, origin: Point2D, size: Size2D, color: Color) {
+    pub fn draw_rect(&mut self, origin: glam::Vec2, size: glam::Vec2, color: Color) {
         self.draw_round_rect(origin, size, Thickness::default(), color);
     }
 
-    pub fn draw_round_rect(&mut self, origin: Point2D, size: Size2D, radii: Thickness, color: Color) {
+    pub fn draw_round_rect(&mut self, origin: glam::Vec2, size: glam::Vec2, radii: Thickness, color: Color) {
         let h = size * 0.5;
         let c = origin + h;
 
@@ -485,7 +485,7 @@ impl CommonRenderer {
             .vertices
             .extend(bytemuck::cast_vec(geom.vertices).into_iter().map(|position| CommonVertex {
                 position,
-                local_uv: Point2D::ZERO,
+                local_uv: glam::Vec2::ZERO,
                 half_size: [0.0; 2],
                 radii: Thickness::default(),
                 color: [color.get_red(), color.get_green(), color.get_blue(), color.get_alpha()],
@@ -497,11 +497,11 @@ impl CommonRenderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
     pub fn draw_text<F: AsRef<str>, T: AsRef<str>>(
         &mut self,
         queue: &wgpu::Queue,
-        origin: Point2D,
+        origin: glam::Vec2,
         font: F,
         text: T,
         color: Color,
@@ -553,7 +553,7 @@ impl CommonRenderer {
                                     .unwrap();
 
                                 let buffer = image::GrayImage::from_raw(image.placement.width, image.placement.height, image.data).unwrap();
-                                let offset = ISize2D::new(image.placement.left, image.placement.top);
+                                let offset = glam::IVec2::new(image.placement.left, image.placement.top);
 
                                 entry.insert((alloc.id, offset));
 
@@ -595,16 +595,22 @@ impl CommonRenderer {
                         let v1 = rect.max.y as f32 / atlas_size.height as f32;
 
                         let base = self.buffers.vertices.len() as u32;
+                        let base_point = glam::Vec2::new(x + offset.x as f32, y - offset.y as f32);
 
                         self.buffers.vertices.extend(
                             [
-                                Point2D::new(x + offset.x as f32, y - offset.y as f32),
-                                Point2D::new(x + offset.x as f32, y - offset.y as f32) + Point2D::new(rect.width() as f32, 0.0),
-                                Point2D::new(x + offset.x as f32, y - offset.y as f32) + Point2D::new(rect.width() as f32, rect.height() as f32),
-                                Point2D::new(x + offset.x as f32, y - offset.y as f32) + Point2D::new(0.0, rect.height() as f32),
+                                base_point,
+                                base_point + glam::Vec2::new(rect.width() as f32, 0.0),
+                                base_point + glam::Vec2::new(rect.width() as f32, rect.height() as f32),
+                                base_point + glam::Vec2::new(0.0, rect.height() as f32),
                             ]
                             .into_iter()
-                            .zip([Point2D::new(u0, v0), Point2D::new(u1, v0), Point2D::new(u1, v1), Point2D::new(u0, v1)])
+                            .zip([
+                                glam::Vec2::new(u0, v0),
+                                glam::Vec2::new(u1, v0),
+                                glam::Vec2::new(u1, v1),
+                                glam::Vec2::new(u0, v1),
+                            ])
                             .map(|(position, local_uv)| CommonVertex {
                                 position,
                                 local_uv,
@@ -630,7 +636,7 @@ impl CommonRenderer {
     //     surface: &mut S,
     //     display: &WindowDisplay,
     //     vertices: &[CommonVertex],
-    //     matrix: Option<Transform3D>,
+    //     matrix: Option<Mat4>,
     // ) -> Result<RenderInfo, DrawError> {
     //     let matrix = matrix.or(self.matrix).unwrap_or(self.window_matrix);
     //     let vertex_buffer = VertexBuffer::new(display, vertices).unwrap();
@@ -640,7 +646,7 @@ impl CommonRenderer {
     //             .minify_filter(MinifySamplerFilter::Nearest)
     //             .magnify_filter(MagnifySamplerFilter::Nearest),
     //         resolution:
-    // UPoint2D::from_tuple(surface.get_dimensions()).as_::<f32>().to_array(),
+    // glam::UVec2::from_tuple(surface.get_dimensions()).as_::<f32>().to_array(),
     //         matrix: matrix.to_cols_array_2d(),
     //     };
 
@@ -654,15 +660,7 @@ impl CommonRenderer {
     //     Ok(RenderInfo { draw_calls: 1, vertices })
     // }
 
-    pub fn render(
-        &mut self,
-        render_pass: &mut wgpu::RenderPass,
-        context: &WindowContext,
-        // matrix: Option<Transform3D>,
-        // size: USize2D,
-    ) -> super::RenderInfo {
-        // let matrix = matrix.or(self.matrix).unwrap_or(self.window_matrix);
-
+    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass, context: &WindowContext) -> super::RenderInfo {
         let vertices = self.buffers.vertices.len();
         let indices = self.buffers.indices.len();
 
@@ -670,22 +668,6 @@ impl CommonRenderer {
         context.queue.write_buffer(&self.ibo, 0, bytemuck::cast_slice(&self.buffers.indices));
 
         self.buffers.clear();
-
-        // self.shader
-        //     .bind()
-        //     .with_uniform("atlas", &self.texture)
-        //     .with_uniform("shape_data", &self.tbo)
-        //     .with_uniform("resolution", size.as_vec2().to_array())
-        //     .with_uniform("matrix", matrix);
-
-        // pass.apply_params(DrawParams {
-        //     blend: Some(Blend {
-        //         color: (BlendingFactor::SourceAlpha,
-        // BlendingFactor::OneMinusSourceAlpha),         alpha:
-        // (BlendingFactor::One, BlendingFactor::OneMinusSourceAlpha),     }),
-        //     depth: None,
-        //     culling: None,
-        // });
 
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);

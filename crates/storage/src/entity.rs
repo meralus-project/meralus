@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use mavelin_io::{EntityElementData, EntityModel, TexturePath, TextureRef};
 use mavelin_physics::Aabb;
-use mavelin_shared::{DPoint3D, Face, Point2D, Point3D, Vector2D};
+use mavelin_shared::Face;
 use mavelin_world::new_boxed_array;
 use tracing::info;
 
@@ -11,7 +11,7 @@ use crate::{FaceData, FaceUV, LoadingError, LoadingResult, Mappings, ModelLoadin
 #[derive(Debug)]
 pub struct BakedEntityModelElement {
     pub cube: Aabb,
-    pub pivot: Point3D,
+    pub pivot: glam::Vec3,
     pub faces: Box<[FaceData; 6]>,
 }
 
@@ -96,7 +96,7 @@ impl EntityModelStorage {
                                 let (offset, size, _) = if let TextureRef::Path(path) = &block.texture.path {
                                     textures.get_texture(path.1.file_stem().unwrap().to_string_lossy()).unwrap()
                                 } else {
-                                    (Point2D::ZERO, Vector2D::ZERO, 0)
+                                    (glam::Vec2::ZERO, glam::Vec2::ZERO, 0)
                                 };
 
                                 let origin = data.origin / f32::from(TextureStorage::ATLAS_SIZE);
@@ -117,7 +117,7 @@ impl EntityModelStorage {
         self.models.push(BakedEntityModel {
             name: name.to_string(),
             elements,
-            bounding_box: bounding_box.unwrap_or(const { Aabb::new(DPoint3D::ZERO, DPoint3D::ONE) }),
+            bounding_box: bounding_box.unwrap_or(const { Aabb::new(glam::DVec3::ZERO, glam::DVec3::ONE) }),
         });
 
         Ok(self.models.last().unwrap())

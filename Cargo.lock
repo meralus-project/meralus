@@ -1107,7 +1107,6 @@ dependencies = [
  "cgl",
  "dispatch2",
  "glutin_egl_sys",
- "glutin_glx_sys",
  "glutin_wgl_sys",
  "libloading 0.8.9",
  "objc2",
@@ -1129,16 +1128,6 @@ checksum = "4c4680ba6195f424febdc3ba46e7a42a0e58743f2edb115297b86d7f8ecc02d2"
 dependencies = [
  "gl_generator",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "glutin_glx_sys"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a7bb2938045a88b612499fbcba375a77198e01306f52272e692f8c1f3751185"
-dependencies = [
- "gl_generator",
- "x11-dl",
 ]
 
 [[package]]
@@ -1232,17 +1221,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "horns"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "glam",
- "glow",
- "glutin",
- "raw-window-handle",
-]
 
 [[package]]
 name = "image"
@@ -1607,6 +1585,7 @@ dependencies = [
  "crossbeam-channel",
  "etagere",
  "euclid",
+ "glam",
  "image",
  "indexmap",
  "kira",
@@ -1632,7 +1611,7 @@ dependencies = [
 name = "mavelin-engine"
 version = "0.1.0"
 dependencies = [
- "horns",
+ "glam",
  "mavelin-shared",
  "png",
  "pollster",
@@ -1645,6 +1624,7 @@ name = "mavelin-io"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "glam",
  "mavelin-shared",
  "mavelin-world",
  "serde",
@@ -1658,7 +1638,7 @@ version = "0.1.0"
 dependencies = [
  "bson",
  "futures",
- "mavelin-shared",
+ "glam",
  "serde",
  "tokio",
  "tokio-serde",
@@ -1670,6 +1650,7 @@ dependencies = [
 name = "mavelin-physics"
 version = "0.1.0"
 dependencies = [
+ "glam",
  "mavelin-shared",
 ]
 
@@ -1697,6 +1678,7 @@ name = "mavelin-storage"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "glam",
  "image",
  "mavelin-io",
  "mavelin-physics",
@@ -1720,6 +1702,7 @@ name = "mavelin-world"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "glam",
  "lasso",
  "mavelin-shared",
  "serde",
@@ -1730,6 +1713,7 @@ name = "mavelin-worldgen"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "glam",
  "mavelin-shared",
  "mavelin-world",
 ]
@@ -1916,7 +1900,7 @@ dependencies = [
 [[package]]
 name = "naga"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -1941,7 +1925,7 @@ dependencies = [
 [[package]]
 name = "naga-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
@@ -3179,9 +3163,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.51"
+version = "0.3.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85c17d80feb7334b40c484e45ed1a5273dfd8bfda537c3be2e74a06a6686f327"
+checksum = "0e48db7b415311b615f910b3dcaa4557bcd4bf1982379c95c223fd8c2a20e210"
 dependencies = [
  "deranged",
  "num-conv",
@@ -3199,9 +3183,9 @@ checksum = "9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109"
 
 [[package]]
 name = "time-macros"
-version = "0.2.30"
+version = "0.2.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcef1a61bdb119096e153208ec5cbec23944ce8bca13be5c7f60c634f7403935"
+checksum = "c431b87111666e491a90baa837f914fb45cd5dc3c268591b0220ff5057f2085f"
 dependencies = [
  "num-conv",
  "time-core",
@@ -3713,7 +3697,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.0",
@@ -3742,7 +3726,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -3775,7 +3759,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3783,7 +3767,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-emscripten"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3791,7 +3775,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "wgpu-hal",
 ]
@@ -3799,7 +3783,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -3854,7 +3838,7 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "naga",
  "wgpu-types",
@@ -3863,7 +3847,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "29.0.0"
-source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#9aefe39b74074b325ed6f42b8c219b045327c145"
+source = "git+https://github.com/mavelin-project/wgpu.git?branch=glutin#ded90f2dbfeb118a9673112eacc5ff7b056c83a7"
 dependencies = [
  "bitflags 2.13.0",
  "bytemuck",

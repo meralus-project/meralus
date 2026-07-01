@@ -1,16 +1,16 @@
 use mavelin_physics::{AabbSource, PhysicsContext, RayCastResult};
-use mavelin_shared::{FrustumCulling, Point3D, Transform3D, Vector3D, camera};
+use mavelin_shared::FrustumCulling;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
-    pub position: Point3D,
+    pub position: glam::Vec3,
 
     pub yaw: f32,
     pub pitch: f32,
 
-    pub right: Vector3D,
-    pub up: Vector3D,
-    pub front: Vector3D,
+    pub right: glam::Vec3,
+    pub up: glam::Vec3,
+    pub front: glam::Vec3,
 
     pub looking_at: Option<RayCastResult>,
 
@@ -27,15 +27,15 @@ impl Camera {
         let yaw = 0f32;
         let pitch = 0f32;
 
-        let front = Vector3D::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
+        let front = glam::Vec3::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
 
-        let right = front.cross(Vector3D::Y).normalize();
+        let right = front.cross(glam::Vec3::Y).normalize();
         let up = right.cross(front).normalize();
 
         Self {
             yaw,
             pitch,
-            position: Point3D::ZERO,
+            position: glam::Vec3::ZERO,
             right,
             up,
             front,
@@ -49,17 +49,17 @@ impl Camera {
     }
 
     #[inline]
-    pub fn new(position: Point3D) -> Self {
+    pub fn new(position: glam::Vec3) -> Self {
         Self { position, ..Self::default() }
     }
 
     #[inline]
-    pub const fn target(&self) -> Point3D {
-        Point3D::new(self.position.x + self.front.x, self.position.y + self.front.y, self.position.z + self.front.z)
+    pub const fn target(&self) -> glam::Vec3 {
+        glam::Vec3::new(self.position.x + self.front.x, self.position.y + self.front.y, self.position.z + self.front.z)
     }
 
     #[inline]
-    pub fn set_position<T: AabbSource>(&mut self, context: &PhysicsContext<T>, position: Point3D) {
+    pub fn set_position<T: AabbSource>(&mut self, context: &PhysicsContext<T>, position: glam::Vec3) {
         self.position = position;
         self.update_looking_at(context);
         self.update_frustum();
@@ -77,36 +77,36 @@ impl Camera {
 
     #[inline]
     pub fn handle_mouse<T: AabbSource>(&mut self, context: &PhysicsContext<T>, (yaw, pitch): (f32, f32)) {
-        self.front = Vector3D::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
-        self.right = self.front.cross(Vector3D::Y).normalize();
+        self.front = glam::Vec3::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos()).normalize();
+        self.right = self.front.cross(glam::Vec3::Y).normalize();
         self.up = self.right.cross(self.front).normalize();
 
         self.update_looking_at(context);
     }
 
     #[inline]
-    pub fn projection(&self) -> Transform3D {
-        camera::proj::directx::perspective(self.fov, self.aspect_ratio, self.z_near, self.z_far)
+    pub fn projection(&self) -> glam::Mat4 {
+        glam::camera::rh::proj::directx::perspective(self.fov, self.aspect_ratio, self.z_near, self.z_far)
     }
 
     #[inline]
-    pub fn view(&self) -> Transform3D {
-        camera::view::look_at_mat4(Point3D::ZERO, self.front, self.up)
+    pub fn view(&self) -> glam::Mat4 {
+        glam::camera::rh::view::look_at_mat4(glam::Vec3::ZERO, self.front, self.up)
     }
 
     #[inline]
-    pub fn world_view(&self) -> Transform3D {
-        camera::view::look_at_mat4(self.position, self.target(), self.up)
+    pub fn world_view(&self) -> glam::Mat4 {
+        glam::camera::rh::view::look_at_mat4(self.position, self.target(), self.up)
     }
 
     #[inline]
     #[allow(dead_code)]
-    pub fn matrix(&self) -> Transform3D {
+    pub fn matrix(&self) -> glam::Mat4 {
         self.projection() * self.view()
     }
 
     #[inline]
-    pub fn world_matrix(&self) -> Transform3D {
+    pub fn world_matrix(&self) -> glam::Mat4 {
         self.projection() * self.world_view()
     }
 

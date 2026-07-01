@@ -1,17 +1,17 @@
 use std::collections::VecDeque;
 
 use ahash::HashSet;
-use mavelin_shared::{Face, IPoint3D, Random};
+use mavelin_shared::{Face, Random};
 use mavelin_world::{CHUNK_HEIGHT_I32, ChunkAccess, ChunkManager, SubChunkBlockState};
 
 struct QueuedCheck {
-    pos: IPoint3D,
+    pos: glam::IVec3,
     distance: i64,
 }
 
 struct LeafDistanceCalculator {
     updates: VecDeque<QueuedCheck>,
-    seen: HashSet<IPoint3D>,
+    seen: HashSet<glam::IVec3>,
 }
 
 impl LeafDistanceCalculator {
@@ -24,7 +24,7 @@ impl LeafDistanceCalculator {
         }
     }
 
-    pub fn add_log(&mut self, pos: IPoint3D) {
+    pub fn add_log(&mut self, pos: glam::IVec3) {
         if self.seen.insert(pos) {
             self.updates.push_front(QueuedCheck { pos, distance: 0 });
         }
@@ -107,7 +107,7 @@ pub struct TreesGenerator {
 }
 
 impl TreesGenerator {
-    pub fn populate<C: ChunkAccess>(&self, chunks: &mut C, random: &mut Random, center: IPoint3D) -> bool {
+    pub fn populate<C: ChunkAccess>(&self, chunks: &mut C, random: &mut Random, center: glam::IVec3) -> bool {
         let l = random.next_i32(3) + 4;
         let mut flag = true;
         let mut ldc = LeafDistanceCalculator::new();
@@ -133,7 +133,7 @@ impl TreesGenerator {
                         }
 
                         if (0..CHUNK_HEIGHT_I32).contains(&i1) {
-                            let block = chunks.get_block(IPoint3D::new(j1, i1, k1));
+                            let block = chunks.get_block(glam::IVec3::new(j1, i1, k1));
 
                             if !block.is_none_or(|block| block.id == self.air || block.id == self.oak_leaves) {
                                 flag = false;
@@ -146,10 +146,10 @@ impl TreesGenerator {
             }
 
             if flag {
-                let block = chunks.get_block(center - IPoint3D::Y);
+                let block = chunks.get_block(center - glam::IVec3::Y);
 
                 if block.is_some_and(|block| block.id == self.grass_block || block.id == self.dirt) && center.y < CHUNK_HEIGHT_I32 - l - 1 {
-                    chunks.set_block(center - IPoint3D::Y, SubChunkBlockState::new(self.dirt));
+                    chunks.set_block(center - glam::IVec3::Y, SubChunkBlockState::new(self.dirt));
 
                     for i2 in (center.y - 3 + l)..=(center.y + l) {
                         let j1 = i2 - (center.y + l);
@@ -163,7 +163,7 @@ impl TreesGenerator {
 
                                 if (j2.abs() != k1 || l2.abs() != k1 || random.next_i32(2) != 0 && j1 != 0)
                                     && !chunks
-                                        .get_block(IPoint3D::new(l1, i2, k2))
+                                        .get_block(glam::IVec3::new(l1, i2, k2))
                                         .map(|block| block.id)
                                         .is_some_and(|name| name != self.air && ![self.water, self.snow, self.glass, self.ice].contains(&name))
                                 {
@@ -171,7 +171,7 @@ impl TreesGenerator {
 
                                     state.set_i64("distance", 7);
 
-                                    chunks.set_block(IPoint3D::new(l1, i2, k2), state);
+                                    chunks.set_block(glam::IVec3::new(l1, i2, k2), state);
                                 }
                             }
                         }
@@ -179,12 +179,12 @@ impl TreesGenerator {
 
                     for i2 in 0..l {
                         if chunks
-                            .get_block(center + IPoint3D::Y * i2)
+                            .get_block(center + glam::IVec3::Y * i2)
                             .is_none_or(|block| block.id == self.air || block.id == self.oak_leaves)
                         {
-                            chunks.set_block(center + IPoint3D::Y * i2, SubChunkBlockState::new(self.oak_log));
+                            chunks.set_block(center + glam::IVec3::Y * i2, SubChunkBlockState::new(self.oak_log));
 
-                            ldc.add_log(center + IPoint3D::Y * i2);
+                            ldc.add_log(center + glam::IVec3::Y * i2);
                         }
                     }
 
@@ -206,7 +206,7 @@ impl TreesGenerator {
 #[allow(dead_code)]
 pub struct BigTreeGenerator {
     random: Random,
-    pos: IPoint3D,
+    pos: glam::IVec3,
     e: i32,
     f: i32,
     g: f64,
@@ -226,7 +226,7 @@ pub struct BigTreeGenerator {
 //     pub fn new() -> Self {
 //         Self {
 //             random: Random::new(0),
-//             pos: IPoint3D::ZERO,
+//             pos: glam::IVec3::ZERO,
 //             e: 0,
 //             f: -1,
 //             g: 0.618,
@@ -490,8 +490,8 @@ pub struct BigTreeGenerator {
 //         }
 //     }
 
-//     fn a<C: ChunkAccess>(&self, chunks: &C, aint: IPoint3D, aint1: IPoint3D)
-// -> i32 {         let mut aint2 = IPoint3D::ZERO;
+//     fn a<C: ChunkAccess>(&self, chunks: &C, aint: glam::IVec3, aint1:
+// glam::IVec3) -> i32 {         let mut aint2 = glam::IVec3::ZERO;
 //         let mut b0 = 0;
 //         let mut b1 = 0;
 
@@ -521,7 +521,7 @@ pub struct BigTreeGenerator {
 //             let d0 = aint2[b2 as usize] as f64 / aint2[b1] as f64;
 //             let d1 = aint2[b3 as usize] as f64 / aint2[b1] as f64;
 
-//             let mut aint3 = IPoint3D::ZERO;
+//             let mut aint3 = glam::IVec3::ZERO;
 //             let mut i = 0;
 //             let mut j = aint2[b1];
 
@@ -546,10 +546,10 @@ pub struct BigTreeGenerator {
 
 //     fn d<C: ChunkAccess>(&self, chunks: &C) -> bool {
 //         let aint = self.pos;
-//         let aint1 = self.pos + IPoint3D::Y * (self.e - 1);
+//         let aint1 = self.pos + glam::IVec3::Y * (self.e - 1);
 
 //         if chunks
-//             .get_block(self.pos - IPoint3D::Y.to_vector())
+//             .get_block(self.pos - glam::IVec3::Y.to_vector())
 //             .is_some_and(|block| block.name == self.grass_block ||
 // block.name == self.dirt)         {
 //             let j = self.a(chunks, aint, aint1);
@@ -569,7 +569,7 @@ pub struct BigTreeGenerator {
 //     }
 
 //     pub fn populate<C: ChunkAccess>(&mut self, chunks: &mut C, random: &mut
-// Random, center: IPoint3D) -> bool {         let l = random.next_i64();
+// Random, center: glam::IVec3) -> bool {         let l = random.next_i64();
 
 //         self.random.set_seed(l);
 //         self.pos = center;
@@ -608,7 +608,7 @@ pub struct ForestGenerator {
 }
 
 impl ForestGenerator {
-    pub fn populate<C: ChunkAccess>(&self, chunks: &mut C, random: &mut Random, center: IPoint3D) -> bool {
+    pub fn populate<C: ChunkAccess>(&self, chunks: &mut C, random: &mut Random, center: glam::IVec3) -> bool {
         let l = random.next_i32(3) + 5;
         let mut flag = true;
         let mut ldc = LeafDistanceCalculator::new();
@@ -634,7 +634,7 @@ impl ForestGenerator {
                         }
 
                         if (0..CHUNK_HEIGHT_I32).contains(&i1) {
-                            let block = chunks.get_block(IPoint3D::new(j1, i1, k1));
+                            let block = chunks.get_block(glam::IVec3::new(j1, i1, k1));
 
                             if !block.is_none_or(|block| block.id == self.air || block.id == self.oak_leaves) {
                                 flag = false;
@@ -647,10 +647,10 @@ impl ForestGenerator {
             }
 
             if flag {
-                let block = chunks.get_block(center - IPoint3D::Y);
+                let block = chunks.get_block(center - glam::IVec3::Y);
 
                 if block.is_some_and(|block| block.id == self.grass_block || block.id == self.dirt) && center.y < CHUNK_HEIGHT_I32 - l - 1 {
-                    chunks.set_block(center - IPoint3D::Y, SubChunkBlockState::new(self.dirt));
+                    chunks.set_block(center - glam::IVec3::Y, SubChunkBlockState::new(self.dirt));
 
                     for i2 in (center.y - 3 + l)..=(center.y + l) {
                         let j1 = i2 - (center.y + l);
@@ -664,7 +664,7 @@ impl ForestGenerator {
 
                                 if (j2.abs() != k1 || l2.abs() != k1 || random.next_i32(2) != 0 && j1 != 0)
                                     && !chunks
-                                        .get_block(IPoint3D::new(l1, i2, k2))
+                                        .get_block(glam::IVec3::new(l1, i2, k2))
                                         .map(|block| block.id)
                                         .is_some_and(|name| name != self.air && ![self.water, self.snow, self.glass, self.ice].contains(&name))
                                 {
@@ -672,7 +672,7 @@ impl ForestGenerator {
 
                                     state.set_i64("distance", 7);
 
-                                    chunks.set_block(IPoint3D::new(l1, i2, k2), state);
+                                    chunks.set_block(glam::IVec3::new(l1, i2, k2), state);
                                 }
                             }
                         }
@@ -680,12 +680,12 @@ impl ForestGenerator {
 
                     for i2 in 0..l {
                         if chunks
-                            .get_block(center + IPoint3D::Y * i2)
+                            .get_block(center + glam::IVec3::Y * i2)
                             .is_none_or(|block| block.id == self.air || block.id == self.oak_leaves)
                         {
-                            chunks.set_block(center + IPoint3D::Y * i2, SubChunkBlockState::new(self.oak_log));
+                            chunks.set_block(center + glam::IVec3::Y * i2, SubChunkBlockState::new(self.oak_log));
 
-                            ldc.add_log(center + IPoint3D::Y * i2);
+                            ldc.add_log(center + glam::IVec3::Y * i2);
                         }
                     }
 

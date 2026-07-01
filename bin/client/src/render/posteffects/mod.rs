@@ -1,14 +1,14 @@
 use horns::{ElementType, IndexBuffer, Program, RenderBackend, RenderPass, Shader, Texture2d, VertexBuffer, impl_vertex};
 use mavelin_physics::{AabbSource, PhysicsBody, PhysicsContext, RayCastResult};
-use mavelin_shared::{Color, Point2D, Point3D, Size3D, Transform3D, Vector3D};
+use mavelin_shared::Color;
 
 pub mod kawase;
 
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 struct BasicVertex {
-    position: Point3D,
-    uv: Point2D,
+    position: glam::Vec3,
+    uv: glam::Vec2,
 }
 
 impl_vertex! {
@@ -21,7 +21,7 @@ impl_vertex! {
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 struct ParticleVertex {
-    position: Point3D,
+    position: glam::Vec3,
 }
 
 impl_vertex! {
@@ -33,8 +33,8 @@ impl_vertex! {
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct ParticleInstance {
-    pub world_position: Point3D,
-    pub color: Vector3D,
+    pub world_position: glam::Vec3,
+    pub color: glam::Vec3,
 }
 
 impl_vertex! {
@@ -46,28 +46,28 @@ impl_vertex! {
 
 const PARTICLE: [ParticleVertex; 8] = [
     ParticleVertex {
-        position: Point3D::new(0.2, 0.2, 0.0),
+        position: glam::Vec3::new(0.2, 0.2, 0.0),
     }, // 0
     ParticleVertex {
-        position: Point3D::new(0.0, 0.2, 0.0),
+        position: glam::Vec3::new(0.0, 0.2, 0.0),
     }, // 1
     ParticleVertex {
-        position: Point3D::new(0.2, 0.2, 0.2),
+        position: glam::Vec3::new(0.2, 0.2, 0.2),
     }, // 2
     ParticleVertex {
-        position: Point3D::new(0.0, 0.2, 0.2),
+        position: glam::Vec3::new(0.0, 0.2, 0.2),
     }, // 3
     ParticleVertex {
-        position: Point3D::new(0.2, 0.0, 0.0),
+        position: glam::Vec3::new(0.2, 0.0, 0.0),
     }, // 4
     ParticleVertex {
-        position: Point3D::new(0.0, 0.0, 0.0),
+        position: glam::Vec3::new(0.0, 0.0, 0.0),
     }, // 5
     ParticleVertex {
-        position: Point3D::new(0.0, 0.0, 0.2),
+        position: glam::Vec3::new(0.0, 0.0, 0.2),
     }, // 6
     ParticleVertex {
-        position: Point3D::new(0.2, 0.0, 0.2),
+        position: glam::Vec3::new(0.2, 0.0, 0.2),
     }, // 7
 ];
 
@@ -95,8 +95,8 @@ impl ParticleSystem {
         }
     }
 
-    pub fn spawn(&mut self, backend: &RenderBackend, position: Point3D, color: Color) {
-        self.particles.push(PhysicsBody::new(position, Size3D::splat(1.0)));
+    pub fn spawn(&mut self, backend: &RenderBackend, position: glam::Vec3, color: Color) {
+        self.particles.push(PhysicsBody::new(position, glam::Vec3::splat(1.0)));
 
         let particle_instances = self
             .particles
@@ -110,9 +110,9 @@ impl ParticleSystem {
         self.particle_instances = backend.create_vertex_buffer(&particle_instances, false).unwrap();
     }
 
-    pub fn spawn_batch(&mut self, backend: &RenderBackend, positions: impl Iterator<Item = Point3D>, color: Color) {
+    pub fn spawn_batch(&mut self, backend: &RenderBackend, positions: impl Iterator<Item = glam::Vec3>, color: Color) {
         for position in positions {
-            self.particles.push(PhysicsBody::new(position, Size3D::splat(1.0)));
+            self.particles.push(PhysicsBody::new(position, glam::Vec3::splat(1.0)));
         }
 
         let particle_instances = self
@@ -131,7 +131,7 @@ impl ParticleSystem {
         let mut mapping = self.particle_instances.map();
 
         for (body, particle) in self.particles.iter_mut().zip(mapping.iter_mut()) {
-            body.velocity += Vector3D::Z * -3.8 * delta;
+            body.velocity += glam::Vec3::Z * -3.8 * delta;
 
             let origin = body.position.as_dvec3();
             let speed = body.velocity.length();
@@ -139,7 +139,7 @@ impl ParticleSystem {
             let (dist, norm) = context
                 .raycast(origin, origin + body.velocity.as_dvec3() * delta as f64, true)
                 .filter(RayCastResult::is_block)
-                .map_or((0.0, Vector3D::ZERO), |raycast| {
+                .map_or((0.0, glam::Vec3::ZERO), |raycast| {
                     (body.position.distance(raycast.position.as_vec3()), raycast.hit_side.as_normal().as_vec3())
                 });
 
@@ -159,7 +159,7 @@ impl ParticleSystem {
         }
     }
 
-    pub fn render<S: Surface>(&self, surface: &mut S, matrix: Transform3D) -> Result<(), DrawError> {
+    pub fn render<S: Surface>(&self, surface: &mut S, matrix: glam::Mat4) -> Result<(), DrawError> {
         surface.draw(
             (&self.base_particle, self.particle_instances.per_instance().unwrap()),
             &self.base_particle_indices,
@@ -172,23 +172,22 @@ impl ParticleSystem {
 
 const SCREEN_RECTANGLE: [BasicVertex; 4] = [
     BasicVertex {
-        position: Point3D::new(-1.0, 1.0, 0.0),
-        uv: Point2D::new(0.0, 1.0),
+        position: glam::Vec3::new(-1.0, 1.0, 0.0),
+        uv: glam::Vec2::new(0.0, 1.0),
     },
     BasicVertex {
-        position: Point3D::new(-1.0, -1.0, 0.0),
-        uv: Point2D::new(0.0, 0.0),
+        position: glam::Vec3::new(-1.0, -1.0, 0.0),
+        uv: glam::Vec2::new(0.0, 0.0),
     },
     BasicVertex {
-        position: Point3D::new(1.0, 1.0, 0.0),
-        uv: Point2D::new(1.0, 1.0),
+        position: glam::Vec3::new(1.0, 1.0, 0.0),
+        uv: glam::Vec2::new(1.0, 1.0),
     },
     BasicVertex {
-        position: Point3D::new(1.0, -1.0, 0.0),
-        uv: Point2D::new(1.0, 0.0),
+        position: glam::Vec3::new(1.0, -1.0, 0.0),
+        uv: glam::Vec2::new(1.0, 0.0),
     },
 ];
-
 
 pub struct WorldScene {
     main_color_attachment: Texture2d,

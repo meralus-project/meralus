@@ -3,8 +3,6 @@ mod body;
 mod context;
 mod raycast;
 
-use mavelin_shared::{IPoint3D, Point3D};
-
 pub use self::{
     aabb::Aabb,
     body::{PhysicsBody, PhysicsConfig},
@@ -13,16 +11,16 @@ pub use self::{
 };
 
 pub trait AabbSource {
-    fn get_aabb(&self, position: Point3D) -> Option<Aabb>;
-    fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb>;
+    fn get_aabb(&self, position: glam::Vec3) -> Option<Aabb>;
+    fn get_block_aabb(&self, position: glam::IVec3) -> Option<Aabb>;
 }
 
 impl<T: AabbSource> AabbSource for &T {
-    fn get_aabb(&self, position: Point3D) -> Option<Aabb> {
+    fn get_aabb(&self, position: glam::Vec3) -> Option<Aabb> {
         T::get_aabb(self, position)
     }
 
-    fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
+    fn get_block_aabb(&self, position: glam::IVec3) -> Option<Aabb> {
         T::get_block_aabb(self, position)
     }
 }

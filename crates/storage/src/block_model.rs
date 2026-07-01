@@ -3,7 +3,7 @@ use std::path::Path;
 use ahash::HashMap;
 use mavelin_io::{BlockFace, Faces, JsonError, TexturePath, TextureRef};
 use mavelin_physics::Aabb;
-use mavelin_shared::{Axis, DPoint3D, Face, IPoint3D, Point2D, Point3D, Transform3D, Vector2D, Vector3D};
+use mavelin_shared::{Axis, Face};
 
 use crate::{LoadingError, LoadingResult, Mappings, block::BlockStorage, texture::TextureStorage};
 
@@ -39,7 +39,7 @@ impl Corner {
     }
 
     #[inline]
-    pub const fn from_vec(face: Face, vec: Point3D) -> Self {
+    pub const fn from_vec(face: Face, vec: glam::Vec3) -> Self {
         Self::from_array(match face.as_axis() {
             Axis::X => [vec.y, vec.z], // only yz
             Axis::Y => [vec.x, vec.z], // only xz
@@ -58,7 +58,7 @@ impl Corner {
     //     [1, 1],   // RIGHT TOP
     // ];
 
-    pub const fn get_neighbours(self, face: Face) -> [IPoint3D; 3] {
+    pub const fn get_neighbours(self, face: Face) -> [glam::IVec3; 3] {
         let neighbours = face.get_neighbours();
 
         match self {
@@ -72,17 +72,17 @@ impl Corner {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FaceUV {
-    pub offset: Point2D,
-    pub scale: Vector2D,
+    pub offset: glam::Vec2,
+    pub scale: glam::Vec2,
 }
 
 #[derive(Debug)]
 pub struct FaceData {
     pub face: Face,
-    pub normal: IPoint3D,
-    pub vertices: [Point3D; 4],
-    pub corners: [[IPoint3D; 3]; 4],
-    pub uvs: [Point2D; 4],
+    pub normal: glam::IVec3,
+    pub vertices: [glam::Vec3; 4],
+    pub corners: [[glam::IVec3; 3]; 4],
+    pub uvs: [glam::Vec2; 4],
 }
 
 #[inline]
@@ -98,7 +98,7 @@ const fn as_vertex_corners(face: Face) -> [Corner; 4] {
 }
 
 impl FaceData {
-    pub fn new(face: Face, aabb: Aabb, uv: FaceUV, rotation: Option<&(Transform3D, Point3D, Point3D)>) -> Self {
+    pub fn new(face: Face, aabb: Aabb, uv: FaceUV, rotation: Option<&(glam::Mat4, glam::Vec3, glam::Vec3)>) -> Self {
         let mut vertices = face.as_vertices();
 
         let aabb_size = aabb.size().as_vec3();
@@ -109,7 +109,7 @@ impl FaceData {
             *vertex = if let Some((matrix, origin, scale)) = rotation {
                 let point = matrix.transform_point3(vert - origin);
 
-                Point3D::new(point.x * scale.x, point.y * scale.y, point.z * scale.z) + origin
+                glam::Vec3::new(point.x * scale.x, point.y * scale.y, point.z * scale.z) + origin
             } else {
                 vert
             };
@@ -131,8 +131,8 @@ impl FaceData {
             normal: face.as_normal(),
             vertices,
             corners: as_vertex_corners(face).map(|corner| corner.get_neighbours(face)),
-            uvs: [Point2D::X, Point2D::ZERO, Point2D::ONE, Point2D::Y].map(|face_uv| {
-                let face_uv = Point2D::new(face_uv.x * uv.scale.x, face_uv.y * uv.scale.y);
+            uvs: [glam::Vec2::X, glam::Vec2::ZERO, glam::Vec2::ONE, glam::Vec2::Y].map(|face_uv| {
+                let face_uv = glam::Vec2::new(face_uv.x * uv.scale.x, face_uv.y * uv.scale.y);
 
                 uv.offset + face_uv
             }),
@@ -144,7 +144,7 @@ impl FaceData {
 pub struct BlockModelFace {
     pub texture_id: usize,
     pub face_data: FaceData,
-    pub cull_face: Option<(usize, IPoint3D, Face, usize)>,
+    pub cull_face: Option<(usize, glam::IVec3, Face, usize)>,
     pub tint: bool,
     pub uv: FaceUV,
     pub is_opaque: bool,
@@ -155,7 +155,7 @@ impl BlockModelFace {
         texture_storage: &TextureStorage,
         textures: &HashMap<String, TextureRef>,
         aabb: Aabb,
-        rotation: Option<&(Transform3D, Point3D, Point3D)>,
+        rotation: Option<&(glam::Mat4, glam::Vec3, glam::Vec3)>,
         data: &BlockFace,
         face: Face,
     ) -> Self {
@@ -278,11 +278,11 @@ impl BakedBlockModelStorage {
 
                 let rotation = element.rotation.map(|rotation| {
                     let angle = rotation.angle.to_radians();
-                    let scale = Point3D::ONE;
+                    let scale = glam::Vec3::ONE;
                     let matrix = match rotation.axis {
-                        Axis::X => Transform3D::from_rotation_x(angle),
-                        Axis::Y => Transform3D::from_rotation_y(angle),
-                        Axis::Z => Transform3D::from_rotation_z(angle),
+                        Axis::X => glam::Mat4::from_rotation_x(angle),
+                        Axis::Y => glam::Mat4::from_rotation_y(angle),
+                        Axis::Z => glam::Mat4::from_rotation_z(angle),
                     };
 
                     (matrix, rotation.origin, scale)
@@ -312,7 +312,7 @@ impl BakedBlockModelStorage {
 
         let is_opaque = elements
             .iter()
-            .any(|element| (element.cube.size().as_vec3() - Vector3D::ONE).abs().to_array() < ERROR);
+            .any(|element| (element.cube.size().as_vec3() - glam::Vec3::ONE).abs().to_array() < ERROR);
 
         let index = self.models.len();
 
@@ -320,7 +320,7 @@ impl BakedBlockModelStorage {
             name: name.to_string(),
             ambient_occlusion: block.ambient_occlusion.unwrap_or(true),
             elements,
-            bounding_box: bounding_box.unwrap_or(const { Aabb::new(DPoint3D::ZERO, DPoint3D::ONE) }),
+            bounding_box: bounding_box.unwrap_or(const { Aabb::new(glam::DVec3::ZERO, glam::DVec3::ONE) }),
             is_opaque,
         });
 

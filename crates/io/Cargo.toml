@@ -10,6 +10,7 @@ mavelin-shared = { workspace = true, features = ["geometry", "face", "serde"] }
 mavelin-world = { workspace = true, features = ["serde"] }
 serde_json.workspace = true
 toml = "1.1.2"
+glam.workspace = true
 
 [lints]
 workspace = true

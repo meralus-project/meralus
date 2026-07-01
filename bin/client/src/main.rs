@@ -31,7 +31,7 @@ use cpal::traits::HostTrait;
 use kira::{AudioManager, AudioManagerSettings, backend::cpal::CpalBackendSettings};
 use mavelin_engine::{Application, CursorGrabMode, KeyCode, KeyboardModifiers, MouseButton, State, WindowContext};
 use mavelin_physics::PhysicsContext;
-use mavelin_shared::{Color, Point2D, Point3D, USize2D, Vector2D, camera::proj};
+use mavelin_shared::Color;
 use mavelin_storage::{Block, ResourceStorage, TextureStorage};
 use mavelin_tween::{Animation, Tween};
 use mavelin_world::{BlockSource, ChunkManager};
@@ -250,7 +250,10 @@ impl State for GameLoop {
 
         common_renderer.add_font("default", include_bytes!("../../../resources/fonts/Monocraft.ttf"));
         common_renderer.add_font("default_bold", include_bytes!("../../../resources/fonts/Monocraft-Bold.ttf"));
-        common_renderer.set_window_matrix(context.queue, proj::directx::orthographic(0.0, size.x, size.y, 0.0, -100.0, 100.0));
+        common_renderer.set_window_matrix(
+            context.queue,
+            glam::camera::rh::proj::directx::orthographic(0.0, size.x, size.y, 0.0, -100.0, 100.0),
+        );
 
         // let sounds = fs::read_dir("./resources/sounds")
         //     .unwrap()
@@ -328,14 +331,16 @@ impl State for GameLoop {
         }
     }
 
-    fn handle_window_resize(&mut self, context: WindowContext, size: USize2D, _scale_factor: f64) {
+    fn handle_window_resize(&mut self, context: WindowContext, size: glam::UVec2, _scale_factor: f64) {
         // self.scene.resize(facade, size.to_array()).unwrap();
         // self.kawase.resize(facade, size.to_array()).unwrap();
 
         let size = size.as_vec2();
 
-        self.common_renderer
-            .set_window_matrix(context.queue, proj::directx::orthographic(0.0, size.x, size.y, 0.0, -1000.0, 1000.0));
+        self.common_renderer.set_window_matrix(
+            context.queue,
+            glam::camera::rh::proj::directx::orthographic(0.0, size.x, size.y, 0.0, -1000.0, 1000.0),
+        );
 
         if let Some(world) = &mut self.world {
             world.camera.aspect_ratio = size.x / size.y;
@@ -354,7 +359,7 @@ impl State for GameLoop {
         self.input.mouse.handle_mouse_button(button, is_pressed);
     }
 
-    fn handle_mouse_motion(&mut self, delta: Option<Vector2D>, position: Option<Point2D>) {
+    fn handle_mouse_motion(&mut self, delta: Option<glam::Vec2>, position: Option<glam::Vec2>) {
         if let Some(delta) = delta
             && let Some(world) = self.world.as_mut()
             && world.clock.active()
@@ -373,7 +378,7 @@ impl State for GameLoop {
         }
     }
 
-    fn handle_mouse_wheel(&mut self, delta: Vector2D) {
+    fn handle_mouse_wheel(&mut self, delta: glam::Vec2) {
         if let Some(world) = &mut self.world {
             if delta.y > 0.0 {
                 world.inventory_slot.decrease();
@@ -449,7 +454,7 @@ impl State for GameLoop {
                     &view,
                     &mut encoder,
                     &mut self.common_renderer,
-                    USize2D::new(width, height),
+                    glam::UVec2::new(width, height),
                     &self.settings,
                     info,
                     delta,
@@ -540,10 +545,10 @@ enum Page {
     Main,
 }
 
-fn apply_world_template(mut world: World, resources: &ResourceStorage, size: Vector2D) -> World {
+fn apply_world_template(mut world: World, resources: &ResourceStorage, size: glam::Vec2) -> World {
     world.seed = 128;
-    world.entities.spawn_model(Point3D::new(0.0, 128.0, 0.0), 0);
-    world.entities.spawn_model(Point3D::new(32.0, 128.0, 0.0), 1);
+    world.entities.spawn_model(glam::Vec3::new(0.0, 128.0, 0.0), 0);
+    world.entities.spawn_model(glam::Vec3::new(32.0, 128.0, 0.0), 1);
     world.camera.aspect_ratio = size.x / size.y;
 
     world.player.inventory.try_insert(&Item {

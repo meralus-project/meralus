@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use mavelin_shared::{DPoint2D, DPoint3D, IPoint2D, IPoint3D, Random};
+use mavelin_shared::Random;
 
 pub struct Perlin {
     permute_table: [i32; 512],
@@ -170,7 +170,7 @@ impl Perlin {
         f64::from(aint[0]).mul_add(d0, f64::from(aint[1]) * d1)
     }
 
-    pub fn generate_noise2d(&self, noise_data: &mut [f64], offset: DPoint2D, size: IPoint2D, scale: DPoint3D) {
+    pub fn generate_noise2d(&self, noise_data: &mut [f64], offset: glam::DVec2, size: glam::IVec2, scale: glam::DVec3) {
         let mut index = 0;
 
         for x in 0..size.x {
@@ -225,7 +225,7 @@ impl Perlin {
         }
     }
 
-    pub fn generate_noise3d(&self, data: &mut [f64], offset: DPoint3D, size: IPoint3D, scale: DPoint3D, frequency: f64) {
+    pub fn generate_noise3d(&self, data: &mut [f64], offset: glam::DVec3, size: glam::IVec3, scale: glam::DVec3, frequency: f64) {
         if size.y == 1 {
             self.generate_noise3d_short(data, offset, size, scale, frequency);
         } else {
@@ -321,7 +321,7 @@ impl Perlin {
         }
     }
 
-    fn generate_noise3d_short(&self, data: &mut [f64], offset: DPoint3D, size: IPoint3D, scale: DPoint3D, frequency: f64) {
+    fn generate_noise3d_short(&self, data: &mut [f64], offset: glam::DVec3, size: glam::IVec3, scale: glam::DVec3, frequency: f64) {
         let inv_frequency = 1.0 / frequency;
         let mut data_offset = 0;
 

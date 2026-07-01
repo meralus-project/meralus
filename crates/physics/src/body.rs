@@ -1,5 +1,3 @@
-use mavelin_shared::{Point3D, Size3D, Vector3D};
-
 use crate::Aabb;
 
 pub struct PhysicsConfig {
@@ -29,19 +27,19 @@ impl Default for PhysicsConfig {
 pub struct PhysicsBody {
     pub config: PhysicsConfig,
     pub is_on_ground: bool,
-    pub size: Size3D,
-    pub position: Point3D,
-    pub velocity: Vector3D,
+    pub size: glam::Vec3,
+    pub position: glam::Vec3,
+    pub velocity: glam::Vec3,
 }
 
 impl PhysicsBody {
-    pub fn new(position: Point3D, size: Size3D) -> Self {
+    pub fn new(position: glam::Vec3, size: glam::Vec3) -> Self {
         Self {
             config: PhysicsConfig::default(),
             is_on_ground: false,
             size,
             position,
-            velocity: Vector3D::ZERO,
+            velocity: glam::Vec3::ZERO,
         }
     }
 

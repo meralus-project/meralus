@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 
-use mavelin_shared::{Face, IPoint2D, USizePoint3D};
+use mavelin_shared::Face;
 
 use crate::{BlockSource, CHUNK_HEIGHT, Chunk, ChunkAccess, SubChunk};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LightNode(pub USizePoint3D, pub IPoint2D);
+pub struct LightNode(pub glam::USizeVec3, pub glam::IVec2);
 
 pub struct BfsLight<'a, C: ChunkAccess> {
     pub chunk_manager: &'a mut C,

@@ -1,4 +1,4 @@
-use mavelin_shared::{DPoint2D, DPoint3D, IPoint2D, IPoint3D, Random};
+use mavelin_shared::Random;
 use mavelin_world::new_boxed_array;
 
 use super::Perlin;
@@ -28,7 +28,7 @@ impl<const O: usize> Fbm<O> {
         noise
     }
 
-    pub fn generate_noise(&self, offset: DPoint3D, size: IPoint3D, scale: DPoint3D) -> [f64; TERRAIN_NOISE_SIZE] {
+    pub fn generate_noise(&self, offset: glam::DVec3, size: glam::IVec3, scale: glam::DVec3) -> [f64; TERRAIN_NOISE_SIZE] {
         let mut noise_data = [0.0; TERRAIN_NOISE_SIZE];
         let mut frequency = 1.0;
 
@@ -41,7 +41,7 @@ impl<const O: usize> Fbm<O> {
         noise_data
     }
 
-    pub fn generate_noise2d(&self, offset: DPoint2D, size: IPoint2D, mut scale: DPoint3D, frequency_step: f64) -> Vec<f64> {
+    pub fn generate_noise2d(&self, offset: glam::DVec2, size: glam::IVec2, mut scale: glam::DVec3, frequency_step: f64) -> Vec<f64> {
         scale.x /= 1.5;
         scale.y /= 1.5;
 
@@ -55,7 +55,7 @@ impl<const O: usize> Fbm<O> {
                 &mut noise_data,
                 offset,
                 size,
-                DPoint3D::new(scale.x * xy_scale, scale.y * xy_scale, 0.55 / frequency),
+                glam::DVec3::new(scale.x * xy_scale, scale.y * xy_scale, 0.55 / frequency),
             );
 
             xy_scale *= scale.z;

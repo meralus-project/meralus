@@ -1,30 +1,28 @@
 use core::{fmt, ops::Add};
 
-use super::{Point3D, Size3D};
-
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct Cube3D {
-    pub origin: Point3D,
-    pub size: Size3D,
+pub struct Cube {
+    pub origin: glam::Vec3,
+    pub size: glam::Vec3,
 }
 
-impl Cube3D {
+impl Cube {
     pub const ONE: Self = Self {
-        origin: Point3D::ZERO,
-        size: Size3D::ONE,
+        origin: glam::Vec3::ZERO,
+        size: glam::Vec3::ONE,
     };
     pub const ZERO: Self = Self {
-        origin: Point3D::ZERO,
-        size: Size3D::ZERO,
+        origin: glam::Vec3::ZERO,
+        size: glam::Vec3::ZERO,
     };
 
-    pub const fn new(origin: Point3D, size: Size3D) -> Self {
+    pub const fn new(origin: glam::Vec3, size: glam::Vec3) -> Self {
         Self { origin, size }
     }
 }
 
-impl fmt::Display for Cube3D {
+impl fmt::Display for Cube {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -34,10 +32,10 @@ impl fmt::Display for Cube3D {
     }
 }
 
-impl Add<Point3D> for Cube3D {
+impl Add<glam::Vec3> for Cube {
     type Output = Self;
 
-    fn add(self, rhs: Point3D) -> Self::Output {
+    fn add(self, rhs: glam::Vec3) -> Self::Output {
         Self {
             origin: self.origin + rhs,
             size: self.size,

@@ -1,6 +1,5 @@
 use ahash::{HashMap, HashSet};
 use mavelin_engine::{KeyCode, KeyboardModifiers, MouseButton};
-use mavelin_shared::Point2D;
 
 #[derive(Debug, Default)]
 pub struct KeyboardController {
@@ -53,7 +52,7 @@ impl KeyboardController {
 
 #[derive(Debug, Default)]
 pub struct MouseController {
-    pub position: Point2D,
+    pub position: glam::Vec2,
     pressed_once: HashSet<MouseButton>,
     pressed: HashSet<MouseButton>,
     released: HashSet<MouseButton>,
@@ -84,7 +83,7 @@ impl MouseController {
     }
 
     #[inline]
-    pub const fn handle_mouse_motion(&mut self, position: Point2D) {
+    pub const fn handle_mouse_motion(&mut self, position: glam::Vec2) {
         self.position = position;
     }
 

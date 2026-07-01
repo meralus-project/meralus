@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mavelin_shared::{Color, Point2D, Size2D};
+use mavelin_shared::Color;
 use mavelin_tween::{Animation, Tween};
 
 use crate::{
@@ -41,14 +41,14 @@ impl Screen for LoadingOverlay {
                 scope.row(|scope| {
                     scope.set_height(32.0);
 
-                    scope.add_space(Point2D::new(4.0, 0.0));
+                    scope.add_space(glam::Vec2::new(4.0, 0.0));
                     scope.rect(
-                        Size2D::new((size.x - 4.0) * 0.4 * self.progress.get_copy(), 32.0),
+                        glam::Vec2::new((size.x - 4.0) * 0.4 * self.progress.get_copy(), 32.0),
                         Color::from_hsl(110.0, 0.4, 0.7),
                     );
                 });
 
-                scope.add_space(Point2D::new(0.0, 4.0));
+                scope.add_space(glam::Vec2::new(0.0, 4.0));
             });
         });
     }

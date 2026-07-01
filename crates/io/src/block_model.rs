@@ -1,5 +1,5 @@
 use ahash::HashMap;
-use mavelin_shared::{Axis, Face, Point2D, Point3D};
+use mavelin_shared::{Axis, Face};
 use serde::{
     Deserialize, Serialize,
     de::{Error, Visitor},
@@ -17,7 +17,7 @@ pub struct BlockFace {
     pub texture: String,
     /// Optional UV coordinates in the range `0.0..1.0` on both axes (where
     /// `0.0, 0.0` is bottom-left and `1.0, 1.0` is top-right).
-    pub uv: Option<[Point2D; 2]>,
+    pub uv: Option<[glam::Vec2; 2]>,
     /// Specifies whether to apply color of current biome to the texture.
     pub tint: bool,
     /// Face, if there is a block on which this face will be "skipped"
@@ -113,7 +113,7 @@ impl BlockModel {
     pub fn is_opaque(&self) -> bool {
         self.elements
             .iter()
-            .any(|element| element.start == Point3D::ZERO && element.end == Point3D::ONE)
+            .any(|element| element.start == glam::Vec3::ZERO && element.end == glam::Vec3::ONE)
     }
 }
 
@@ -124,9 +124,9 @@ impl BlockModel {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockElement {
     /// Start point in the range `0.0..1.0` for all axes.
-    pub start: Point3D,
+    pub start: glam::Vec3,
     /// End point in the range `0.0..1.0` for all axes.
-    pub end: Point3D,
+    pub end: glam::Vec3,
     /// Faces with certain UV coordinates, texture and some other parameters.
     #[serde(flatten)]
     pub faces: Faces,
@@ -139,7 +139,7 @@ pub struct BlockElement {
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
 pub struct ElementRotation {
     /// Point around which rotation will be performed.
-    pub origin: Point3D,
+    pub origin: glam::Vec3,
     /// Axis of rotation.
     pub axis: Axis,
     /// Angle of rotation (in degrees).

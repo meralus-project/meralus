@@ -1,9 +1,7 @@
 use std::ops::{Index, IndexMut};
 
-use crate::{Point3D, Transform2D, Transform3D, Vector3D, Vector4D};
-
 pub trait Frustum {
-    fn is_box_visible(&self, minp: Point3D, maxp: Point3D) -> bool;
+    fn is_box_visible(&self, minp: glam::Vec3, maxp: glam::Vec3) -> bool;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,12 +25,12 @@ impl Plane {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FrustumCulling {
-    planes: [Vector4D; Plane::Count as usize],
-    points: [Vector3D; 8],
+    planes: [glam::Vec4; Plane::Count as usize],
+    points: [glam::Vec3; 8],
 }
 
 impl Index<Plane> for FrustumCulling {
-    type Output = Vector4D;
+    type Output = glam::Vec4;
 
     #[inline]
     fn index(&self, index: Plane) -> &Self::Output {
@@ -51,13 +49,13 @@ impl FrustumCulling {
     #[inline]
     pub const fn default() -> Self {
         Self {
-            planes: [Vector4D::ZERO; Plane::Count as usize],
-            points: [Vector3D::ZERO; 8],
+            planes: [glam::Vec4::ZERO; Plane::Count as usize],
+            points: [glam::Vec3::ZERO; 8],
         }
     }
 
     #[inline]
-    pub fn update(&mut self, projection_view: Transform3D) {
+    pub fn update(&mut self, projection_view: glam::Mat4) {
         use Plane::{Bottom, Combinations, Far, Left, Near, Right, Top};
 
         let projection = projection_view.transpose();
@@ -69,7 +67,7 @@ impl FrustumCulling {
         self[Near] = projection.col(3) + projection.col(2);
         self[Far] = projection.col(3) - projection.col(2);
 
-        let crosses: [Vector3D; Combinations as usize] = [
+        let crosses: [glam::Vec3; Combinations as usize] = [
             self.plane_cross(Left, Right),
             self.plane_cross(Left, Bottom),
             self.plane_cross(Left, Top),
@@ -98,14 +96,14 @@ impl FrustumCulling {
     }
 
     #[inline]
-    fn plane_cross(&self, a: Plane, b: Plane) -> Vector3D {
+    fn plane_cross(&self, a: Plane, b: Plane) -> glam::Vec3 {
         self[a].truncate().cross(self[b].truncate())
     }
 
     #[inline]
-    fn intersection(&self, a: Plane, b: Plane, c: Plane, crosses: &[Vector3D]) -> Vector3D {
+    fn intersection(&self, a: Plane, b: Plane, c: Plane, crosses: &[glam::Vec3]) -> glam::Vec3 {
         let d = self[a].truncate().dot(crosses[b.k(c)]);
-        let res = Transform2D::from_cols(crosses[b.k(c)], -crosses[a.k(c)], crosses[a.k(b)]) * Vector3D::new(self[a].w, self[b].w, self[c].w);
+        let res = glam::Mat3::from_cols(crosses[b.k(c)], -crosses[a.k(c)], crosses[a.k(b)]) * glam::Vec3::new(self[a].w, self[b].w, self[c].w);
 
         res * (-1.0 / d)
     }
@@ -113,17 +111,17 @@ impl FrustumCulling {
 
 impl Frustum for FrustumCulling {
     #[inline]
-    fn is_box_visible(&self, minp: Point3D, maxp: Point3D) -> bool {
+    fn is_box_visible(&self, minp: glam::Vec3, maxp: glam::Vec3) -> bool {
         // check box outside/inside of frustum
         for i in 0..(Plane::Count as usize) {
-            if (self.planes[i].dot(Vector4D::new(minp.x, minp.y, minp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(maxp.x, minp.y, minp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(minp.x, maxp.y, minp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(maxp.x, maxp.y, minp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(minp.x, minp.y, maxp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(maxp.x, minp.y, maxp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(minp.x, maxp.y, maxp.z, 1.0)) < 0.0)
-                && (self.planes[i].dot(Vector4D::new(maxp.x, maxp.y, maxp.z, 1.0)) < 0.0)
+            if (self.planes[i].dot(glam::Vec4::new(minp.x, minp.y, minp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(maxp.x, minp.y, minp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(minp.x, maxp.y, minp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(maxp.x, maxp.y, minp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(minp.x, minp.y, maxp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(maxp.x, minp.y, maxp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(minp.x, maxp.y, maxp.z, 1.0)) < 0.0)
+                && (self.planes[i].dot(glam::Vec4::new(maxp.x, maxp.y, maxp.z, 1.0)) < 0.0)
             {
                 return false;
             }

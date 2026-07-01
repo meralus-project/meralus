@@ -1,5 +1,4 @@
 use mavelin_physics::{Aabb, AabbSource};
-use mavelin_shared::{IPoint3D, Point3D};
 use mavelin_storage::ResourceStorage;
 use mavelin_world::{ChunkAccess, ChunkCache, ChunkManager};
 
@@ -12,7 +11,7 @@ pub struct AabbProvider<'a, C: ChunkCache> {
 }
 
 impl<C: ChunkCache> AabbSource for AabbProvider<'_, C> {
-    fn get_aabb(&self, position: Point3D) -> Option<Aabb> {
+    fn get_aabb(&self, position: glam::Vec3) -> Option<Aabb> {
         let correct_position = position.floor();
 
         for (_, entity) in self.entity_manager {
@@ -54,7 +53,7 @@ impl<C: ChunkCache> AabbSource for AabbProvider<'_, C> {
         None
     }
 
-    fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
+    fn get_block_aabb(&self, position: glam::IVec3) -> Option<Aabb> {
         self.chunk_manager
             .get_block(position)
             .filter(|&b| !b.is_air() && self.storage.blocks.get_unchecked(b.id).selectable())
@@ -69,7 +68,7 @@ pub struct LimitedAabbProvider<'a, C: ChunkCache> {
 }
 
 impl<C: ChunkCache> AabbSource for LimitedAabbProvider<'_, C> {
-    fn get_aabb(&self, position: Point3D) -> Option<Aabb> {
+    fn get_aabb(&self, position: glam::Vec3) -> Option<Aabb> {
         let correct_position = position.floor();
 
         if let Some(block) = self.chunk_manager.get_block(correct_position.as_ivec3())
@@ -94,7 +93,7 @@ impl<C: ChunkCache> AabbSource for LimitedAabbProvider<'_, C> {
         None
     }
 
-    fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
+    fn get_block_aabb(&self, position: glam::IVec3) -> Option<Aabb> {
         self.chunk_manager
             .get_block(position)
             .filter(|&b| !b.is_air() && self.storage.blocks.get_unchecked(b.id).selectable())

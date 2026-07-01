@@ -1,24 +1,24 @@
-use crate::{Box2D, Point2D, Size2D};
+use crate::Box2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
-    pub origin: Point2D,
-    pub size: Size2D,
+    pub origin: glam::Vec2,
+    pub size: glam::Vec2,
 }
 
 impl Rect {
-    pub const ZERO: Self = Self::new(Point2D::ZERO, Size2D::ZERO);
+    pub const ZERO: Self = Self::new(glam::Vec2::ZERO, glam::Vec2::ZERO);
 
-    pub const fn new(origin: Point2D, size: Size2D) -> Self {
+    pub const fn new(origin: glam::Vec2, size: glam::Vec2) -> Self {
         Self { origin, size }
     }
 
-    pub fn center(&self) -> Point2D {
+    pub fn center(&self) -> glam::Vec2 {
         self.origin + self.size / 2.0
     }
 
-    pub fn to_box2d(self) -> Box2D {
-        Box2D {
+    pub fn to_box2(self) -> Box2 {
+        Box2 {
             min: self.origin,
             max: self.origin + self.size,
         }

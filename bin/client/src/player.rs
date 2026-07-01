@@ -3,7 +3,7 @@ use std::f32;
 use ahash::HashMap;
 use mavelin_engine::KeyCode;
 use mavelin_physics::{Aabb, PhysicsBody};
-use mavelin_shared::{DSize3D, Lerp, Point3D, Vector2D};
+use mavelin_shared::Lerp;
 
 use crate::{Camera, get_movement_direction, get_rotation_directions, input::Input};
 
@@ -136,7 +136,7 @@ pub struct Player {
     // END PHYSICS
     // CAMERA BOBBING START
     pub bob_time: f32,
-    pub bob_offset: Point3D,
+    pub bob_offset: glam::Vec3,
 
     pub dash_time: f32,
     // INVENTORY
@@ -148,9 +148,9 @@ impl Default for Player {
         Self {
             yaw: 0.0,
             pitch: 0.0,
-            body: PhysicsBody::new(Point3D::Y, Self::PLAYER_SIZE.as_vec3()),
+            body: PhysicsBody::new(glam::Vec3::Y, Self::PLAYER_SIZE.as_vec3()),
             bob_time: 0.0,
-            bob_offset: Point3D::ZERO,
+            bob_offset: glam::Vec3::ZERO,
             dash_time: 0.0,
             inventory: Inventory::default(),
         }
@@ -160,16 +160,20 @@ impl Default for Player {
 #[allow(dead_code)]
 impl Player {
     pub const AFFECTED_BY_PHYSICS: bool = true;
-    pub const CAMERA_OFFSET: Point3D = if Self::IS_THIRD_PERSON { Point3D::new(-2.0, 0.5, 0.0) } else { Point3D::ZERO };
+    pub const CAMERA_OFFSET: glam::Vec3 = if Self::IS_THIRD_PERSON {
+        glam::Vec3::new(-2.0, 0.5, 0.0)
+    } else {
+        glam::Vec3::ZERO
+    };
     pub const IS_THIRD_PERSON: bool = false;
     pub const LOOK_SPEED: f32 = 0.1;
     pub const MOUSE_SENSE: f32 = 0.05;
     pub const MOVE_SPEED: f32 = 4.0;
-    pub const PLAYER_HALF_SIZE: DSize3D = DSize3D::new(0.35 / 2.0, 1.625 / 2.0, 0.35 / 2.0);
-    pub const PLAYER_SIZE: DSize3D = DSize3D::new(0.35, 1.625, 0.35);
+    pub const PLAYER_HALF_SIZE: glam::DVec3 = glam::DVec3::new(0.35 / 2.0, 1.625 / 2.0, 0.35 / 2.0);
+    pub const PLAYER_SIZE: glam::DVec3 = glam::DVec3::new(0.35, 1.625, 0.35);
 
     #[inline]
-    pub fn calc_player_aabb(position: Point3D) -> Aabb {
+    pub fn calc_player_aabb(position: glam::Vec3) -> Aabb {
         let position = position.as_dvec3();
 
         Aabb::new(position - Self::PLAYER_HALF_SIZE, position + Self::PLAYER_HALF_SIZE)
@@ -181,12 +185,12 @@ impl Player {
     }
 
     #[inline]
-    pub fn camera_position(&self) -> Point3D {
-        self.body.position + Point3D::Y * (Self::PLAYER_HALF_SIZE.y as f32) + self.bob_offset + Self::CAMERA_OFFSET
+    pub fn camera_position(&self) -> glam::Vec3 {
+        self.body.position + glam::Vec3::Y * (Self::PLAYER_HALF_SIZE.y as f32) + self.bob_offset + Self::CAMERA_OFFSET
     }
 
     #[inline]
-    pub fn handle_mouse(&mut self, delta: Vector2D) -> (f32, f32) {
+    pub fn handle_mouse(&mut self, delta: glam::Vec2) -> (f32, f32) {
         self.yaw = (delta.x * Self::MOUSE_SENSE).mul_add(Self::LOOK_SPEED, self.yaw);
         self.pitch = (delta.y * Self::MOUSE_SENSE).mul_add(-Self::LOOK_SPEED, self.pitch);
         self.pitch = self.pitch.clamp(-1.5, 1.5);
@@ -231,7 +235,7 @@ impl Player {
 
         if (self.body.velocity.x == 0.0 && self.body.velocity.z == 0.0) || !self.body.is_on_ground || self.dash_time > 0.0 {
             self.bob_time = 0.0;
-            self.bob_offset = self.bob_offset.lerp(Point3D::ZERO, (delta * 16.0).min(1.0));
+            self.bob_offset = self.bob_offset.lerp(glam::Vec3::ZERO, (delta * 16.0).min(1.0));
         } else {
             let mut amp = BOB_AMP;
             let mut freq = BOB_FREQ;
@@ -242,7 +246,7 @@ impl Player {
             }
 
             self.bob_time = BOB_SPEED.mul_add(delta, self.bob_time);
-            self.bob_offset = Point3D::new(amp * (self.bob_time * freq).sin(), amp * (self.bob_time * freq * 2.0).sin(), 0.0);
+            self.bob_offset = glam::Vec3::new(amp * (self.bob_time * freq).sin(), amp * (self.bob_time * freq * 2.0).sin(), 0.0);
         }
 
         let direction = get_movement_direction(input);

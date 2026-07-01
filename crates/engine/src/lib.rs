@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use mavelin_shared::{InspectMut, Point2D, USize2D, Vector2D};
+use mavelin_shared::InspectMut;
 use winit::{
     application::ApplicationHandler,
     error::EventLoopError,
@@ -104,10 +104,10 @@ impl WindowContext<'_> {
         }
     }
 
-    pub fn window_size(&self) -> USize2D {
+    pub fn window_size(&self) -> glam::UVec2 {
         let size = self.window.surface_size();
 
-        USize2D::new(size.width, size.height)
+        glam::UVec2::new(size.width, size.height)
     }
 
     pub fn window_scale_factor(&self) -> f64 {
@@ -141,11 +141,11 @@ pub trait State {
 
     fn new(context: WindowContext, args: Self::Args) -> Self;
 
-    fn handle_window_resize(&mut self, context: WindowContext, size: USize2D, scale_factor: f64) {}
+    fn handle_window_resize(&mut self, context: WindowContext, size: glam::UVec2, scale_factor: f64) {}
     fn handle_keyboard_modifiers(&mut self, modifiers: KeyboardModifiers) {}
     fn handle_keyboard_input(&mut self, key: KeyCode, is_pressed: bool, repeat: bool) {}
-    fn handle_mouse_motion(&mut self, delta: Option<Vector2D>, position: Option<Point2D>) {}
-    fn handle_mouse_wheel(&mut self, delta: Vector2D) {}
+    fn handle_mouse_motion(&mut self, delta: Option<glam::Vec2>, position: Option<glam::Vec2>) {}
+    fn handle_mouse_wheel(&mut self, delta: glam::Vec2) {}
     fn handle_mouse_button(&mut self, button: MouseButton, is_pressed: bool) {}
 
     fn update(&mut self, context: WindowContext, delta: Duration) {}
@@ -337,7 +337,7 @@ impl<T: State> ApplicationHandler for Application<T> {
                         depth_texture: &window.depth_texture,
                         adapter: &window.adapter,
                     },
-                    USize2D::new(physical_size.width, physical_size.height),
+                    glam::UVec2::new(physical_size.width, physical_size.height),
                     window.window.scale_factor(),
                 );
             }),
@@ -370,8 +370,8 @@ impl<T: State> ApplicationHandler for Application<T> {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let delta = match delta {
-                    MouseScrollDelta::LineDelta(x, y) => Vector2D::new(x, y),
-                    MouseScrollDelta::PixelDelta(delta) => Vector2D::new(delta.x as f32, delta.y as f32),
+                    MouseScrollDelta::LineDelta(x, y) => glam::Vec2::new(x, y),
+                    MouseScrollDelta::PixelDelta(delta) => glam::Vec2::new(delta.x as f32, delta.y as f32),
                 };
 
                 self.window.inspect_mut(|window| {
@@ -380,7 +380,9 @@ impl<T: State> ApplicationHandler for Application<T> {
             }
             WindowEvent::PointerMoved { position, .. } => {
                 self.window.inspect_mut(|window| {
-                    window.state.handle_mouse_motion(None, Some(Point2D::new(position.x as f32, position.y as f32)));
+                    window
+                        .state
+                        .handle_mouse_motion(None, Some(glam::Vec2::new(position.x as f32, position.y as f32)));
                 });
             }
             WindowEvent::PointerButton {
@@ -459,7 +461,7 @@ impl<T: State> ApplicationHandler for Application<T> {
     fn device_event(&mut self, _: &dyn ActiveEventLoop, _: Option<DeviceId>, event: DeviceEvent) {
         if let DeviceEvent::PointerMotion { delta } = event {
             self.window.inspect_mut(|window| {
-                window.state.handle_mouse_motion(Some(Vector2D::new(delta.0 as f32, delta.1 as f32)), None);
+                window.state.handle_mouse_motion(Some(glam::Vec2::new(delta.0 as f32, delta.1 as f32)), None);
             });
         }
     }

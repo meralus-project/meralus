@@ -1,6 +1,5 @@
 use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
-use glam::{UVec2, Vec2};
 use image::{GenericImage, Rgba, RgbaImage};
 
 #[allow(clippy::cast_possible_truncation)]
@@ -46,8 +45,8 @@ const fn pack_rgba((r, g, b, a): (u8, u8, u8, u8)) -> u32 {
 }
 
 pub struct TextureViewAtlas<K: Hash + Eq> {
-    texture_map: HashMap<K, (UVec2, UVec2, u8)>,
-    next_texture_offset: UVec2,
+    texture_map: HashMap<K, (glam::UVec2, glam::UVec2, u8)>,
+    next_texture_offset: glam::UVec2,
     spacing: u32,
     size: u32,
 }
@@ -56,7 +55,7 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
     pub fn new(size: u32) -> Self {
         Self {
             texture_map: HashMap::new(),
-            next_texture_offset: UVec2::ZERO,
+            next_texture_offset: glam::UVec2::ZERO,
             spacing: 0,
             size,
         }
@@ -69,18 +68,18 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
         self
     }
 
-    pub fn size(&self) -> Vec2 {
-        UVec2::splat(self.size).as_vec2()
+    pub fn size(&self) -> glam::Vec2 {
+        glam::UVec2::splat(self.size).as_vec2()
     }
 
-    pub fn get_texture_rect<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(UVec2, UVec2, u8)>
+    pub fn get_texture_rect<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(glam::UVec2, glam::UVec2, u8)>
     where
         K: Borrow<Q>,
     {
         self.texture_map.get(key).copied()
     }
 
-    pub fn get_texture_uv<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(Vec2, Vec2, u8)>
+    pub fn get_texture_uv<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(glam::Vec2, glam::Vec2, u8)>
     where
         K: Borrow<Q>,
     {
@@ -101,7 +100,7 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
         self.texture_map.contains_key(key)
     }
 
-    pub fn step_next(&mut self, size: UVec2) {
+    pub fn step_next(&mut self, size: glam::UVec2) {
         self.next_texture_offset = self.next_texture_offset.with_x(self.next_texture_offset.x + size.x + self.spacing);
     }
 
@@ -109,13 +108,13 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
     ///
     /// Returns an error if the image is too large to be copied at the given
     /// position.
-    pub fn special_append(&mut self, key: K, image: &RgbaImage) -> UVec2 {
+    pub fn special_append(&mut self, key: K, image: &RgbaImage) -> glam::UVec2 {
         if let Some((_, size, _)) = self.get_texture_rect(&key) {
             return size;
         }
 
         let alpha = image.pixels().map(|pixel| pixel.0[3]).min().unwrap_or(0);
-        let size = UVec2::from(image.dimensions());
+        let size = glam::UVec2::from(image.dimensions());
         let offset = (self.next_texture_offset, size);
 
         self.texture_map.insert(key, (offset.0, offset.1, alpha));
@@ -128,13 +127,13 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
     ///
     /// Returns an error if the image is too large to be copied at the given
     /// position.
-    pub fn append(&mut self, key: K, image: &RgbaImage) -> (Vec2, Vec2, u8) {
+    pub fn append(&mut self, key: K, image: &RgbaImage) -> (glam::Vec2, glam::Vec2, u8) {
         if let Some(rect) = self.get_texture_uv(&key) {
             return rect;
         }
 
         let alpha = image.pixels().map(|pixel| pixel.0[3]).min().unwrap_or(0);
-        let offset = (self.next_texture_offset, UVec2::from(image.dimensions()));
+        let offset = (self.next_texture_offset, glam::UVec2::from(image.dimensions()));
 
         self.texture_map.insert(key, (offset.0, offset.1, alpha));
         self.step_next(image.dimensions().into());
@@ -146,8 +145,8 @@ impl<K: Hash + Eq> TextureViewAtlas<K> {
 }
 
 pub struct TextureAtlas<K: Hash + Eq> {
-    texture_map: HashMap<K, (UVec2, UVec2, u8)>,
-    next_texture_offset: UVec2,
+    texture_map: HashMap<K, (glam::UVec2, glam::UVec2, u8)>,
+    next_texture_offset: glam::UVec2,
     spacing: u32,
     mipmaps: Vec<RgbaImage>,
 }
@@ -156,7 +155,7 @@ impl<K: Hash + Eq> TextureAtlas<K> {
     pub fn new(size: u32) -> Self {
         Self {
             texture_map: HashMap::new(),
-            next_texture_offset: UVec2::ZERO,
+            next_texture_offset: glam::UVec2::ZERO,
             spacing: 0,
             mipmaps: vec![RgbaImage::new(size, size)],
         }
@@ -190,18 +189,18 @@ impl<K: Hash + Eq> TextureAtlas<K> {
         &mut self.mipmaps[0]
     }
 
-    pub fn size(&self) -> Vec2 {
-        UVec2::from(self.main_texture().dimensions()).as_vec2()
+    pub fn size(&self) -> glam::Vec2 {
+        glam::UVec2::from(self.main_texture().dimensions()).as_vec2()
     }
 
-    pub fn get_texture_rect<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(UVec2, UVec2, u8)>
+    pub fn get_texture_rect<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(glam::UVec2, glam::UVec2, u8)>
     where
         K: Borrow<Q>,
     {
         self.texture_map.get(key).copied()
     }
 
-    pub fn get_texture_uv<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(Vec2, Vec2, u8)>
+    pub fn get_texture_uv<Q: ?Sized + Hash + Eq>(&self, key: &Q) -> Option<(glam::Vec2, glam::Vec2, u8)>
     where
         K: Borrow<Q>,
     {
@@ -256,7 +255,7 @@ impl<K: Hash + Eq> TextureAtlas<K> {
         self.texture_map.contains_key(key)
     }
 
-    pub fn step_next(&mut self, size: UVec2) {
+    pub fn step_next(&mut self, size: glam::UVec2) {
         self.next_texture_offset = self.next_texture_offset.with_x(self.next_texture_offset.x + size.x + self.spacing);
     }
 
@@ -264,13 +263,13 @@ impl<K: Hash + Eq> TextureAtlas<K> {
     ///
     /// Returns an error if the image is too large to be copied at the given
     /// position.
-    pub fn special_append(&mut self, key: K, image: &RgbaImage) -> UVec2 {
+    pub fn special_append(&mut self, key: K, image: &RgbaImage) -> glam::UVec2 {
         if let Some((_, size, _)) = self.get_texture_rect(&key) {
             return size;
         }
 
         let alpha = image.pixels().map(|pixel| pixel.0[3]).min().unwrap_or(0);
-        let size = UVec2::from(image.dimensions());
+        let size = glam::UVec2::from(image.dimensions());
         let offset = (self.next_texture_offset, size);
 
         let main_image = self.main_level_mut();
@@ -292,13 +291,13 @@ impl<K: Hash + Eq> TextureAtlas<K> {
     ///
     /// Returns an error if the image is too large to be copied at the given
     /// position.
-    pub fn append(&mut self, key: K, image: &RgbaImage) -> (Vec2, Vec2, u8) {
+    pub fn append(&mut self, key: K, image: &RgbaImage) -> (glam::Vec2, glam::Vec2, u8) {
         if let Some(rect) = self.get_texture_uv(&key) {
             return rect;
         }
 
         let alpha = image.pixels().map(|pixel| pixel.0[3]).min().unwrap_or(0);
-        let offset = (self.next_texture_offset, UVec2::from(image.dimensions()));
+        let offset = (self.next_texture_offset, glam::UVec2::from(image.dimensions()));
 
         let main_image = self.main_level_mut();
         let mut sub_image = main_image.sub_image(offset.0.x, 0, offset.1.x, offset.1.y);

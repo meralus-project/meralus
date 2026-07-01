@@ -8,6 +8,7 @@ ahash.workspace = true
 lasso.workspace = true
 mavelin-shared = { workspace = true, features = ["face"] }
 serde = { workspace = true, optional = true }
+glam.workspace = true
 
 [features]
 default = []

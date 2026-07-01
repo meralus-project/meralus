@@ -1,5 +1,5 @@
 [workspace]
-members = ["bin/*", "crates/*", "support-crates/*"]
+members = ["bin/*", "crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -14,8 +14,8 @@ mavelin-storage = { path = "./crates/storage" }
 mavelin-world = { path = "./crates/world" }
 mavelin-worldgen = { path = "./crates/worldgen" }
 meck = { path = "./crates/meck" }
-horns = { path = "./support-crates/horns" }
 
+glam = { version = "0.33.1", features = ["bytemuck"] }
 ahash = "0.8.12"
 image = { version = "0.25.9", default-features = false }
 tokio = "1.50.0"

@@ -1,4 +1,4 @@
-use mavelin_shared::{Color, Point2D, Rect, Size2D, Thickness, Vector2D};
+use mavelin_shared::{Color, Rect, Thickness};
 
 use crate::render::common::CommonRenderer;
 
@@ -8,7 +8,7 @@ pub trait ArrangeStrategy {
 
 pub trait MeasureStrategy {
     #[must_use = "size must be used"]
-    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> Size2D;
+    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> glam::Vec2;
 }
 
 pub struct RowStrategy {
@@ -17,7 +17,7 @@ pub struct RowStrategy {
 
 impl ArrangeStrategy for RowStrategy {
     fn arrange(&mut self, context: &mut UiContext, widget: WidgetId) {
-        let mut offset = Point2D::ZERO;
+        let mut offset = glam::Vec2::ZERO;
 
         for w in widget.into_iter(context.all_children(widget)) {
             if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -25,15 +25,15 @@ impl ArrangeStrategy for RowStrategy {
 
                 context.translate(w, offset);
 
-                offset += Vector2D::new(item_size.x + self.spacing, 0.0);
+                offset += glam::Vec2::new(item_size.x + self.spacing, 0.0);
             }
         }
     }
 }
 
 impl MeasureStrategy for RowStrategy {
-    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> Size2D {
-        let mut size = Size2D::ZERO;
+    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> glam::Vec2 {
+        let mut size = glam::Vec2::ZERO;
 
         for w in widget.into_iter(context.all_children(widget)) {
             if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -68,7 +68,7 @@ pub struct ColumnStrategy {
 
 impl ArrangeStrategy for ColumnStrategy {
     fn arrange(&mut self, context: &mut UiContext, widget: WidgetId) {
-        let mut offset = Point2D::ZERO;
+        let mut offset = glam::Vec2::ZERO;
 
         for w in widget.into_iter(context.all_children(widget)) {
             if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -76,12 +76,12 @@ impl ArrangeStrategy for ColumnStrategy {
 
                 context.translate(w, offset);
 
-                offset += Vector2D::new(0.0, item_size.y + self.spacing);
+                offset += glam::Vec2::new(0.0, item_size.y + self.spacing);
             }
         }
 
         if matches!(self.v_arrangement, Arrangement::End) {
-            let offset = Point2D::Y * (context.layout_node(widget).size.y - offset.y);
+            let offset = glam::Vec2::Y * (context.layout_node(widget).size.y - offset.y);
 
             for w in widget.into_iter(context.all_children(widget)) {
                 if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -92,7 +92,7 @@ impl ArrangeStrategy for ColumnStrategy {
 
         match self.h_arrangement {
             Arrangement::End => {
-                let offset = Point2D::X * (context.layout_node(widget).size.x - offset.x);
+                let offset = glam::Vec2::X * (context.layout_node(widget).size.x - offset.x);
 
                 for w in widget.into_iter(context.all_children(widget)) {
                     if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -124,8 +124,8 @@ impl ArrangeStrategy for ColumnStrategy {
 }
 
 impl MeasureStrategy for ColumnStrategy {
-    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> Size2D {
-        let mut size = Size2D::ZERO;
+    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> glam::Vec2 {
+        let mut size = glam::Vec2::ZERO;
 
         for w in widget.into_iter(context.all_children(widget)) {
             if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
@@ -151,8 +151,8 @@ impl ArrangeStrategy for NoopStrategy {
 }
 
 impl MeasureStrategy for NoopStrategy {
-    fn measure(&mut self, _: &mut UiContext, _: WidgetId) -> Size2D {
-        Size2D::ZERO
+    fn measure(&mut self, _: &mut UiContext, _: WidgetId) -> glam::Vec2 {
+        glam::Vec2::ZERO
     }
 }
 
@@ -160,7 +160,7 @@ impl MeasureStrategy for NoopStrategy {
 pub struct FillStrategy;
 
 impl MeasureStrategy for FillStrategy {
-    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> Size2D {
+    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> glam::Vec2 {
         context.layout_node(context.parent(widget)).size
     }
 }
@@ -168,7 +168,7 @@ impl MeasureStrategy for FillStrategy {
 pub struct SingleChildStrategy;
 
 impl MeasureStrategy for SingleChildStrategy {
-    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> Size2D {
+    fn measure(&mut self, context: &mut UiContext, widget: WidgetId) -> glam::Vec2 {
         context.layout_node(WidgetId(widget.0 + 1)).size
     }
 }
@@ -183,7 +183,7 @@ impl ArrangeStrategy for CenterStrategy {
             if context.parent(w) == widget && !context.widgets[w.0].abs_pos {
                 let child = context.layout_node(w);
 
-                context.translate(w, ((root.size - child.size) / 2.0).max(Point2D::ZERO));
+                context.translate(w, ((root.size - child.size) / 2.0).max(glam::Vec2::ZERO));
             }
         }
     }
@@ -243,7 +243,7 @@ pub struct UiContext {
     widgets: Vec<WidgetData>,
 }
 
-fn rect_contains(rect: &Rect, point: Point2D) -> bool {
+fn rect_contains(rect: &Rect, point: glam::Vec2) -> bool {
     point.x > rect.origin.x && point.x < (rect.origin.x + rect.size.x) && point.y > rect.origin.y && point.y < (rect.origin.y + rect.size.y)
 }
 
@@ -275,7 +275,7 @@ impl UiContext {
         }
     }
 
-    pub fn process_mouse_move(&mut self, position: Point2D) {
+    pub fn process_mouse_move(&mut self, position: glam::Vec2) {
         for w in &mut self.widgets {
             if rect_contains(&w.layout_node, position) {
                 if w.state.pointer_inside {
@@ -294,7 +294,7 @@ impl UiContext {
         }
     }
 
-    pub fn translate(&mut self, widget: WidgetId, offset: Point2D) {
+    pub fn translate(&mut self, widget: WidgetId, offset: glam::Vec2) {
         self.widgets[widget.0].layout_node.origin += offset;
 
         for w in widget.into_iter(self.all_children(widget)) {
@@ -304,12 +304,12 @@ impl UiContext {
         }
     }
 
-    pub fn set_origin(&mut self, widget: WidgetId, origin: Point2D) {
+    pub fn set_origin(&mut self, widget: WidgetId, origin: glam::Vec2) {
         self.widgets[widget.0].abs_pos = true;
         self.translate(widget, origin);
     }
 
-    pub fn set_size(&mut self, widget: WidgetId, size: Size2D) {
+    pub fn set_size(&mut self, widget: WidgetId, size: glam::Vec2) {
         self.widgets[widget.0].layout_node.size = size;
     }
 
@@ -347,7 +347,7 @@ impl UiContext {
         }
     }
 
-    pub fn try_allocate_widget(&mut self, parent: WidgetId, id: WidgetId, shape: Shape, size: Size2D) {
+    pub fn try_allocate_widget(&mut self, parent: WidgetId, id: WidgetId, shape: Shape, size: glam::Vec2) {
         let widgets = self.widgets.len();
 
         self.widgets[parent.0].children += 1;
@@ -356,7 +356,7 @@ impl UiContext {
         if widgets < (id.0 + 1) {
             self.widgets.push(WidgetData {
                 parent,
-                layout_node: Rect::new(Point2D::ZERO, size),
+                layout_node: Rect::new(glam::Vec2::ZERO, size),
                 abs_pos: false,
                 children: 0,
                 shape,
@@ -364,15 +364,15 @@ impl UiContext {
             });
         } else {
             self.widgets[id.0].parent = parent;
-            self.widgets[id.0].layout_node = Rect::new(Point2D::ZERO, size);
+            self.widgets[id.0].layout_node = Rect::new(glam::Vec2::ZERO, size);
             self.widgets[id.0].abs_pos = false;
             self.widgets[id.0].children = 0;
             self.widgets[id.0].shape = shape;
         }
     }
 
-    pub fn root<'a>(&'a mut self, renderer: &'a CommonRenderer, size: Size2D) -> UiSubcontext<'a, RowStrategy, RowStrategy> {
-        self.widgets[0].layout_node = Rect::new(Point2D::ZERO, size);
+    pub fn root<'a>(&'a mut self, renderer: &'a CommonRenderer, size: glam::Vec2) -> UiSubcontext<'a, RowStrategy, RowStrategy> {
+        self.widgets[0].layout_node = Rect::new(glam::Vec2::ZERO, size);
         self.widgets[0].children = 0;
         self.widgets[0].abs_pos = false;
         self.widgets[0].shape = Shape::Noop;
@@ -398,7 +398,7 @@ pub struct UiSubcontext<'a, A: ArrangeStrategy, M: MeasureStrategy> {
     pub context: &'a mut UiContext,
     arrange_strategy: A,
     measure_strategy: M,
-    explicit_pos: Option<Point2D>,
+    explicit_pos: Option<glam::Vec2>,
     explicit_width: Option<f32>,
     explicit_height: Option<f32>,
 }
@@ -436,7 +436,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
     }
 
     pub const fn abs_pos(&mut self, x: f32, y: f32) {
-        self.explicit_pos.replace(Point2D::new(x, y));
+        self.explicit_pos.replace(glam::Vec2::new(x, y));
     }
 
     pub fn set_width(&mut self, width: f32) {
@@ -449,7 +449,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.context.layout_node_mut(self.id).size.y = height;
     }
 
-    pub fn parent_size(&self) -> Size2D {
+    pub fn parent_size(&self) -> glam::Vec2 {
         let parent = self.context.parent(self.id);
 
         self.context.layout_node(parent).size
@@ -476,10 +476,10 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
     }
 
     pub fn child(&mut self, shape: Shape) -> WidgetId {
-        self.sized_child(Size2D::ZERO, shape)
+        self.sized_child(glam::Vec2::ZERO, shape)
     }
 
-    pub fn sized_child(&mut self, size: Size2D, shape: Shape) -> WidgetId {
+    pub fn sized_child(&mut self, size: glam::Vec2, shape: Shape) -> WidgetId {
         let id = self.next_child();
 
         self.context.try_allocate_widget(self.id, id, shape, size);
@@ -507,7 +507,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.arrange_strategy.arrange(self.context, self.id);
     }
 
-    pub fn add_space(&mut self, space: Size2D) {
+    pub fn add_space(&mut self, space: glam::Vec2) {
         self.sized_child(space, Shape::Noop);
     }
 
@@ -578,7 +578,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
         self.scope(NoopStrategy, SingleChildStrategy, ui)
     }
 
-    pub fn rect(&mut self, size: Size2D, color: Color) {
+    pub fn rect(&mut self, size: glam::Vec2, color: Color) {
         self.sized_child(size, Shape::Rect(color));
     }
 
@@ -590,7 +590,7 @@ impl<A: ArrangeStrategy, M: MeasureStrategy> UiSubcontext<'_, A, M> {
     }
 
     #[allow(dead_code)]
-    pub fn rrect(&mut self, size: Size2D, rounding: Thickness, color: Color) {
+    pub fn rrect(&mut self, size: glam::Vec2, rounding: Thickness, color: Color) {
         self.sized_child(size, Shape::RRect(rounding, color));
     }
 }

@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, time::Duration};
 
-use mavelin_shared::IPoint3D;
 use mavelin_storage::ResourceStorage;
 use mavelin_world::{Chunk, ChunkAccess};
 
@@ -57,9 +56,9 @@ impl LightStyle {
     fn smooth_light<T: ChunkAccess>(
         chunks: &T,
         resource_storage: &ResourceStorage,
-        world_position: IPoint3D,
-        light_source: IPoint3D,
-        corners: [[IPoint3D; 3]; 4],
+        world_position: glam::IVec3,
+        light_source: glam::IVec3,
+        corners: [[glam::IVec3; 3]; 4],
         have_ao: bool,
     ) -> ([f32; 4], [u8; 4]) {
         let mut aos = [1.0; 4];
@@ -68,9 +67,9 @@ impl LightStyle {
 
         for (([side1, side2, corner], ao), light) in corners.into_iter().zip(&mut aos).zip(&mut lights) {
             if have_ao {
-                let side1_block: IPoint3D = world_position + side1;
-                let side2_block: IPoint3D = world_position + side2;
-                let corner_block: IPoint3D = world_position + corner;
+                let side1_block: glam::IVec3 = world_position + side1;
+                let side2_block: glam::IVec3 = world_position + side2;
+                let corner_block: glam::IVec3 = world_position + corner;
 
                 let (side1_block, side1_light) = chunks.get_block_with_light_level(side1_block);
                 let (side2_block, side2_light) = chunks.get_block_with_light_level(side2_block);
@@ -107,9 +106,9 @@ impl LightStyle {
     fn blocky_with_ao<T: ChunkAccess>(
         chunks: &T,
         resource_storage: &ResourceStorage,
-        world_position: IPoint3D,
-        light_source: IPoint3D,
-        corners: [[IPoint3D; 3]; 4],
+        world_position: glam::IVec3,
+        light_source: glam::IVec3,
+        corners: [[glam::IVec3; 3]; 4],
         have_ao: bool,
     ) -> ([f32; 4], [u8; 4]) {
         let mut aos: [f32; 4] = [1.0; 4];
@@ -129,7 +128,14 @@ impl LightStyle {
     }
 
     #[inline]
-    fn blocky<T: ChunkAccess>(chunks: &T, _: &ResourceStorage, _: IPoint3D, light_source: IPoint3D, _: [[IPoint3D; 3]; 4], _: bool) -> ([f32; 4], [u8; 4]) {
+    fn blocky<T: ChunkAccess>(
+        chunks: &T,
+        _: &ResourceStorage,
+        _: glam::IVec3,
+        light_source: glam::IVec3,
+        _: [[glam::IVec3; 3]; 4],
+        _: bool,
+    ) -> ([f32; 4], [u8; 4]) {
         let light = chunks.get_light_level(light_source);
 
         ([0.0; 4], [light; 4])
@@ -137,7 +143,7 @@ impl LightStyle {
 
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub const fn get_light_fn<T: ChunkAccess>(self) -> fn(&T, &ResourceStorage, IPoint3D, IPoint3D, [[IPoint3D; 3]; 4], bool) -> ([f32; 4], [u8; 4]) {
+    pub const fn get_light_fn<T: ChunkAccess>(self) -> fn(&T, &ResourceStorage, glam::IVec3, glam::IVec3, [[glam::IVec3; 3]; 4], bool) -> ([f32; 4], [u8; 4]) {
         match self {
             Self::Smooth => Self::smooth_light::<T>,
             Self::BlockyWithAO => Self::blocky_with_ao::<T>,

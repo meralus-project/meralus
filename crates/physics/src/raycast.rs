@@ -1,19 +1,19 @@
 use std::cmp::Ordering;
 
-use mavelin_shared::{DPoint3D, DVector3D, Face, IPoint3D};
+use mavelin_shared::Face;
 
 use crate::{Aabb, AabbSource, PhysicsContext};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RayCastResult {
-    pub position: IPoint3D,
+    pub position: glam::IVec3,
     pub hit_type: HitType,
     pub hit_side: Face,
-    pub hit_vec: DPoint3D,
+    pub hit_vec: glam::DVec3,
 }
 
 impl RayCastResult {
-    pub const fn new(hit_type: HitType, hit_vec: DPoint3D, hit_side: Face, position: IPoint3D) -> Self {
+    pub const fn new(hit_type: HitType, hit_vec: glam::DVec3, hit_side: Face, position: glam::IVec3) -> Self {
         Self {
             position,
             hit_type,
@@ -22,11 +22,11 @@ impl RayCastResult {
         }
     }
 
-    pub const fn new2(hit_vec: DPoint3D, hit_side: Face) -> Self {
-        Self::new(HitType::Block, hit_vec, hit_side, IPoint3D::ZERO)
+    pub const fn new2(hit_vec: glam::DVec3, hit_side: Face) -> Self {
+        Self::new(HitType::Block, hit_vec, hit_side, glam::IVec3::ZERO)
     }
 
-    pub const fn new3(hit_vec: DPoint3D, hit_side: Face, position: IPoint3D) -> Self {
+    pub const fn new3(hit_vec: glam::DVec3, hit_side: Face, position: glam::IVec3) -> Self {
         Self::new(HitType::Block, hit_vec, hit_side, position)
     }
 
@@ -41,13 +41,13 @@ pub enum HitType {
     Block,
 }
 
-fn raycast_into(position: IPoint3D, start: DPoint3D, end: DPoint3D, aabb: Aabb) -> Option<RayCastResult> {
+fn raycast_into(position: glam::IVec3, start: glam::DVec3, end: glam::DVec3, aabb: Aabb) -> Option<RayCastResult> {
     aabb.calculate_intercept(start - position.as_dvec3(), end - position.as_dvec3())
         .map(|raytraceresult| RayCastResult::new3(raytraceresult.hit_vec + position.as_dvec3(), raytraceresult.hit_side, position))
 }
 
 impl<T: AabbSource> PhysicsContext<T> {
-    pub fn raycast(&self, mut origin: DPoint3D, target: DPoint3D, last_uncollidable_block: bool) -> Option<RayCastResult> {
+    pub fn raycast(&self, mut origin: glam::DVec3, target: glam::DVec3, last_uncollidable_block: bool) -> Option<RayCastResult> {
         if origin.is_nan() || target.is_nan() {
             return None;
         }
@@ -135,25 +135,25 @@ impl<T: AabbSource> PhysicsContext<T> {
             }
 
             let facing_at = if d3 < d4 && d3 < d5 {
-                origin = DPoint3D::new(d0, d7.mul_add(d3, origin.y), d8.mul_add(d3, origin.z));
+                origin = glam::DVec3::new(d0, d7.mul_add(d3, origin.y), d8.mul_add(d3, origin.z));
 
                 if target.x > start_dvec3.x { Face::Left } else { Face::Right }
             } else if d4 < d5 {
-                origin = DPoint3D::new(d6.mul_add(d4, origin.x), d1, d8.mul_add(d4, origin.z));
+                origin = glam::DVec3::new(d6.mul_add(d4, origin.x), d1, d8.mul_add(d4, origin.z));
 
                 if target.y > start_dvec3.y { Face::Bottom } else { Face::Top }
             } else {
-                origin = DPoint3D::new(d6.mul_add(d5, origin.x), d7.mul_add(d5, origin.y), d2);
+                origin = glam::DVec3::new(d6.mul_add(d5, origin.x), d7.mul_add(d5, origin.y), d2);
 
                 if target.z > start_dvec3.z { Face::Front } else { Face::Back }
             };
 
             start_dvec3 = origin.floor()
                 - match facing_at {
-                    Face::Right => DVector3D::X,
-                    Face::Top => DVector3D::Y,
-                    Face::Back => DVector3D::Z,
-                    Face::Bottom | Face::Left | Face::Front => DVector3D::ZERO,
+                    Face::Right => glam::DVec3::X,
+                    Face::Top => glam::DVec3::Y,
+                    Face::Back => glam::DVec3::Z,
+                    Face::Bottom | Face::Left | Face::Front => glam::DVec3::ZERO,
                 };
 
             start = start_dvec3.as_ivec3();
@@ -170,7 +170,7 @@ impl<T: AabbSource> PhysicsContext<T> {
         if last_uncollidable_block { result } else { None }
     }
 
-    fn get_block_aabb(&self, position: IPoint3D) -> Option<Aabb> {
+    fn get_block_aabb(&self, position: glam::IVec3) -> Option<Aabb> {
         self.source.get_block_aabb(position)
     }
 }

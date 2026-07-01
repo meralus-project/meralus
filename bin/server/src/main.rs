@@ -1,7 +1,7 @@
 // use std::{error::Error, sync::Arc, time::Duration};
 
 // use ahash::{HashMap, HashMapExt};
-// use glam::{IVec2, USizeVec3, Vec3};
+// use glam::{glam::IVec2, glam::USizeVec3, glam::Vec3};
 // use mavelin_shared::{IncomingPacket, OutgoingPacket, Player,
 // ServerConnection}; use mavelin_world::{BfsLight, Chunk, ChunkGenerator,
 // ChunkManager, LightNode, SUBCHUNK_SIZE}; use tokio::{
@@ -94,7 +94,7 @@
 //         });
 //     }
 
-//     pub fn load_chunk(&mut self, origin: IVec2) -> &Chunk {
+//     pub fn load_chunk(&mut self, origin: glam::IVec2) -> &Chunk {
 //         let mut chunk = Chunk::new(origin);
 
 //         self.chunk_generator.generate_bare_terrain(&mut chunk);
@@ -103,7 +103,7 @@
 
 //         for z in 0..SUBCHUNK_SIZE {
 //             for x in 0..SUBCHUNK_SIZE {
-//                 let position = USizeVec3::new(x, 255, z);
+//                 let position = glam::USizeVec3::new(x, 255, z);
 
 //                 if chunk.get_block_unchecked(position).is_none() {
 //                     chunk.set_sky_light(position, 15);
@@ -126,7 +126,7 @@
 //         chunk
 //     }
 
-//     pub fn try_load_chunk(&mut self, origin: IVec2) -> &Chunk {
+//     pub fn try_load_chunk(&mut self, origin: glam::IVec2) -> &Chunk {
 //         if self.chunks.contains_chunk(&origin) {
 //             let Some(chunk) = self.chunks.get_chunk(&origin) else {
 // unreachable!() };
@@ -186,8 +186,9 @@
 //                             Some(Ok(packet)) => match packet {
 //                                 IncomingPacket::PlayerConnected(name) => {
 //                                     let player = Player::new(name,
-// Vec3::ZERO);                                     let uuid = player.uuid;
-//                                     let name = player.nickname.clone();
+// glam::Vec3::ZERO);                                     let uuid =
+// player.uuid;                                     let name =
+// player.nickname.clone();
 
 //                                     current_player_uuid.replace(uuid);
 
@@ -242,7 +243,7 @@
 
 //                                                 let mut queue = Vec::new();
 //                                                 let up = block +
-// USizeVec3::Y;
+// glam::USizeVec3::Y;
 
 //                                                 if up.y < 256 &&
 // bfs_light.chunk_manager[chunk].get_sky_light(up) == 15 {
@@ -307,13 +308,13 @@
 // #[cfg(test)]
 // mod tests {
 //     use async_compression::tokio::write::{ZlibDecoder, ZlibEncoder};
-//     use glam::IVec2;
+//     use glam::glam::IVec2;
 //     use mavelin_world::Chunk;
 //     use tokio::io::AsyncWriteExt;
 
 //     #[tokio::test]
 //     async fn test_chunk_compressing() {
-//         let mut chunk = Chunk::new(IVec2::new(0, 0));
+//         let mut chunk = Chunk::new(glam::IVec2::new(0, 0));
 
 //         chunk.generate_surface(0);
 
