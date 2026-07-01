@@ -256,6 +256,7 @@ struct FogUniform {
     enabled: u32,
     _pad: [u32; 3],
 }
+
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 struct VoxelUniform {
@@ -818,7 +819,6 @@ impl ChunkRenderer {
                 let chunk_offset = chunk_origin - pos;
 
                 render_pass.set_immediates(64, bytemuck::bytes_of(&chunk_offset.to_array()));
-
                 render_pass.set_vertex_buffer(0, subchunk.solid.vertices.slice(..));
                 render_pass.set_index_buffer(subchunk.solid.indices.slice(..), wgpu::IndexFormat::Uint32);
                 render_pass.draw_indexed(0..subchunk.solid.count as u32, 0, 0..1);
